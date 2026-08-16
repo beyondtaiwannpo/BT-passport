@@ -2134,6 +2134,23 @@ GitHub repo → Actions → 「ping supabase」→ 最近有沒有綠勾。
 正確做法：Table Editor → `activities` → 那一列的 `active` 改成 `false`。
 它就不會再出現在護照上，但已經蓋過的人資料還在。
 
+## Supabase 的 SQL Editor 有兩個要先知道的限制
+
+第一次貼 SQL 進去的人一定會踩到這兩件事，先講：
+
+**1. 它只顯示「最後一句」的結果。** 一份腳本裡有十句，前面九句的輸出你都看不到。
+所以 `supabase/rls-test.sql` 的最後一句是一個 `select`，把 25 條檢查整理成一張表 ——
+不是因為那樣比較好看，是因為不那樣做你就什麼都看不到。
+
+**2. 它不顯示 `raise notice`。** PostgreSQL 的 `notice` 走的是另一條訊息通道，
+SQL Editor 不會呈現。**不要叫人去找 notice 訊息，那裡永遠是空的。**
+腳本跑完只看到「Success. No rows returned」不代表成功，只代表最後一句沒有回傳資料。
+
+所以判斷 `rls-test.sql` 有沒有過，看的是那張表的第一列 `OVERALL 全部測試`：
+
+- `PASS` → 25 條全過
+- `FAIL` → 往下看，失敗的列會被排在最上面，`expected` 與 `actual` 兩欄會告訴你差在哪
+
 ## 要改資料表結構的話
 
 `supabase/schema.sql` 的檔頭寫著「可以重複執行」，那句話只保證**重跑不會弄壞資料**。
