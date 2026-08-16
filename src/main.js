@@ -56,7 +56,7 @@ function render() {
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg); return; }
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
-  if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile); return; }
+  if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
   el.innerHTML = UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
@@ -176,7 +176,7 @@ document.addEventListener("click", async e => {
     return;
   }
 
-  if (act === "edit") { root().innerHTML = UI.setupHTML(S.profile); return; }
+  if (act === "edit") { root().innerHTML = UI.setupHTML(S.profile, S.user); return; }
   if (act === "cancel") { render(); return; }
 
   if (act === "issue") {
@@ -228,7 +228,11 @@ document.addEventListener("click", async e => {
       toast("沒有清除成功，再試一次。");
       return;
     }
+    // user / authMode / authMsg 一定要帶過去。清除的是護照內容，不是登入狀態 ——
+    // 漏掉 user 的話，下一次 render() 會撞上 `if (!S.user)` 掉回登入頁，
+    // session 明明還好好的，學生卻以為自己被登出了。
     S = {
+      user: S.user, authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {},
       activities: S.activities, months: S.months,
       page: 0, view: "passport", wall: null, wallLoading: false,
@@ -254,6 +258,9 @@ export async function boot() {
     // 先問「現在是誰」。沒有人登入就到此為止：render() 會停在登入頁，
     // 不去讀護照內容（讀了也只會被 RLS 擋掉）。登入成功後 main.js 會再呼叫一次
     // boot()，那時候 S.user 有值，才會往下走。
+    // config.js 填錯時 client 建不出來，這裡拿到空字串以外的東西，
+    // 登入頁就會帶著「現在連不上資料庫」那句出現，而不是一片空白（spec §8.1）。
+    S.authMsg = DATA.configMessage();
     S.user = await DATA.currentUser();
     if (!S.user) { render(); return; }
 

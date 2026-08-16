@@ -6,7 +6,18 @@
 import { createClient } from "../vendor/supabase-js.js";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// createClient 會對格式不對的網址（少了 https://、多了空白之類）當場 throw
+// 「Invalid supabaseUrl」。這裡是 module scope，throw 出去就是 data.js 匯入失敗、
+// main.js 跟著匯入失敗、整頁全白，一句話都沒有 —— 直接違反 spec §8.1「連不上資料庫時
+// 前端不得空白」。而下一步正好是人手動把網址貼進 config.js，打錯的機率不低，所以擋起來。
+let client = null;
+try {
+  client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+} catch (e) {
+  // 給部署的人看的線索留在 console；學生看到的是 configMessage() 那句翻譯過的中文。
+  console.error("src/config.js 的 SUPABASE_URL 或 SUPABASE_PUBLISHABLE_KEY 格式不對：", e);
+}
+export const supabase = client;
 
 /* ---------- auth ---------- */
 
@@ -69,8 +80,6 @@ const RULES = [
   // 邀請碼：trigger raise 之後 GoTrue 回通用 500「Database error saving new user」。
   // spec §6.1 假設這是唯一會讓 signUp 拋 500 的路徑，所以 500 一律視為邀請碼問題。
   // 這條最寬，一定要留在最後。**這是最需要實測確認的一條。**
-  // 另外注意：supabase-js 把 5xx 當成可重試，會自己重試幾次才把錯誤交出來，
-  // 所以打錯邀請碼的人要等幾秒才看得到訊息。這是函式庫行為，不是這裡的 bug。
   { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 
@@ -84,9 +93,14 @@ export function authMessage(err) {
   return hit ? MSG[hit.key] : MSG.other;
 }
 
+// config.js 填錯、client 根本建不出來時，畫面該顯示哪一句。放在 data.js 是為了讓
+// 文案的真相來源只有 MSG 一處；config 沒問題時回空字串，呼叫端不必判斷。
+export function configMessage() { return client ? "" : MSG.offline; }
+
 // invite 進來之前已經由呼叫端（main.js 讀輸入框的那一行）trim + 轉大寫。
 // 正規化只做在輸入層一處，資料庫那邊的比對是刻意精確且分大小寫的。
 export async function signUp(email, pw, invite) {
+  if (!supabase) throw new Error(MSG.offline);
   const { data, error } = await supabase.auth.signUp({
     email, password: pw,
     options: { data: { invite: invite } }
@@ -101,14 +115,16 @@ export async function signUp(email, pw, invite) {
 }
 
 export async function signIn(email, pw) {
+  if (!supabase) throw new Error(MSG.offline);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
   if (error) throw new Error(authMessage(error));
   return data;
 }
 
-export async function signOut() { await supabase.auth.signOut(); }
+export async function signOut() { if (supabase) await supabase.auth.signOut(); }
 
 export async function currentUser() {
+  if (!supabase) return null;
   const { data } = await supabase.auth.getUser();
   return (data && data.user) || null;
 }

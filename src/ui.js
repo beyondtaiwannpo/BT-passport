@@ -199,7 +199,9 @@ export function authHTML(mode, msg) {
   </div>`;
 }
 
-export function setupHTML(p) {
+// user 有值時多一顆登出。這個畫面沒有 barHTML，沒有這顆的話，註冊完但還沒填資料的人
+// 在這裡是走不掉的 —— 唯一的登出鍵在他還看不到的那條 bar 上。
+export function setupHTML(p, user) {
   p = p || {};
   return `<div class="card">
     <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
@@ -213,6 +215,7 @@ export function setupHTML(p) {
     <div class="row">
       <button class="btn" data-act="issue">${p.id ? "儲存" : "核發護照"}</button>
       ${p.id ? `<button class="btn ghost" data-act="cancel">取消</button>` : ""}
+      ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">登出</button>` : ""}
     </div>
   </div>`;
 }
