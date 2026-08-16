@@ -1,6 +1,16 @@
 -- BT Passport schema
 -- 用法：整份貼進 Supabase SQL Editor 執行。可以重複執行，重跑不會弄壞已經有的資料。
 --
+-- 但「可以重複執行」只保證資料安全，不保證結構會更新。這裡的
+-- create table if not exists，如果那張表已經存在，就整段跳過，
+-- 不會比對、也不會補上新舊差異。所以如果你改了這個檔案裡的某個欄位、
+-- 型別或限制，然後重貼進去重跑，資料庫會維持原樣、不會報錯也不會提醒你——
+-- 你會以為改好了，其實完全沒生效。
+-- （create policy 跟 create or replace function 不在此限，這兩種重跑真的會更新，
+-- 因為它們是用 drop policy if exists / create or replace 寫的。只有表跟欄位的結構會被跳過。）
+-- 已經有真實資料的資料庫要改結構，請另外寫一支針對那個改動的 alter table 遷移，
+-- 不要靠改這個檔案再重跑。
+--
 -- 這個檔案只建「結構」與「權限」。活動文案在 seed.sql，
 -- 之後課程組要改文案，是去 Supabase 後台直接編輯 activities 表，不用再碰 SQL。
 --
