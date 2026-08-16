@@ -7,24 +7,36 @@ say() { printf '%s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
 ok()  { printf 'ok    %s\n' "$1"; }
 
-FILES="index.html src"
+FILES="index.html src activities.json"
 
-# §11-6 secret key 絕不可入庫。sb_secret_ 全 repo 掃（真金鑰不可能合法出現在
-# vendor 裡）；service_role 排除 vendor/（supabase-js 原始碼含這個字，是 API
-# 的一部分，之後 vendor/ 進來會誤報）。
-# 兩者都排除 check.sh 自己（腳本原始碼裡就寫著這兩個字串當 grep pattern，
-# 不排除的話腳本永遠會抓到自己）和 docs/、.superpowers/（規劃文件用白話文
-# 說明金鑰命名規則，不是真的金鑰；spec §11-6 的「全 repo 含 git 歷史零命中」
-# 是上線前的人工稽核步驟，不是這個自動腳本要覆蓋的範圍）。
-SECRET_EXCL="--exclude-dir=.git --exclude-dir=docs --exclude-dir=.superpowers --exclude=check.sh"
-if grep -rIq $SECRET_EXCL 'sb_secret_' . ; then
-  bad "§11-6 repo 裡出現 sb_secret_"
-  grep -rIn $SECRET_EXCL 'sb_secret_' .
-elif grep -rIq $SECRET_EXCL --exclude-dir=vendor 'service_role' . ; then
-  bad "§11-6 repo 裡出現 service_role"
-  grep -rIn $SECRET_EXCL --exclude-dir=vendor 'service_role' .
+# §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
+# 一支沒抓到，不能蓋掉另一支抓到的事。
+
+# sb_secret_ leg：全 repo 掃，不排除任何目錄（含 docs/、.superpowers/、
+# check.sh 自己）。真金鑰的字首後面一定接著一長串英數字元；pattern 要求字首後
+# 緊接 8 碼以上連續英數，規劃文件用白話文提到這個字首時（例如反引號、刪節號、
+# 空格、`\|`）湊不出這個長度，所以不需要也不應該排除任何目錄。
+if grep -rIEq --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' . ; then
+  bad "§11-6 repo 裡出現 sb_secret_ 金鑰"
+  grep -rInE --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' .
 else
-  ok "§11-6 沒有 secret key"
+  ok "§11-6 沒有 sb_secret_ 金鑰"
+fi
+
+# service_role leg：這個字全 repo 掃一定會撞到 spec/plan 文件討論它的地方——
+# 它是一個合法英文詞，規劃文件會直接當名詞寫，前後沒有能拿來過濾字元數的東西。
+# 所以縮小到真的會被部署出去的範圍：index.html、src/、activities.json、
+# .github/（現在還不存在；用 -d 判斷要不要加進掃描清單，不讓「路徑不存在」
+# 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
+# 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
+# service_role 是 API 的一部分）。
+service_scope="index.html src activities.json"
+[ -d .github ] && service_scope="$service_scope .github"
+if grep -rIq service_role $service_scope 2>/dev/null; then
+  bad "§11-6 repo 裡出現 service_role"
+  grep -rIn service_role $service_scope 2>/dev/null
+else
+  ok "§11-6 沒有 service_role"
 fi
 
 # §11-14 只有三色。抓所有 #hex，扣掉三個允許值。
@@ -49,6 +61,17 @@ else
   ok "§11-14 rgba 只用允許的三個底色"
 fi
 
+# §11-14 不允許 rgb()/hsl()（三色只能用 hex 或上面那三種 rgba 底色定義；
+# rgb( 這個 pattern 天生不會誤吃 rgba( ——"rgb" 後面緊接的是 "a" 不是 "("，
+# 所以不用另外排除）。
+strayfunc=$(grep -rhIoE 'rgb\([^)]*\)|hsl\([^)]*\)' $FILES 2>/dev/null | sort -u)
+if [ -n "$strayfunc" ]; then
+  bad "§11-14 出現不允許的 rgb()/hsl()："
+  printf '%s\n' "$strayfunc"
+else
+  ok "§11-14 沒有 rgb()/hsl()"
+fi
+
 # §11-15 不載入中文網頁字體
 if grep -rIq '@font-face' $FILES 2>/dev/null; then
   bad "§11-15 出現 @font-face，不得自行載入字體"
@@ -63,8 +86,10 @@ else
 fi
 
 # §10-1 分類代碼。排除 SVG 濾鏡的 xChannelSelector="R" / yChannelSelector="G"
-# ——這是原型就有、蓋章要用的墨水紋理效果，不是分類代碼，"G" 只是誤觸。
-catcodes=$(grep -rnIE '"[GPF]"' $FILES 2>/dev/null | grep -v 'ChannelSelector')
+# ——這是原型就有、蓋章要用的墨水紋理效果，不是分類代碼。只濾掉
+# ChannelSelector="X" 這個精確片段，不是整行都不看，避免真的分類代碼殘留
+# 剛好跟這段 SVG 擠在同一行時被一起蓋過去。
+catcodes=$(grep -rnIE '"[GPF]"' $FILES 2>/dev/null | grep -v 'ChannelSelector="[PGF]"')
 if [ -n "$catcodes" ]; then
   bad "§10-1 還有原型的 G/P/F 分類代碼："
   printf '%s\n' "$catcodes"
@@ -79,8 +104,8 @@ else
   ok "§10-2 沒有 36 格"
 fi
 
-# §10-3 進度牆 11 欄
-if grep -rIq 'repeat(12,1fr)' $FILES 2>/dev/null; then
+# §10-3 進度牆 11 欄。容忍 repeat(12,1fr) 與 repeat(12, 1fr) 這類空白差異。
+if grep -rIqE 'repeat\(\s*12\s*,' $FILES 2>/dev/null; then
   bad "§10-3 .track 還是 12 欄"
 else
   ok "§10-3 .track 不是 12 欄"

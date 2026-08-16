@@ -64,6 +64,16 @@ export async function removeStamp(actId) {
   writeLocal(d);
 }
 
+// 清除這個人自己的整本護照。localStorage 版直接砍掉那把 key；Task 6 換
+// Supabase 之後，這裡要做的是刪掉這個使用者自己名下的 passport/stamps 列
+// （RLS 保證刪不到別人的）。加進六個函式的介面清單，是因為 spec §11 的驗收
+// 標準要求「匯出 → 清除護照 → 匯入還原」要真的能動作；沒有這個函式時，
+// main.js 只能繞過 data.js 直接戳 localStorage，Task 6 換後端後這個「清除」
+// 會變成只清畫面、資料庫裡的資料還在，卻沒有任何錯誤訊息可以看出來。
+export async function clearAll() {
+  localStorage.removeItem(KEY);
+}
+
 export async function loadWall() {
   const d = readLocal();
   if (!d.profile) return [];

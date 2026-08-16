@@ -68,7 +68,7 @@ export function bookHTML(S) {
 export function idPageHTML(S) {
   const p = S.profile;
   const [l1, l2] = mrz(p);
-  const av = S.profile.avatar ? `<img src="${S.profile.avatar}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
+  const av = S.profile.avatar ? `<img src="${esc(S.profile.avatar)}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
   const done = Object.keys(S.stamps).length;
   const total = S.activities.length;
   return `<div class="mhead">
@@ -83,7 +83,7 @@ export function idPageHTML(S) {
           <div class="f"><i>Type / 類別</i><b>BT</b></div>
           <div class="f"><i>Code / 代碼</i><b>TWN</b></div>
           <div class="f"><i>Passport No. / 護照號碼</i><b>${passportNo(p.id)}</b></div>
-          <div class="f"><i>Date of issue / 核發日</i><b>${p.issued}</b></div>
+          <div class="f"><i>Date of issue / 核發日</i><b>${esc(p.issued)}</b></div>
           <div class="f wide"><i>Name / 姓名</i><b>${esc(p.name_zh)} · ${esc(p.name_en).toUpperCase()}</b></div>
           <div class="f wide"><i>Team / 所屬團隊</i><b>${esc(p.team)}</b></div>
         </div>
@@ -134,7 +134,7 @@ export function slotHTML(S, a) {
     <span class="en">${esc(a.title_en)}</span>
     ${st ? `${stampHTML(a, st, anim)}
         ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
-        ${entry.photo ? `<img class="thumb" src="${entry.photo}" alt="">` : ""}`
+        ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}`
       : `<span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
   </button>`;
 }

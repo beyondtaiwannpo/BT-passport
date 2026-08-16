@@ -8,12 +8,6 @@
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 
-// 跟 data.js 的私有 KEY 常數同一個字串。reset 需要整把清掉 localStorage，
-// 但六個介面函式（loadAll/saveProfile/saveAvatar/saveStamp/removeStamp/loadWall）
-// 裡沒有一個是「清空」，所以這裡直接用同名的 key 操作 localStorage，
-// 不新增第七個 data.js 匯出（避免 Task 6 換後端時要多顧一個沒在介面清單裡的函式）。
-const LOCAL_KEY = "bt-passport:local";
-
 let S = {
   profile: null, stamps: {}, entries: {},
   activities: [], months: [],
@@ -80,10 +74,10 @@ function openModal(id) {
     <h3>${UI.esc(a.title_zh)}</h3>
     <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
     <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
-    <label><i>日期 / Date</i><input type="date" id="md" value="${st ? st.date : UI.today()}"></label>
+    <label><i>日期 / Date</i><input type="date" id="md" value="${UI.esc(st ? st.date : UI.today())}"></label>
     <label><i>一句話 / One line（選填，最多 60 字）</i><textarea id="mn" maxlength="60" placeholder="那天發生了什麼？">${st ? UI.esc(entry.note || "") : ""}</textarea></label>
     <label><i>照片（選填，只存在你的護照裡）</i><input type="file" id="mf" accept="image/*"></label>
-    <img class="prev" id="mp" src="${entry.photo || ""}" style="${entry.photo ? "" : "display:none"}" alt="">
+    <img class="prev" id="mp" src="${UI.esc(entry.photo || "")}" style="${entry.photo ? "" : "display:none"}" alt="">
     <div class="row" style="margin-top:14px">
       <button class="btn" data-act="stamp" data-id="${id}">${st ? "更新" : "蓋章"}</button>
       <button class="btn ghost" data-act="close">取消</button>
@@ -182,19 +176,32 @@ document.addEventListener("click", async e => {
     const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
     i.onchange = async () => {
       const f = i.files && i.files[0]; if (!f) return;
+      let url;
       try {
-        const url = await compress(f, 420, 0.7);
-        S.profile.avatar = url;
-        render();
+        url = await compress(f, 420, 0.7);
+      } catch (err) {
+        toast("這張圖讀不到，換一張試試");
+        return;
+      }
+      S.profile.avatar = url;
+      render();
+      try {
         await DATA.saveAvatar(url);
-      } catch (err) { toast("這張圖讀不到，換一張試試"); }
+      } catch (err) {
+        toast("大頭照沒有存起來，再試一次");
+      }
     };
     i.click(); return;
   }
 
   if (act === "reset") {
     if (!confirm("清除這本護照？所有的章、心得和照片都會消失，無法復原。")) return;
-    localStorage.removeItem(LOCAL_KEY);
+    try {
+      await DATA.clearAll();
+    } catch (e) {
+      toast("沒有清除成功，再試一次。");
+      return;
+    }
     S = {
       profile: null, stamps: {}, entries: {},
       activities: S.activities, months: S.months,
@@ -217,12 +224,16 @@ document.addEventListener("keydown", e => {
 
 /* ---------- boot ---------- */
 export async function boot() {
-  const all = await DATA.loadAll();
-  S.activities = all.activities.filter(a => a.active !== false);
-  S.months = all.months;
-  S.profile = all.profile;
-  S.stamps = all.stamps;
-  S.entries = all.entries;
-  render();
+  try {
+    const all = await DATA.loadAll();
+    S.activities = all.activities.filter(a => a.active !== false);
+    S.months = all.months;
+    S.profile = all.profile;
+    S.stamps = all.stamps;
+    S.entries = all.entries;
+    render();
+  } catch (e) {
+    root().innerHTML = `<div class="empty">活動資料讀不到，重新整理試試。</div>`;
+  }
 }
 boot();
