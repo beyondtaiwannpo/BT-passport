@@ -226,7 +226,9 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 | 連不上資料庫 | 現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。 |
 | 其他未預期錯誤 | 出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。 |
 
-判斷方式：signUp 回傳 500 且非上述已知情況 → 視為邀請碼問題（這是唯一會讓 signUp 拋 500 的路徑）。email 重複與密碼長度由 GoTrue 以 4xx 回報，可明確區分。
+**判斷方式必須實測決定，不得照預期的錯誤字串寫。** trigger `raise` 之後 Supabase 回給前端的是籠統的資料庫錯誤，不會是 `invalid_invite`；實際的 `status` / `code` / `message` 只有真的註冊失敗一次才知道，而且會隨 GoTrue 版本改變。實作時先用四個情境各打一次 `signUp`，把原始回應記下來，判斷式依實測寫。
+
+目前的假設（**待實測驗證，不符就更新本節**）：signUp 回傳 500 且非下述已知情況 → 視為邀請碼問題（這是唯一會讓 signUp 拋 500 的路徑）；密碼長度由 GoTrue 以 4xx 回報。email 重複則有兩種可能形狀 —— 4xx 錯誤，或在「防止帳號列舉」開啟時回 200 且 `data.user.identities` 為空陣列，兩者都要處理。
 
 任何錯誤訊息都**不得出現個人姓名或個人聯絡方式**，一律導向 `beyondtaiwan2020@gmail.com`。
 
@@ -377,7 +379,7 @@ Supabase 免費方案閒置 7 天會暫停。資料不會不見，但網站會�
 | 我想改姓名／團隊／一句話 | 請對方自己在資料頁改。資料頁改不動才由管理者改 `passports` 表 |
 | 我要一組邀請碼 | `invite_codes` 新增一列，`uses_left = 1`，`note` 寫發給誰（見 §9 第 3 項）|
 | 我不小心註冊了兩個帳號 | 確認哪個有章，刪掉沒章的那個。Authentication → Users → 刪除。`passports` 有 `on delete cascade`，章與心得會一併清掉 |
-| 我要離開 BT，請刪掉我的資料 | **先問要不要留備份**，需要就請對方自己按匯出（§7.4）拿走 JSON，再刪帳號。刪除是不可逆的，做之前確認一次 |
+| 我要離開 BT，請刪掉我的資料 | **順序不能反**：先請對方自己按匯出（§7.4）拿到 JSON、回報收到，才刪帳號。資料表是 `on delete cascade`，刪 `auth.users` 那一列會連帶刪掉他的 `passports` / `stamps` / `entries`，免費方案沒有備份，救不回來 |
 | 我的章不見了 | 先確認是不是登錯帳號（最常見）。真的不見再查 `stamps` 表。若有備份檔就走匯入還原 |
 | 網站整個打不開 | 多半是專案休眠，見 §9 第 5 項。恢復後確認每日 ping 的 workflow 還在跑 |
 

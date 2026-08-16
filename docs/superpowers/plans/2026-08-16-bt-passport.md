@@ -1091,9 +1091,40 @@ export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_<貼上後台 Project Se
 
 實作時把 `<…>` 換成真實值。若後台只看到 legacy 的 anon key，先在同一頁把新版金鑰啟用／建立，取得 `sb_publishable_` 開頭的字串再繼續（spec §4.1）。
 
-- [ ] **Step 3: 寫失敗的驗證 —— 先確認錯誤翻譯表**
+- [ ] **Step 3: 先實測「錯誤長什麼樣」，再寫翻譯 —— 順序不可以顛倒**
 
-這一段沒有自動化測試可寫（要真的打 GoTrue）。改為在 Step 6 用四個真實情境手動驗，每個情境的預期文案先在這裡定死，逐字抄自 spec §6.1：
+**不要照著預期的錯誤字串寫 `authMessage`。** trigger `raise` 之後，Supabase 回給前端的
+是籠統的資料庫錯誤，不會是 `invalid_invite`。實際的 `status`、`code`、`message` 三者
+長什麼樣，只有真的失敗一次才知道，而且會隨 GoTrue 版本變。
+
+所以先做這件事，Step 4 的程式碼才有依據：
+
+1. 在 SQL Editor 建一組測試碼：`insert into invite_codes (code, uses_left, note) values ('TEST-ONCE', 1, '手動測試用，測完刪掉');`
+2. 用一個最小的 HTML 頁面（或瀏覽器 console）打四次 `signUp`，把**原始錯誤物件**印出來：
+
+```js
+const { data, error } = await supabase.auth.signUp({
+  email: "probe1@example.com", password: "123456",
+  options: { data: { invite: "WRONG-CODE" } }
+});
+console.log(JSON.stringify({ error, user: data && data.user }, null, 2));
+```
+
+四個情境各打一次，把回應原封不動記下來：
+
+| # | 送什麼 | 記下 |
+|---|---|---|
+| 1 | 無效邀請碼 | `error.status`、`error.code`、`error.message` |
+| 2 | 已用完的碼 | 同上（預期與 1 相同，因為 trigger 走同一條路徑）|
+| 3 | 重複的 email + 有效碼 | 有 `error` 還是回 200 且 `data.user.identities` 為空陣列 |
+| 4 | 密碼 `12345`（5 字）| `error.status`、`error.message` |
+
+3. **把四次的原始回應貼進 `.superpowers/sdd/2026-08-16-bt-passport/task-5-report.md`**，
+   Step 4 的判斷式依據實測結果寫，不依據猜測。
+4. 若實測與 spec §6.1 的假設不符（例如重複 email 回 200 而非 4xx），**回報並更新 spec §6.1**，
+   不要默默改程式了事。
+
+每個情境的**畫面文案**是固定的，逐字抄自 spec §6.1；會變的只有「怎麼判斷落到哪一格」：
 
 | 情境 | 必須出現的文案 |
 |---|---|
@@ -2102,6 +2133,20 @@ GitHub repo → Actions → 「ping supabase」→ 最近有沒有綠勾。
 
 正確做法：Table Editor → `activities` → 那一列的 `active` 改成 `false`。
 它就不會再出現在護照上，但已經蓋過的人資料還在。
+
+## 要改資料表結構的話
+
+`supabase/schema.sql` 的檔頭寫著「可以重複執行」，那句話只保證**重跑不會弄壞資料**。
+
+它**不保證會更新結構**。`create table if not exists` 遇到已經存在的表就整個跳過，
+不會比對欄位、不會補欄位、也不會報錯 —— 你會以為改好了，其實資料庫還是舊的。
+
+所以：**資料庫已經有真實資料之後，要改欄位、改型別、改約束，一律另外寫一段
+`alter table …` 執行，不要改 `schema.sql` 再重跑。** 改完之後也把 `schema.sql`
+一起更新，讓它對新專案仍然正確。
+
+（`create policy` 與 `create or replace function` 那些是會更新的 —— 它們寫了
+`drop policy if exists` 與 `or replace`。會靜默跳過的只有「表和欄位」。）
 ```
 
 - [ ] **Step 8: 「管理者怎麼處理帳號問題」（spec §9.2）**
@@ -2147,10 +2192,19 @@ Authentication → Users → 改 email。
 3. 章和心得會跟著一起清掉，這是設計好的
 
 **「我要離開 BT，請刪掉我的資料」**
-1. **先問他要不要留一份備份。** 要的話請他自己在護照資料頁按「匯出備份」，
-   下載那個 JSON 檔收好
-2. 確認他拿到檔案之後，Authentication → Users → Delete user
-3. 刪除不可逆，做之前再確認一次
+
+> **順序不能反。刪帳號的那一刻，他的章、心得、照片全部一起消失，救不回來。**
+>
+> 資料表是 `on delete cascade` 設計的：刪掉 `auth.users` 那一列，`passports`、
+> `stamps`、`entries` 裡屬於他的每一列都會被連帶刪除。這是刻意的（他要求刪資料，
+> 就該刪乾淨），但也表示**先刪帳號再想到要備份就來不及了**。免費方案沒有自動備份，
+> 資料庫裡也不會留副本。
+
+1. **先請他自己匯出。** 護照資料頁 → 「匯出備份」→ 下載 JSON 檔。
+   **等他回報「檔案拿到了」再往下做。** 不要你幫他匯出，也不要跳過這步
+2. 他說不需要備份的話，跟他確認一次：「刪掉之後這一年的章和心得都回不來，確定嗎？」
+3. 確認之後：Authentication → Users → 該列 `⋯` → Delete user
+4. 刪完不要再問「要不要復原」—— 沒有復原這個選項
 
 **「我的章不見了」**
 1. 先問他是不是登錯帳號 —— 這是最常見的原因，尤其是註冊過兩次的人
