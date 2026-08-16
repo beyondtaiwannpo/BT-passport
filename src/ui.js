@@ -41,6 +41,7 @@ export function barHTML(S) {
       <button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>
     </div>
+    <button class="btn ghost sm" data-act="signout">登出</button>
     <div class="sp"></div>
     <div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
   </div>`;
@@ -173,6 +174,28 @@ export function wallHTML(S) {
         return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${esc(f.who)}</b> 蓋了 <b>${a ? esc(a.title_zh) : esc(f.id)}</b></span></div>`;
       }).join("")}</div>` : ""}
     <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+  </div>`;
+}
+
+// 只用既有的 .card / label / .btn / .wnote，不新增任何樣式（spec §3.4）。
+// 忘記密碼只有登入頁底部那一行提示：不做自助重設、不做重設畫面、
+// 不呼叫 resetPasswordForEmail（spec §6.3）。
+export function authHTML(mode, msg) {
+  const up = mode === "up";
+  return `<div class="card">
+    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
+    <div class="sub">${up ? "需要一組 BT 邀請碼。跟你的組長拿。" : "用你註冊時的 email 登入。"}</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <label><i>Email</i><input id="ae" type="email" autocomplete="email" placeholder="you@example.com"></label>
+    <label><i>密碼 / Password${up ? "（至少 6 個字）" : ""}</i><input id="ap" type="password" autocomplete="${up ? "new-password" : "current-password"}"></label>
+    ${up ? `<label><i>邀請碼 / Invite code</i><input id="ai" autocomplete="off" placeholder="跟組長拿"></label>` : ""}
+    ${up ? `<div class="wnote" style="margin:0 0 16px">送出後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>` : ""}
+    <div class="row">
+      <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
+      <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "我有邀請碼，要註冊"}</button>
+    </div>
+    ${up ? "" : `<div class="wnote" style="margin:16px 0 0">忘記密碼？寄信到 beyondtaiwan2020@gmail.com，我們會幫你重設。你的資料都還在。</div>`}
   </div>`;
 }
 

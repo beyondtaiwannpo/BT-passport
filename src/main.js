@@ -9,6 +9,7 @@ import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 
 let S = {
+  user: null, authMode: "in", authMsg: "",
   profile: null, stamps: {}, entries: {},
   activities: [], months: [],
   page: 0, view: "passport", wall: null, wallLoading: false,
@@ -52,7 +53,10 @@ const root = () => document.getElementById("bt-root");
 
 function render() {
   const el = root();
-  if (!S.profile) { el.innerHTML = UI.setupHTML(); return; }
+  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg); return; }
+  // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
+  // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
+  if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile); return; }
   el.innerHTML = UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
@@ -124,6 +128,28 @@ async function doStamp(id) {
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
+
+  if (act === "switch-auth") { S.authMode = b.dataset.m; S.authMsg = ""; render(); return; }
+
+  if (act === "do-signin" || act === "do-signup") {
+    const email = document.getElementById("ae").value.trim();
+    const pw = document.getElementById("ap").value;
+    // 邀請碼的正規化只做在這裡（輸入層）：trim + 轉大寫。資料庫那邊的比對是刻意
+    // 精確且分大小寫的，「這組碼到底是什麼」只有一個真相來源。學生打了一個尾隨空格，
+    // 不應該被告知邀請碼無效。
+    const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim().toUpperCase() : "";
+    try {
+      if (act === "do-signup") await DATA.signUp(email, pw, inv);
+      else await DATA.signIn(email, pw);
+      await boot();
+    } catch (e) {
+      S.authMsg = e.message;
+      render();
+    }
+    return;
+  }
+
+  if (act === "signout") { await DATA.signOut(); location.reload(); return; }
 
   if (act === "tab") { S.view = b.dataset.v; render(); if (S.view === "wall" && !S.wall) loadWall(); return; }
   if (act === "refresh") { loadWall(); return; }
@@ -225,6 +251,12 @@ document.addEventListener("keydown", e => {
 /* ---------- boot ---------- */
 export async function boot() {
   try {
+    // 先問「現在是誰」。沒有人登入就到此為止：render() 會停在登入頁，
+    // 不去讀護照內容（讀了也只會被 RLS 擋掉）。登入成功後 main.js 會再呼叫一次
+    // boot()，那時候 S.user 有值，才會往下走。
+    S.user = await DATA.currentUser();
+    if (!S.user) { render(); return; }
+
     const all = await DATA.loadAll();
     S.activities = all.activities.filter(a => a.active !== false);
     S.months = all.months;
