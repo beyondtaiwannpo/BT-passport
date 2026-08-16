@@ -93,12 +93,9 @@ drop policy if exists activities_read on activities;
 create policy activities_read on activities
   for select to authenticated using (true);
 
--- invite_codes：故意一條 policy 都不給。
--- 另外連表層級的權限也收掉 —— Supabase 對 public schema 的新表預設會發權限給
--- anon 與 authenticated，不 revoke 的話，雖然 RLS 會擋成 0 列，
--- 但「連查都不給查」比「查得動但回 0 列」少一層可以出錯的地方。
+-- invite_codes：故意一條 policy 都不給，等於對所有登入身分關閉。
+-- 表層級的權限也要一起收掉，收在下面的 grant 段落。
 -- 只有最下面那個 security definer 的 trigger 讀得到這張表。
-revoke all on invite_codes from anon, authenticated;
 
 drop policy if exists passports_read on passports;
 create policy passports_read on passports
@@ -148,9 +145,24 @@ drop policy if exists entries_delete on entries;
 create policy entries_delete on entries
   for delete to authenticated using (auth.uid() = user_id);
 
--- ---------- grant ----------
--- RLS 決定「看得到哪幾列」，grant 決定「這張表准不准碰」，兩層都要對。
--- 只發給 authenticated：沒登入的人（anon）在這個系統裡沒有任何事情可做。
+-- ---------- 權限（先全部收回，再一項一項發）----------
+-- RLS 決定「看得到、動得了哪幾列」，權限決定「這張表准不准碰」，兩層都要對。
+--
+-- 先 revoke 再 grant，不是多此一舉：Supabase 對 public schema 的新表預設會把
+-- ALL 發給 anon 與 authenticated，不收回的話下面那兩行 grant 只是裝飾，
+-- 真正生效的是 Supabase 給的那份預設權限。
+--
+-- 而且 ALL 裡面有 TRUNCATE，**RLS 管不到 TRUNCATE** —— 它不是一列一列刪，
+-- 政策條件沒有列可以套。也就是說沒有這段 revoke 的話，任何人（連沒登入的 anon 都算）
+-- 只要能對資料庫下 SQL，一句 truncate passports cascade 就能把全部的章與心得清空。
+-- PostgREST 沒有 TRUNCATE 這個動詞，所以走 API 打不到，但這一層不該賭在那件事上。
+--
+-- 收回之後 anon 手上一個權限都不剩。要注意的是「anon 動不了東西」靠的是這件事
+-- 加上「每一條 policy 都寫了 to authenticated」——
+-- 之後新增 policy 若忘了寫 to authenticated，就等於對未登入的人開門。
+
+revoke all on invite_codes from anon, authenticated;
+revoke all on months, activities, passports, stamps, entries from anon, authenticated;
 
 grant select on months, activities to authenticated;
 grant select, insert, update, delete on passports, stamps, entries to authenticated;
@@ -164,13 +176,16 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer                     -- 用函式擁有者的身分跑，才讀得到上面關掉的 invite_codes
-set search_path = public
+set search_path = public, pg_temp    -- 釘死搜尋路徑，別人就沒辦法用同名的暫存表換掉下面的兩張表
 as $$
 declare v_code text := new.raw_user_meta_data->>'invite';
 begin
   -- 檢查與扣減寫成同一句 update ... where uses_left > 0，再用 if not found 判斷。
   -- 分成「先 select 檢查、再 update 扣減」兩句的話，兩個人同時用同一組只剩一次的碼，
   -- 會兩個都通過。這樣寫由資料庫的列鎖擋掉。
+  --
+  -- 這裡的比對是嚴格相同，大小寫與前後空白都算數。正規化（trim、轉大寫）由前端
+  -- 送出前做，只做一邊 —— 兩邊都做的話，「這組碼到底長怎樣」就有兩個答案。
   update invite_codes set uses_left = uses_left - 1
    where code = v_code and uses_left > 0;
   if not found then
@@ -181,7 +196,16 @@ begin
   return new;
 end $$;
 
+-- 這個函式只該由 trigger 呼叫，沒有人需要能直接執行它。
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- 注意：這個 trigger 對「每一筆」進到 auth.users 的列都會開火，
+-- 包含你在 Supabase 後台按 Add user 手動開的帳號、以及用 Admin API 建的帳號。
+-- 所以管理者手動開帳號時，metadata 也要填一組還有次數的邀請碼
+-- （User Metadata 填 {"invite":"某組碼"}），不然那筆會直接失敗。
+-- 這是規格要的行為（spec §6）：沒有邀請碼就沒有護照，沒有例外通道。

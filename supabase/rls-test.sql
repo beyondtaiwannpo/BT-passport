@@ -69,6 +69,51 @@ begin
     raise exception 'FAIL: B 看不到自己的 entries，政策過緊';
   end if;
 
+  -- spec §11-1 續：讀不到只是一半。乙也不能把東西塞進甲的名下、
+  -- 不能改甲的心得、不能刪甲的心得。
+  --
+  -- 下面幾個 raise 都指定了 errcode P0002。原因跟檔案最下面那段一樣：
+  -- 不指定的話預設是 P0001，會被自己那句 exception when ... 接走，
+  -- 失敗會被吃掉、測試假裝通過。改動這裡時千萬別把 errcode 拿掉。
+  begin
+    insert into entries (user_id, act_id, note)
+         values ('aaaaaaaa-0000-0000-0000-000000000001', '11B', '乙偽造在甲名下的心得');
+    raise exception 'FAIL §11-1: B 可以偽造 A 的 entries' using errcode = 'P0002';
+  exception when insufficient_privilege or check_violation then
+    null;  -- 預期會走到這裡
+  end;
+
+  -- 乙也不能把自己的心得改掛到甲名下（測的是 update 的 with check 那一半）
+  begin
+    update entries set user_id = 'aaaaaaaa-0000-0000-0000-000000000001'
+     where user_id = 'bbbbbbbb-0000-0000-0000-000000000002' and act_id = '09B';
+    raise exception 'FAIL §11-1: B 可以把自己的 entries 搬到 A 名下' using errcode = 'P0002';
+  exception when insufficient_privilege or check_violation then
+    null;
+  end;
+
+  update entries set note = 'hacked'
+   where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'FAIL §11-1: B 改得動 A 的 entries（% 列）', n;
+  end if;
+
+  delete from entries where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'FAIL §11-1: B 刪得掉 A 的 entries（% 列）', n;
+  end if;
+
+  -- spec §11-2：乙不能把章蓋在甲的護照上
+  begin
+    insert into stamps (user_id, act_id, stamped_on)
+         values ('aaaaaaaa-0000-0000-0000-000000000001', '11A', '2026-11-10');
+    raise exception 'FAIL §11-2: B 可以在 A 的護照上蓋章' using errcode = 'P0002';
+  exception when insufficient_privilege or check_violation then
+    null;
+  end;
+
   -- spec §11-2：乙不能改甲的 stamps
   update stamps set stamped_on = '2000-01-01'
    where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
@@ -116,6 +161,30 @@ begin
   exception when insufficient_privilege then
     null;  -- 連查都不給查，比回 0 列更嚴，通過
   end;
+
+  -- 政策本身的檢查（不是行為測，是直接看政策長什麼樣子）
+  --
+  -- 上面那些都是「以乙的身分實際去碰甲的資料」，是最有說服力的一種測法。
+  -- 但有一種情況行為測不出來：只要 entries 的 SELECT 政策是對的，乙就看不到甲的心得，
+  -- 那麼 UPDATE 與 DELETE 政策即使被改成全開，乙也還是碰不到 —— 行為測會過。
+  -- （PostgreSQL 連 UPDATE 之後的新列都會拿 SELECT 政策再檢查一次，所以連
+  --   「把自己的心得改掛到甲名下」這條路也是 SELECT 政策擋掉的。）
+  -- 那等於整道防線只剩 SELECT 一條在撐，哪天有人放寬它就全破。
+  -- 所以這裡直接數政策：entries 的四條、stamps 的三條寫入政策，條件都必須綁 auth.uid()。
+  select count(*) into n from pg_policies
+   where schemaname = 'public' and tablename = 'entries'
+     and coalesce(qual, '') || ' ' || coalesce(with_check, '') like '%uid()%';
+  if n <> 4 then
+    raise exception 'FAIL §11-1: entries 的四條政策每一條都要綁 auth.uid()，符合的只有 % 條', n;
+  end if;
+
+  select count(*) into n from pg_policies
+   where schemaname = 'public' and tablename = 'stamps'
+     and policyname in ('stamps_insert', 'stamps_update', 'stamps_delete')
+     and coalesce(qual, '') || ' ' || coalesce(with_check, '') like '%uid()%';
+  if n <> 3 then
+    raise exception 'FAIL §11-2: stamps 的三條寫入政策每一條都要綁 auth.uid()，符合的只有 % 條', n;
+  end if;
 
   -- 乙看得到 activities 與 months
   select count(*) into n from activities;
