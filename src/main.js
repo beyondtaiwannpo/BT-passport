@@ -1,0 +1,228 @@
+// App 邏輯：state、事件委派、跟 data.js / ui.js 對話。boot() 是具名函式
+// （不是原型的匿名 IIFE），因為 Task 5 登入成功後要再呼叫一次。
+//
+// 原型用 S.photos + hydratePhotos() 做照片延遲載入，因為 window.storage 把
+// 照片存在跟其他資料分開的 key 下。這裡的 data.js 用 loadAll() 一次把照片
+// 隨 entries/profile 帶回，延遲載入沒有存在理由，留著會變成第二個真相來源，
+// 所以整個拿掉：idPageHTML 讀 S.profile.avatar，slotHTML 讀 S.entries[id]。
+import * as DATA from "./data.js";
+import * as UI from "./ui.js";
+
+// 跟 data.js 的私有 KEY 常數同一個字串。reset 需要整把清掉 localStorage，
+// 但六個介面函式（loadAll/saveProfile/saveAvatar/saveStamp/removeStamp/loadWall）
+// 裡沒有一個是「清空」，所以這裡直接用同名的 key 操作 localStorage，
+// 不新增第七個 data.js 匯出（避免 Task 6 換後端時要多顧一個沒在介面清單裡的函式）。
+const LOCAL_KEY = "bt-passport:local";
+
+let S = {
+  profile: null, stamps: {}, entries: {},
+  activities: [], months: [],
+  page: 0, view: "passport", wall: null, wallLoading: false,
+  justStamped: null
+};
+
+function compress(file, maxDim, quality) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error("read"));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => rej(new Error("decode"));
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        const sc = Math.min(1, maxDim / Math.max(w, h));
+        w = Math.round(w * sc); h = Math.round(h * sc);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        res(c.toDataURL("image/jpeg", quality));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+let toastT;
+function toast(msg) {
+  document.querySelectorAll(".toast").forEach(n => n.remove());
+  const d = document.createElement("div");
+  d.className = "toast"; d.textContent = msg; d.setAttribute("role", "status");
+  document.body.appendChild(d);
+  clearTimeout(toastT);
+  toastT = setTimeout(() => d.remove(), 2600);
+}
+
+/* ---------- render ---------- */
+const root = () => document.getElementById("bt-root");
+
+function render() {
+  const el = root();
+  if (!S.profile) { el.innerHTML = UI.setupHTML(); return; }
+  el.innerHTML = UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
+}
+
+async function loadWall() {
+  S.wallLoading = true; render();
+  S.wall = await DATA.loadWall();
+  S.wallLoading = false; render();
+}
+
+/* ---------- modal ---------- */
+function openModal(id) {
+  const a = S.activities.find(x => x.id === id); if (!a) return;
+  const st = S.stamps[id];
+  const entry = S.entries[id] || {};
+  const d = document.createElement("div");
+  d.className = "scrim"; d.id = "scrim";
+  d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
+    <div class="mt">${UI.CATNAME[a.category]} · ${String(a.month).padStart(2, "0")}月</div>
+    <h3>${UI.esc(a.title_zh)}</h3>
+    <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
+    <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
+    <label><i>日期 / Date</i><input type="date" id="md" value="${st ? st.date : UI.today()}"></label>
+    <label><i>一句話 / One line（選填，最多 60 字）</i><textarea id="mn" maxlength="60" placeholder="那天發生了什麼？">${st ? UI.esc(entry.note || "") : ""}</textarea></label>
+    <label><i>照片（選填，只存在你的護照裡）</i><input type="file" id="mf" accept="image/*"></label>
+    <img class="prev" id="mp" src="${entry.photo || ""}" style="${entry.photo ? "" : "display:none"}" alt="">
+    <div class="row" style="margin-top:14px">
+      <button class="btn" data-act="stamp" data-id="${id}">${st ? "更新" : "蓋章"}</button>
+      <button class="btn ghost" data-act="close">取消</button>
+      ${st ? `<button class="btn ghost sm" data-act="unstamp" data-id="${id}" style="margin-left:auto">撕掉這格</button>` : ""}
+    </div>
+  </div>`;
+  document.body.appendChild(d);
+  d.addEventListener("click", e => { if (e.target === d) d.remove(); });
+  const f = d.querySelector("#mf");
+  f.addEventListener("change", async () => {
+    const file = f.files && f.files[0]; if (!file) return;
+    try {
+      const url = await compress(file, 640, 0.68);
+      const p = d.querySelector("#mp");
+      p.src = url; p.style.display = "block"; p.dataset.new = "1";
+    } catch (e) { toast("這張圖讀不到，換一張試試"); }
+  });
+  setTimeout(() => { const n = d.querySelector("#mn"); if (n) n.focus(); }, 30);
+}
+
+async function doStamp(id) {
+  const d = document.getElementById("scrim"); if (!d) return;
+  const date = d.querySelector("#md").value || UI.today();
+  const note = d.querySelector("#mn").value.trim();
+  const p = d.querySelector("#mp");
+  const photo = (p.style.display !== "none" && p.src && p.src.startsWith("data:")) ? p.src : null;
+  const fresh = !S.stamps[id];
+
+  S.stamps[id] = { date };
+  S.entries[id] = { note, photo };
+  S.justStamped = fresh ? id : null;
+  d.remove();
+  render();
+
+  try {
+    await DATA.saveStamp(id, { date, note, photo });
+    toast(fresh ? "蓋好了。" : "已更新。");
+  } catch (e) {
+    toast("沒有存起來，再試一次。");
+  }
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act;
+
+  if (act === "tab") { S.view = b.dataset.v; render(); if (S.view === "wall" && !S.wall) loadWall(); return; }
+  if (act === "refresh") { loadWall(); return; }
+  if (act === "prev") { S.page = Math.max(0, S.page - 1); render(); return; }
+  if (act === "next") { S.page = Math.min(S.months.length, S.page + 1); render(); return; }
+  if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
+  if (act === "open") { openModal(b.dataset.id); return; }
+  if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
+  if (act === "stamp") { doStamp(b.dataset.id); return; }
+
+  if (act === "unstamp") {
+    const id = b.dataset.id;
+    if (!confirm("撕掉這格？日期、心得和照片都會不見。")) return;
+    delete S.stamps[id];
+    delete S.entries[id];
+    const d = document.getElementById("scrim"); if (d) d.remove();
+    render();
+    try {
+      await DATA.removeStamp(id);
+      toast("撕掉了。");
+    } catch (e) {
+      toast("沒有存起來，再試一次。");
+    }
+    return;
+  }
+
+  if (act === "edit") { root().innerHTML = UI.setupHTML(S.profile); return; }
+  if (act === "cancel") { render(); return; }
+
+  if (act === "issue") {
+    const name_zh = document.getElementById("fz").value.trim();
+    const name_en = document.getElementById("fe").value.trim();
+    if (!name_zh && !name_en) { toast("至少填一個名字"); return; }
+    const p = {
+      name_zh, name_en: name_en || name_zh,
+      team: document.getElementById("ft").value,
+      motto: document.getElementById("fm").value.trim()
+    };
+    try {
+      await DATA.saveProfile(p);
+      await boot();
+      S.view = "passport"; S.page = 0;
+      render();
+      toast("護照核發完成。");
+    } catch (e) { toast("沒有存起來，再試一次。"); }
+    return;
+  }
+
+  if (act === "avatar") {
+    const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
+    i.onchange = async () => {
+      const f = i.files && i.files[0]; if (!f) return;
+      try {
+        const url = await compress(f, 420, 0.7);
+        S.profile.avatar = url;
+        render();
+        await DATA.saveAvatar(url);
+      } catch (err) { toast("這張圖讀不到，換一張試試"); }
+    };
+    i.click(); return;
+  }
+
+  if (act === "reset") {
+    if (!confirm("清除這本護照？所有的章、心得和照片都會消失，無法復原。")) return;
+    localStorage.removeItem(LOCAL_KEY);
+    S = {
+      profile: null, stamps: {}, entries: {},
+      activities: S.activities, months: S.months,
+      page: 0, view: "passport", wall: null, wallLoading: false,
+      justStamped: null
+    };
+    render();
+    return;
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
+  if (document.getElementById("scrim") || !S.profile) return;
+  if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (S.view !== "passport") return;
+  if (e.key === "ArrowLeft" && S.page > 0) { S.page--; render(); }
+  if (e.key === "ArrowRight" && S.page < S.months.length) { S.page++; render(); }
+});
+
+/* ---------- boot ---------- */
+export async function boot() {
+  const all = await DATA.loadAll();
+  S.activities = all.activities.filter(a => a.active !== false);
+  S.months = all.months;
+  S.profile = all.profile;
+  S.stamps = all.stamps;
+  S.entries = all.entries;
+  render();
+}
+boot();
