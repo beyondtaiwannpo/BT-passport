@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "term": "2026-2027",
+  "note": "學年制：9 月至隔年 7 月，共 11 個月 33 格。每月固定一格聚會 gather、一格題目 prompt、一格鏡頭 frame。",
+  "categories": {
+    "gather": { "zh": "聚會", "en": "GATHER", "desc": "全 BT 一起做的事", "private": false },
+    "prompt": { "zh": "題目", "en": "PROMPT", "desc": "一個寫的題目，只有自己看得到", "private": true },
+    "frame":  { "zh": "鏡頭", "en": "FRAME",  "desc": "一張照片題目", "private": true }
+  },
+  "months": [
+    { "seq": 1,  "month": 9,  "theme_zh": "開學",   "theme_en": "FIRST WEEK" },
+    { "seq": 2,  "month": 10, "theme_zh": "換季",   "theme_en": "TURNING" },
+    { "seq": 3,  "month": 11, "theme_zh": "低潮期", "theme_en": "THE DIP" },
+    { "seq": 4,  "month": 12, "theme_zh": "收尾",   "theme_en": "WRAP" },
+    { "seq": 5,  "month": 1,  "theme_zh": "起頭",   "theme_en": "OPENING" },
+    { "seq": 6,  "month": 2,  "theme_zh": "配對季", "theme_en": "MATCHING" },
+    { "seq": 7,  "month": 3,  "theme_zh": "長跑",   "theme_en": "THE LONG RUN" },
+    { "seq": 8,  "month": 4,  "theme_zh": "春天",   "theme_en": "SPRING" },
+    { "seq": 9,  "month": 5,  "theme_zh": "生日月", "theme_en": "BIRTH MONTH" },
+    { "seq": 10, "month": 6,  "theme_zh": "大場面", "theme_en": "SHOWTIME" },
+    { "seq": 11, "month": 7,  "theme_zh": "散場",   "theme_en": "CURTAIN" }
+  ],
+  "activities": [
+    { "id": "09A", "month": 9,  "category": "gather", "title_zh": "開學電影夜",       "title_en": "OPENING NIGHT",   "desc": "新學年第一次全員上線，選片權給今年的新幹部", "needs_host": true },
+    { "id": "09B", "month": 9,  "category": "prompt", "title_zh": "我是怎麼進來的",   "title_en": "HOW I GOT HERE",  "desc": "三句話，寫下你當初為什麼點進 BT", "needs_host": false },
+    { "id": "09C", "month": 9,  "category": "frame",  "title_zh": "開學第一天",       "title_en": "DAY ONE",         "desc": "你的桌子、教室、通勤路上，隨便哪個", "needs_host": false },
+
+    { "id": "10A", "month": 10, "category": "gather", "title_zh": "遊戲夜",           "title_en": "GAME NIGHT",      "desc": "Gartic Phone、狼人殺、Among Us，主辦組決定", "needs_host": true },
+    { "id": "10B", "month": 10, "category": "prompt", "title_zh": "沒有人知道的事",   "title_en": "NOBODY KNOWS",    "desc": "一件 BT 裡沒人知道的關於你的事", "needs_host": false },
+    { "id": "10C", "month": 10, "category": "frame",  "title_zh": "十月的天空",       "title_en": "OCTOBER SKY",     "desc": "抬頭拍一張，不管你在哪個城市", "needs_host": false },
+
+    { "id": "11A", "month": 11, "category": "gather", "title_zh": "線上自習",         "title_en": "STUDY WITH ME",   "desc": "開鏡頭、靜音、唸兩小時，中間休息十分鐘", "needs_host": true },
+    { "id": "11B", "month": 11, "category": "prompt", "title_zh": "最想放棄的一刻",   "title_en": "THE LOWEST HOUR", "desc": "寫下來就好，不用解決它", "needs_host": false },
+    { "id": "11C", "month": 11, "category": "frame",  "title_zh": "桌上的一團亂",     "title_en": "THE MESS",        "desc": "你現在的桌面，不要整理", "needs_host": false },
+
+    { "id": "12A", "month": 12, "category": "gather", "title_zh": "年末大合照",       "title_en": "YEAR-END PHOTO",  "desc": "缺席的用手機同框", "needs_host": true },
+    { "id": "12B", "month": 12, "category": "prompt", "title_zh": "今年學會的一件事", "title_en": "ONE THING",       "desc": "跟 BT 無關也可以", "needs_host": false },
+    { "id": "12C", "month": 12, "category": "frame",  "title_zh": "你的十二月",       "title_en": "DECEMBER LIGHT",  "desc": "燈、街、窗，任何一種光", "needs_host": false },
+
+    { "id": "01A", "month": 1,  "category": "gather", "title_zh": "慶功宵夜",         "title_en": "AFTER PARTY",     "desc": "寒期探索營結束當晚，線上實體都算", "needs_host": true },
+    { "id": "01B", "month": 1,  "category": "prompt", "title_zh": "今年想丟掉的一件事","title_en": "LEAVE BEHIND",   "desc": "習慣、想法、任何東西", "needs_host": false },
+    { "id": "01C", "month": 1,  "category": "frame",  "title_zh": "冬天的樣子",       "title_en": "WINTER",          "desc": "外套、暖氣、手，隨便哪個", "needs_host": false },
+
+    { "id": "02A", "month": 2,  "category": "gather", "title_zh": "桌遊夜",           "title_en": "BOARD GAME NIGHT","desc": "試玩留學大富翁，順便回報 bug", "needs_host": true },
+    { "id": "02B", "month": 2,  "category": "prompt", "title_zh": "我最不擅長的事",   "title_en": "WHAT I'M BAD AT", "desc": "寫下來，不用改善它", "needs_host": false },
+    { "id": "02C", "month": 2,  "category": "frame",  "title_zh": "有人在忙",         "title_en": "SOMEONE WORKING", "desc": "拍一張別人在做 BT 的樣子", "needs_host": false },
+
+    { "id": "03A", "month": 3,  "category": "gather", "title_zh": "廚房夜",           "title_en": "KITCHEN NIGHT",   "desc": "各自煮、同框吃，泡麵也是煮", "needs_host": true },
+    { "id": "03B", "month": 3,  "category": "prompt", "title_zh": "如果不做 BT",      "title_en": "THE OTHER LIFE",  "desc": "這學期你會在做什麼", "needs_host": false },
+    { "id": "03C", "month": 3,  "category": "frame",  "title_zh": "走路回家的路上",   "title_en": "THE WAY HOME",    "desc": "一張就好", "needs_host": false },
+
+    { "id": "04A", "month": 4,  "category": "gather", "title_zh": "教我一件事",       "title_en": "TEACH ME",        "desc": "五分鐘閃電分享，折衣服也算", "needs_host": true },
+    { "id": "04B", "month": 4,  "category": "prompt", "title_zh": "我改變想法的一件事","title_en": "I CHANGED MY MIND","desc": "以前這樣想、現在那樣想", "needs_host": false },
+    { "id": "04C", "month": 4,  "category": "frame",  "title_zh": "綠色的東西",       "title_en": "SOMETHING GREEN", "desc": "四月了，找一個", "needs_host": false },
+
+    { "id": "05A", "month": 5,  "category": "gather", "title_zh": "BT 慶生",          "title_en": "BIRTHDAY TABLE",  "desc": "五月是 BT 的生日月，找張桌子", "needs_host": true },
+    { "id": "05B", "month": 5,  "category": "prompt", "title_zh": "在 BT 最喜歡的一天","title_en": "BEST DAY",       "desc": "到目前為止", "needs_host": false },
+    { "id": "05C", "month": 5,  "category": "frame",  "title_zh": "期末的樣子",       "title_en": "FINALS",          "desc": "圖書館、咖啡廳、房間", "needs_host": false },
+
+    { "id": "06A", "month": 6,  "category": "gather", "title_zh": "跨國連線夜",       "title_en": "GLOBAL CALL",     "desc": "不同時區同框截圖，誰在凌晨誰就贏", "needs_host": true },
+    { "id": "06B", "month": 6,  "category": "prompt", "title_zh": "這一年沒做到的事", "title_en": "WHAT I MISSED",   "desc": "誠實一點", "needs_host": false },
+    { "id": "06C", "month": 6,  "category": "frame",  "title_zh": "官方活動的非官方照","title_en": "OFF THE RECORD", "desc": "愈亂愈好", "needs_host": false },
+
+    { "id": "07A", "month": 7,  "category": "gather", "title_zh": "學年最後一夜",     "title_en": "LAST NIGHT",      "desc": "電影夜還是遊戲夜，今年的幹部自己決定", "needs_host": true },
+    { "id": "07B", "month": 7,  "category": "prompt", "title_zh": "現在還算數嗎",     "title_en": "STILL TRUE?",     "desc": "回去看九月寫的那三句，補一段今天的回應", "needs_host": false, "callback_to": "09B" },
+    { "id": "07C", "month": 7,  "category": "frame",  "title_zh": "這一年最喜歡的一張","title_en": "PHOTO OF THE YEAR","desc": "翻相簿，挑一張", "needs_host": false }
+  ]
+}

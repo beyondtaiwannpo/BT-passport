@@ -1,0 +1,772 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bt-orange:#FFC46C;
+    --bt-cream:#EDE5D8;
+    --bt-navy:#102A86;
+    --ink:var(--bt-navy);
+    --paper:var(--bt-cream);
+    --display:"Barlow Condensed", "Noto Sans TC", sans-serif;
+    --body:"Inter", "Noto Sans TC", system-ui, sans-serif;
+    --r:3px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  #bt-root{
+    font-family:var(--body);
+    color:var(--ink);
+    line-height:1.55;
+    max-width:940px;
+    margin:0 auto;
+    padding:0 0 40px;
+  }
+  #bt-root button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* ---------- shell ---------- */
+  .bar{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:14px 18px;margin-bottom:14px;
+    background:var(--paper);
+    border:1px solid rgba(16,42,134,.14);
+    border-radius:var(--r);
+  }
+  .bar img{height:26px;width:auto;display:block}
+  .bar .sp{flex:1}
+  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:2px;overflow:hidden}
+  .tabs button{
+    font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;padding:6px 14px;color:rgba(16,42,134,.55);
+    transition:background .15s,color .15s;
+  }
+  .tabs button[aria-selected="true"]{background:var(--bt-navy);color:var(--bt-cream)}
+  .prog{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1}
+  .prog small{font-family:var(--body);font-size:10px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;display:block;opacity:.5;line-height:1;margin-bottom:4px}
+
+  /* ---------- book ---------- */
+  .book{
+    background:var(--paper);
+    border:1px solid rgba(16,42,134,.18);
+    border-radius:var(--r);
+    position:relative;overflow:hidden;
+    min-height:520px;
+  }
+  .book::before{ /* spine */
+    content:"";position:absolute;left:0;top:0;bottom:0;width:9px;
+    background:var(--bt-navy);opacity:.9;
+  }
+  .book::after{ /* paper grain */
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:radial-gradient(rgba(16,42,134,.05) 1px, transparent 1px);
+    background-size:5px 5px;
+  }
+  .page{padding:26px 26px 26px 34px;position:relative;z-index:1}
+  .page.turn{animation:turn .34s ease}
+  @keyframes turn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  .nav{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px 10px 34px;border-top:1px solid rgba(16,42,134,.14);
+    position:relative;z-index:1;
+  }
+  .nav button.arrow{
+    font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.06em;
+    padding:6px 12px;border:1px solid rgba(16,42,134,.25);border-radius:2px;
+  }
+  .nav button.arrow:disabled{opacity:.3;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center;flex-wrap:wrap}
+  .dots button{width:9px;height:9px;border-radius:50%;border:1px solid rgba(16,42,134,.4)}
+  .dots button[data-on="1"]{background:var(--bt-orange);border-color:var(--bt-orange)}
+  .dots button[aria-current="true"]{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* ---------- month page ---------- */
+  .mhead{display:flex;align-items:flex-end;gap:16px;border-bottom:2px solid var(--bt-navy);padding-bottom:10px;margin-bottom:22px}
+  .mnum{font-family:var(--display);font-size:76px;font-weight:700;line-height:.78;letter-spacing:-.02em}
+  .mzh{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;margin-bottom:2px}
+  .mtheme{margin-left:auto;text-align:right;line-height:1.25}
+  .mtheme b{font-family:var(--display);font-size:23px;font-weight:600;letter-spacing:.04em;display:block}
+  .mtheme span{font-size:10px;font-weight:600;letter-spacing:.2em;opacity:.55;text-transform:uppercase}
+
+  .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .slot{
+    border:1.5px dashed rgba(16,42,134,.3);border-radius:var(--r);
+    min-height:270px;padding:14px;
+    display:flex;flex-direction:column;text-align:left;width:100%;
+    transition:border-color .16s,background .16s;
+    position:relative;
+  }
+  .slot:hover,.slot:focus-visible{border-color:var(--bt-navy);background:rgba(255,196,108,.14)}
+  .slot .cat{font-size:9px;font-weight:700;letter-spacing:.2em;opacity:.5;text-transform:uppercase}
+  .slot .ttl{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;margin:5px 0 3px}
+  .slot .en{font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;opacity:.45}
+  .slot .hint{font-size:12.5px;opacity:.62;margin-top:9px}
+  .slot .cta{
+    margin-top:auto;font-family:var(--display);font-size:15px;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;opacity:.35;
+  }
+  .slot:hover .cta{opacity:.85}
+  .slot[data-done="1"]{border-style:solid;border-color:rgba(16,42,134,.18);background:rgba(255,196,108,.1)}
+
+  /* ---------- the stamp ---------- */
+  .stampwrap{margin:auto 0 0;display:flex;justify-content:center;padding:6px 0 2px}
+  .tilt{transform-origin:center}
+  .stamp{
+    border:2.5px solid currentColor;border-radius:7px;
+    padding:7px 11px 5px;text-align:center;
+    opacity:.86;filter:url(#bt-ink);
+    position:relative;
+  }
+  .stamp::after{
+    content:"";position:absolute;inset:3px;border:1px solid currentColor;border-radius:4px;opacity:.55;
+  }
+  .stamp .s1{font-size:7.5px;font-weight:700;letter-spacing:.26em;text-transform:uppercase}
+  .stamp .s2{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.06em;line-height:1.05;margin:1px 0;text-transform:uppercase}
+  .stamp .s3{font-size:9.5px;font-weight:600;letter-spacing:.14em;font-variant-numeric:tabular-nums}
+  .ink-orange{color:#E09A2E}
+  .ink-navy{color:var(--bt-navy)}
+  .stamp.land{animation:land .42s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes land{
+    0%{transform:scale(2.5) rotate(-14deg);opacity:0}
+    55%{transform:scale(.93) rotate(2deg);opacity:.95}
+    100%{opacity:.86}
+  }
+  .overprint{
+    position:absolute;top:70px;right:26px;z-index:2;pointer-events:none;
+    transform:rotate(-11deg);color:#E09A2E;opacity:.55;
+    border:3px double currentColor;border-radius:4px;padding:3px 13px;
+    font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.2em;
+    filter:url(#bt-ink);
+  }
+  .overprint.land{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
+  .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
+  .thumb{width:100%;height:82px;object-fit:cover;border-radius:2px;margin-top:9px;display:block;
+    border:1px solid rgba(16,42,134,.2)}
+
+  /* ---------- ID page ---------- */
+  .idgrid{display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:start}
+  .photo{
+    width:150px;height:190px;border:1px solid rgba(16,42,134,.35);border-radius:2px;
+    background:rgba(255,196,108,.2);display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;
+  }
+  .photo img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(.15) contrast(1.05)}
+  .photo span{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;opacity:.5;text-align:center;padding:0 10px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+  .f{border-bottom:1px solid rgba(16,42,134,.18);padding-bottom:5px}
+  .f i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;display:block}
+  .f b{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:.03em;line-height:1.2;display:block}
+  .f.wide{grid-column:1/-1}
+  .mrz{
+    margin-top:24px;padding:12px 14px;background:rgba(16,42,134,.05);
+    border-top:1px solid rgba(16,42,134,.25);border-radius:2px;
+    font-size:13px;font-weight:600;letter-spacing:.13em;font-variant-numeric:tabular-nums;
+    word-break:break-all;opacity:.75;line-height:1.9;
+  }
+  .motto{font-family:var(--display);font-size:24px;font-weight:500;line-height:1.35;
+    margin-top:22px;padding-left:14px;border-left:3px solid var(--bt-orange)}
+
+  /* ---------- wall ---------- */
+  .wall{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:24px 26px}
+  .wnote{font-size:12px;opacity:.6;margin-bottom:20px;padding:9px 12px;background:rgba(255,196,108,.25);border-radius:2px}
+  .people{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
+  .person{border:1px solid rgba(16,42,134,.16);border-radius:2px;padding:12px 14px;background:rgba(255,255,255,.35)}
+  .person b{font-family:var(--display);font-size:21px;font-weight:600;display:block;line-height:1.15}
+  .person .team{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;opacity:.5}
+  .track{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;margin-top:10px}
+  .track i{height:16px;background:rgba(16,42,134,.1);border-radius:1px;display:block}
+  .track i[data-on="1"]{background:var(--bt-orange)}
+  .person .cnt{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;margin-top:7px;opacity:.7}
+  .feed{margin-top:26px;border-top:1px solid rgba(16,42,134,.15);padding-top:16px}
+  .feed h3,.wall h3{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin:0 0 12px}
+  .fitem{display:flex;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px dotted rgba(16,42,134,.16)}
+  .fitem time{font-variant-numeric:tabular-nums;opacity:.5;flex:none;font-size:12px;font-weight:600}
+  .fitem b{font-weight:600}
+
+  /* ---------- setup / modal ---------- */
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:30px 28px;max-width:560px;margin:0 auto}
+  .card h2{font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1}
+  .card .sub{font-size:13px;opacity:.6;margin-bottom:24px}
+  label{display:block;margin-bottom:15px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
+  input,select,textarea{
+    width:100%;font-family:var(--body);font-size:15px;color:var(--ink);
+    padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
+    background:rgba(255,255,255,.55);
+  }
+  textarea{resize:vertical;min-height:64px}
+  .btn{
+    font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    padding:11px 22px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:opacity .15s;
+  }
+  .btn:hover{opacity:.86}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:15px;padding:7px 14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+
+  .scrim{position:fixed;inset:0;background:rgba(16,42,134,.45);display:flex;align-items:center;
+    justify-content:center;padding:16px;z-index:50;overflow:auto}
+  .modal{background:var(--paper);border-radius:var(--r);padding:26px;max-width:440px;width:100%;
+    border:1px solid rgba(16,42,134,.3);max-height:92vh;overflow:auto}
+  .modal h3{font-family:var(--display);font-size:29px;font-weight:700;margin:0 0 2px;line-height:1.05}
+  .modal .mt{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;margin-bottom:16px}
+  .prev{width:100%;max-height:210px;object-fit:cover;border-radius:2px;margin-top:8px;display:block}
+
+  .empty{text-align:center;padding:40px 10px;opacity:.55;font-size:14px}
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--bt-navy);color:var(--bt-cream);padding:10px 18px;border-radius:2px;
+    font-size:13px;font-weight:500;z-index:60;box-shadow:0 6px 22px rgba(16,42,134,.3);
+  }
+
+  @media (max-width:720px){
+    .slots{grid-template-columns:1fr}
+    .slot{min-height:0}
+    .idgrid{grid-template-columns:1fr}
+    .photo{width:130px;height:164px}
+    .fields{grid-template-columns:1fr}
+    .mnum{font-size:56px}
+    .page{padding:20px 18px 20px 24px}
+    .nav{padding-left:24px}
+    .mrz{font-size:10.5px;letter-spacing:.08em}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .stamp.land,.page.turn{animation:none}
+  }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="bt-ink">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" result="n" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="bt-root"><div class="empty">載入護照中…</div></div>
+
+<script>
+const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAYIAAAC/CAMAAADEtyt8AAAAwFBMVEXboFznlyf005bVs49jXleemZSzlnD5yHDs2s9lUjKJdmOTaS08PDyzgzLbfim5vcRDP0BzfIGAf4S8wbq5wsf///9XV1f5+u/uqUpkZGT+99PtlC5LS0vvqDbt6enVlUrws07siyq4uLj76s/Hx8fY2Nd3d3fZlDb+57HTqG7Yp1T017Cnp6eIh4f+9bPut2wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADL09xEAAAAMHRSTlP///////////////////////////8A//////////////////////////////////+B+Kl4AAAiiElEQVR42u1dC2OiSLNtXmoyu/vdlzSNpEUBFZTw///drapuoEE0PohmZ2R3MplEUet0vU5VV7P5gy7O9d/z19W92CPEPp+npfB9X3hZ/QP5Ev1DIKjFffAjRABBEC/hPx6CzPMjnzCIIvjGz1626LEQZKWIfBC/1gL4JvJeUn8gBGiCQOwR/V9fkXjZoodBsBaG5JtL+JvsJfiHQJAq46PsUIlSPyAkAt3CC4PvhECq6D/b+OgFEIBIrOvfeZE2SWkneH1B8A3XgUQP/wMIa0PYaWONRLmWL/l/CwQoUlm2/nfdlXLq6/BIAEC+9/LM36MF68b1bo4jUIkagC5BOQnvpQXfEImW5INRDUo5pCVGfAoPKrMXBGMnYxsyNRFEPumJh4iasMCvf23kC4JxjdBGBUHijJ3PRCdPWL8gGC0YBbPuNQHPV4KVWanSBt9/QTBeOjAvhXK2/mXWhRg84csXBKNdG0p94c/hItQ45Mv46PQFwViKIJRl2VzGP8gmfF2/IBgpJ9vUycDlTymP2YoXBHdYIe2IywtZB67iV7gkf0EwDgIRIeAZ3vkcFhQREY1Rzl8QjHF55InBtV4ozrLODdw/nbkeC4K1XtHrix+us+PI7bBE/AXBHawEyvNCBA6ipoiERqDuMnpBcOtVKl7uUtpTRA1FkSbz+csX3H+lgir05aU6I3RHxaYOR/mMc/6C4N54VIhL/epapXAHqY0P53vH2Yf8BcHtaXF0XZJ7oPC1JjE4D0Ob5czeyxcEt16HK5PilFyBYbYSp4gtK7YT+YLgtktZ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";
+
+const TEAMS = ["Curriculum Team","Mentorship Team","Marketing Team","Sponsorship Team","Internship Team","Community Relations Team","President's Office"];
+
+const MONTHS = [
+  {n:9, zh:"九月", theme:"開學", en:"FIRST WEEK"},
+  {n:10, zh:"十月", theme:"換季", en:"TURNING"},
+  {n:11, zh:"十一月", theme:"低潮期", en:"THE DIP"},
+  {n:12, zh:"十二月", theme:"收尾", en:"WRAP"},
+  {n:1, zh:"一月", theme:"起頭", en:"OPENING"},
+  {n:2, zh:"二月", theme:"配對季", en:"MATCHING"},
+  {n:3, zh:"三月", theme:"長跑", en:"THE LONG RUN"},
+  {n:4, zh:"四月", theme:"春天", en:"SPRING"},
+  {n:5, zh:"五月", theme:"生日月", en:"BIRTH MONTH"},
+  {n:6, zh:"六月", theme:"大場面", en:"SHOWTIME"},
+  {n:7, zh:"七月", theme:"散場", en:"CURTAIN"}
+];
+
+// cat: G 相聚 / S 分享 / T 留痕
+const ACTS = [
+  {id:"09A",m:9,c:"G",zh:"開學電影夜",en:"OPENING NIGHT",hint:"新學年第一次全員上線，選片權給今年的新幹部"},
+  {id:"09B",m:9,c:"P",zh:"我是怎麼進來的",en:"HOW I GOT HERE",hint:"三句話，寫下你當初為什麼點進 BT"},
+  {id:"09C",m:9,c:"F",zh:"開學第一天",en:"DAY ONE",hint:"你的桌子、教室、通勤路上，隨便哪個"},
+
+  {id:"10A",m:10,c:"G",zh:"遊戲夜",en:"GAME NIGHT",hint:"Gartic Phone、狼人殺、Among Us，主辦組決定"},
+  {id:"10B",m:10,c:"P",zh:"沒有人知道的事",en:"NOBODY KNOWS",hint:"一件 BT 裡沒人知道的關於你的事"},
+  {id:"10C",m:10,c:"F",zh:"十月的天空",en:"OCTOBER SKY",hint:"抬頭拍一張，不管你在哪個城市"},
+
+  {id:"11A",m:11,c:"G",zh:"線上自習",en:"STUDY WITH ME",hint:"開鏡頭、靜音、唸兩小時，中間休息十分鐘"},
+  {id:"11B",m:11,c:"P",zh:"最想放棄的一刻",en:"THE LOWEST HOUR",hint:"寫下來就好，不用解決它"},
+  {id:"11C",m:11,c:"F",zh:"桌上的一團亂",en:"THE MESS",hint:"你現在的桌面，不要整理"},
+
+  {id:"12A",m:12,c:"G",zh:"年末大合照",en:"YEAR-END PHOTO",hint:"缺席的用手機同框"},
+  {id:"12B",m:12,c:"P",zh:"今年學會的一件事",en:"ONE THING",hint:"跟 BT 無關也可以"},
+  {id:"12C",m:12,c:"F",zh:"你的十二月",en:"DECEMBER LIGHT",hint:"燈、街、窗，任何一種光"},
+
+  {id:"01A",m:1,c:"G",zh:"慶功宵夜",en:"AFTER PARTY",hint:"寒期探索營結束當晚，線上實體都算"},
+  {id:"01B",m:1,c:"P",zh:"今年想丟掉的一件事",en:"LEAVE BEHIND",hint:"習慣、想法、任何東西"},
+  {id:"01C",m:1,c:"F",zh:"冬天的樣子",en:"WINTER",hint:"外套、暖氣、手，隨便哪個"},
+
+  {id:"02A",m:2,c:"G",zh:"桌遊夜",en:"BOARD GAME NIGHT",hint:"試玩留學大富翁，順便回報 bug"},
+  {id:"02B",m:2,c:"P",zh:"我最不擅長的事",en:"WHAT I'M BAD AT",hint:"寫下來，不用改善它"},
+  {id:"02C",m:2,c:"F",zh:"有人在忙",en:"SOMEONE WORKING",hint:"拍一張別人在做 BT 的樣子"},
+
+  {id:"03A",m:3,c:"G",zh:"廚房夜",en:"KITCHEN NIGHT",hint:"各自煮、同框吃，泡麵也是煮"},
+  {id:"03B",m:3,c:"P",zh:"如果不做 BT",en:"THE OTHER LIFE",hint:"這學期你會在做什麼"},
+  {id:"03C",m:3,c:"F",zh:"走路回家的路上",en:"THE WAY HOME",hint:"一張就好"},
+
+  {id:"04A",m:4,c:"G",zh:"教我一件事",en:"TEACH ME",hint:"五分鐘閃電分享，折衣服也算"},
+  {id:"04B",m:4,c:"P",zh:"我改變想法的一件事",en:"I CHANGED MY MIND",hint:"以前這樣想、現在那樣想"},
+  {id:"04C",m:4,c:"F",zh:"綠色的東西",en:"SOMETHING GREEN",hint:"四月了，找一個"},
+
+  {id:"05A",m:5,c:"G",zh:"BT 慶生",en:"BIRTHDAY TABLE",hint:"五月是 BT 的生日月，找張桌子"},
+  {id:"05B",m:5,c:"P",zh:"在 BT 最喜歡的一天",en:"BEST DAY",hint:"到目前為止"},
+  {id:"05C",m:5,c:"F",zh:"期末的樣子",en:"FINALS",hint:"圖書館、咖啡廳、房間"},
+
+  {id:"06A",m:6,c:"G",zh:"跨國連線夜",en:"GLOBAL CALL",hint:"不同時區同框截圖，誰在凌晨誰就贏"},
+  {id:"06B",m:6,c:"P",zh:"這一年沒做到的事",en:"WHAT I MISSED",hint:"誠實一點"},
+  {id:"06C",m:6,c:"F",zh:"官方活動的非官方照",en:"OFF THE RECORD",hint:"愈亂愈好"},
+
+  {id:"07A",m:7,c:"G",zh:"學年最後一夜",en:"LAST NIGHT",hint:"電影夜還是遊戲夜，今年的幹部自己決定"},
+  {id:"07B",m:7,c:"P",zh:"現在還算數嗎",en:"STILL TRUE?",hint:"回去看九月寫的那三句，補一段今天的回應"},
+  {id:"07C",m:7,c:"F",zh:"這一年最喜歡的一張",en:"PHOTO OF THE YEAR",hint:"翻相簿，挑一張"}
+];
+
+const CATNAME = {G:"聚會 GATHER", P:"題目 PROMPT", F:"鏡頭 FRAME"};
+const TOTAL = ACTS.length;
+const KEY = "bt-passport:v3";
+
+let S = {profile:null, stamps:{}, page:0, view:"passport", wall:null, wallLoading:false, photos:{}};
+
+const PKEY = id => "bt-photo:" + id;
+
+/* ---------- storage helpers ---------- */
+async function sget(k, shared){
+  try{ const r = await window.storage.get(k, !!shared); if(!r) return null; return JSON.parse(r.value); }
+  catch(e){ return null; }
+}
+async function sset(k, v, shared){
+  try{ const r = await window.storage.set(k, JSON.stringify(v), !!shared); return !!r; }
+  catch(e){ console.error("storage.set failed", k, e); return false; }
+}
+async function slist(prefix, shared){
+  try{ const r = await window.storage.list(prefix, !!shared); if(!r||!r.keys) return []; 
+       return r.keys.map(k => typeof k === "string" ? k : (k && (k.key||k.name)) ).filter(Boolean); }
+  catch(e){ return []; }
+}
+
+/* ---------- util ---------- */
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today = () => new Date().toISOString().slice(0,10);
+const actById = id => ACTS.find(a=>a.id===id);
+const doneCount = () => Object.keys(S.stamps).length;
+
+function rid(){ return Math.random().toString(36).slice(2,10); }
+
+function passportNo(id){
+  let h=0; for(const ch of id) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+  return "BT" + String(h % 10000000).padStart(7,"0");
+}
+
+function mrz(p){
+  const clean = s => String(s||"").toUpperCase().replace(/[^A-Z ]/g,"").trim().replace(/ +/g,"<");
+  const parts = clean(p.nameEn).split("<").filter(Boolean);
+  const sur = parts.length>1 ? parts[parts.length-1] : (parts[0]||"MEMBER");
+  const giv = parts.length>1 ? parts.slice(0,-1).join("<") : "";
+  const l1 = ("P<TWN" + sur + "<<" + giv).padEnd(44,"<").slice(0,44);
+
+  const iso = p.issued || today();
+  const yy = iso.slice(2,4), mm = iso.slice(5,7), dd = iso.slice(8,10);
+  const expYY = String((Number(yy)+1) % 100).padStart(2,"0");
+  const teamCode = (p.team||"BT").replace(/[^A-Za-z]/g,"").toUpperCase().slice(0,6);
+  const l2 = (passportNo(p.id) + "7TWN" + yy+mm+dd + "1M" + expYY+mm+dd + "4" + teamCode)
+    .padEnd(44,"<").slice(0,44);
+  return [l1, l2];
+}
+
+function compress(file, maxDim, quality){
+  return new Promise((res, rej)=>{
+    const fr = new FileReader();
+    fr.onerror = ()=>rej(new Error("read"));
+    fr.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>rej(new Error("decode"));
+      img.onload = ()=>{
+        let {width:w, height:h} = img;
+        const sc = Math.min(1, maxDim/Math.max(w,h));
+        w = Math.round(w*sc); h = Math.round(h*sc);
+        const c = document.createElement("canvas");
+        c.width=w; c.height=h;
+        c.getContext("2d").drawImage(img,0,0,w,h);
+        res(c.toDataURL("image/jpeg", quality));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+let toastT;
+function toast(msg){
+  document.querySelectorAll(".toast").forEach(n=>n.remove());
+  const d = document.createElement("div");
+  d.className="toast"; d.textContent=msg; d.setAttribute("role","status");
+  document.body.appendChild(d);
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>d.remove(), 2600);
+}
+
+/* ---------- persistence ---------- */
+async function saveLocal(){
+  const ok = await sset(KEY, {profile:S.profile, stamps:S.stamps});
+  if(!ok) toast("儲存失敗，請再試一次");
+  return ok;
+}
+async function pushWall(){
+  if(!S.profile) return;
+  const list = Object.keys(S.stamps).map(id=>({id, d:S.stamps[id].date})).sort((a,b)=>a.d<b.d?1:-1);
+  await sset("wall:"+S.profile.id, {
+    nameZh:S.profile.nameZh, nameEn:S.profile.nameEn, team:S.profile.team,
+    count:list.length, stamps:list, updated:new Date().toISOString()
+  }, true);
+}
+
+/* ---------- render ---------- */
+const root = () => document.getElementById("bt-root");
+
+function render(){
+  const el = root();
+  if(!S.profile){ el.innerHTML = setupHTML(); return; }
+  el.innerHTML = barHTML() + (S.view==="wall" ? wallHTML() : bookHTML());
+  hydratePhotos();
+}
+
+function barHTML(){
+  return `<div class="bar">
+    <img src="${LOGO}" alt="Beyond Taiwan">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="${S.view==="passport"}" data-act="tab" data-v="passport">我的護照</button>
+      <button role="tab" aria-selected="${S.view==="wall"}" data-act="tab" data-v="wall">進度牆</button>
+    </div>
+    <div class="sp"></div>
+    <div class="prog"><small>Stamps collected</small>${doneCount()} <span style="opacity:.4">/ ${TOTAL}</span></div>
+  </div>`;
+}
+
+function bookHTML(){
+  return `<div class="book">
+    <div class="page turn">${S.page===0 ? idPageHTML() : monthPageHTML(MONTHS[S.page-1])}</div>
+    <div class="nav">
+      <button class="arrow" data-act="prev" ${S.page===0?"disabled":""}>← 前一頁</button>
+      <div class="dots">
+        <button data-act="go" data-p="0" aria-current="${S.page===0}" aria-label="資料頁" title="資料頁"></button>
+        ${MONTHS.map((m,i)=>{
+          const acts = ACTS.filter(a=>a.m===m.n);
+          const on = acts.every(a=>S.stamps[a.id]) ? 1 : 0;
+          return `<button data-act="go" data-p="${i+1}" data-on="${on}" aria-current="${S.page===i+1}" aria-label="${m.zh}" title="${m.zh}"></button>`;
+        }).join("")}
+      </div>
+      <button class="arrow" data-act="next" ${S.page===MONTHS.length?"disabled":""}>下一頁 →</button>
+    </div>
+  </div>`;
+}
+
+function idPageHTML(){
+  const p = S.profile;
+  const [l1,l2] = mrz(p);
+  const av = S.photos.avatar ? `<img src="${S.photos.avatar}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
+  return `<div class="mhead">
+      <div class="mnum">00</div>
+      <div class="mzh">持照人資料</div>
+      <div class="mtheme"><b>BEYOND TAIWAN</b><span>Passport · ${new Date(p.issued).getFullYear()}</span></div>
+    </div>
+    <div class="idgrid">
+      <button class="photo" data-act="avatar" title="上傳大頭照">${av}</button>
+      <div>
+        <div class="fields">
+          <div class="f"><i>Type / 類別</i><b>BT</b></div>
+          <div class="f"><i>Code / 代碼</i><b>TWN</b></div>
+          <div class="f"><i>Passport No. / 護照號碼</i><b>${passportNo(p.id)}</b></div>
+          <div class="f"><i>Date of issue / 核發日</i><b>${p.issued}</b></div>
+          <div class="f wide"><i>Name / 姓名</i><b>${esc(p.nameZh)} · ${esc(p.nameEn).toUpperCase()}</b></div>
+          <div class="f wide"><i>Team / 所屬團隊</i><b>${esc(p.team)}</b></div>
+        </div>
+        ${p.motto ? `<div class="motto">「${esc(p.motto)}」</div>` : ""}
+      </div>
+    </div>
+    ${doneCount()===TOTAL ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${TOTAL} / ${TOTAL} · FULL</div>` : ""}
+    <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn ghost sm" data-act="edit">編輯資料</button>
+      <button class="btn ghost sm" data-act="reset">清除這本護照</button>
+    </div>`;
+}
+
+function stampHTML(act, st, animate){
+  const ink = act.c==="G" ? "ink-orange" : "ink-navy";
+  const rot = ((act.id.charCodeAt(2) * 7) % 11) - 5;
+  return `<div class="stampwrap"><div class="tilt" style="transform:rotate(${rot}deg)">
+    <div class="stamp ${ink}${animate?" land":""}">
+      <div class="s1">Beyond Taiwan</div>
+      <div class="s2">${esc(act.en)}</div>
+      <div class="s3">${esc(st.date).replace(/-/g,".")}</div>
+    </div>
+  </div></div>`;
+}
+
+function monthPageHTML(m){
+  const acts = ACTS.filter(a=>a.m===m.n);
+  const full = acts.every(a=>S.stamps[a.id]);
+  return `${full?`<div class="overprint">MONTH CLEARED</div>`:""}
+    <div class="mhead">
+      <div class="mnum">${String(m.n).padStart(2,"0")}</div>
+      <div class="mzh">${m.zh}</div>
+      <div class="mtheme"><b>${m.theme}</b><span>${m.en}</span></div>
+    </div>
+    <div class="slots">${acts.map(a=>slotHTML(a)).join("")}</div>`;
+}
+
+function slotHTML(a){
+  const st = S.stamps[a.id];
+  const anim = st && S.justStamped===a.id;
+  if(anim) S.justStamped = null;
+  return `<button class="slot" data-act="open" data-id="${a.id}" data-done="${st?1:0}">
+    <span class="cat">${CATNAME[a.c]}</span>
+    <span class="ttl">${esc(a.zh)}</span>
+    <span class="en">${esc(a.en)}</span>
+    ${st ? `${stampHTML(a, st, anim)}
+        ${st.note ? `<span class="note">${esc(st.note)}</span>` : ""}
+        ${st.hasPhoto ? (S.photos[a.id]
+            ? `<img class="thumb" src="${S.photos[a.id]}" alt="">`
+            : `<img class="thumb" data-load="${a.id}" alt="" style="background:rgba(16,42,134,.07)">`) : ""}`
+      : `<span class="hint">${esc(a.hint)}</span><span class="cta">蓋章 →</span>`}
+  </button>`;
+}
+
+/* fills in thumbnails whose photo isn't in memory yet */
+async function hydratePhotos(){
+  const pending = Array.from(document.querySelectorAll("img[data-load]"));
+  for(const img of pending){
+    const id = img.dataset.load;
+    img.removeAttribute("data-load");
+    if(S.photos[id]){ img.src = S.photos[id]; continue; }
+    const v = await sget(PKEY(id), false);
+    if(v){ S.photos[id] = v; img.src = v; }
+    else { img.remove(); }
+  }
+}
+
+/* ---------- wall ---------- */
+function wallHTML(){
+  if(S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
+  const people = (S.wall||[]).slice().sort((a,b)=>b.count-a.count);
+  const feed = [];
+  people.forEach(p => (p.stamps||[]).forEach(s => feed.push({who:p.nameZh||p.nameEn, id:s.id, d:s.d})));
+  feed.sort((a,b)=> a.d<b.d ? 1 : a.d>b.d ? -1 : 0);
+
+  return `<div class="wall">
+    <h3>全體進度牆</h3>
+    <div class="wnote">這面牆是公開的：所有打開這本護照的 BT 成員都看得到你的名字、團隊與蓋章紀錄。你寫的心得和上傳的照片不會出現在這裡，只留在你自己的護照裡。</div>
+    ${people.length===0 ? `<div class="empty">還沒有人蓋章。去蓋第一個吧。</div>` :
+      `<div class="people">${people.map(p=>{
+        const on = new Set((p.stamps||[]).map(s=>s.id));
+        return `<div class="person">
+          <b>${esc(p.nameZh||p.nameEn)}</b>
+          <span class="team">${esc(p.team||"")}</span>
+          <div class="track">${MONTHS.map(m=>{
+            const acts = ACTS.filter(a=>a.m===m.n);
+            const got = acts.filter(a=>on.has(a.id)).length;
+            const op = got===0 ? 1 : (0.34 + 0.66*got/acts.length);
+            return `<i data-on="${got>0?1:0}" style="opacity:${op.toFixed(2)}" title="${m.zh} ${got}/${acts.length}"></i>`;
+          }).join("")}</div>
+          <div class="cnt">${p.count||0} / ${TOTAL}</div>
+        </div>`;
+      }).join("")}</div>`}
+    ${feed.length ? `<div class="feed"><h3>最近蓋的章</h3>
+      ${feed.slice(0,20).map(f=>{
+        const a = actById(f.id);
+        return `<div class="fitem"><time>${esc(f.d)}</time><span><b>${esc(f.who)}</b> 蓋了 <b>${a?esc(a.zh):esc(f.id)}</b></span></div>`;
+      }).join("")}</div>` : ""}
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+  </div>`;
+}
+
+async function loadWall(){
+  S.wallLoading = true; render();
+  const keys = (await slist("wall:", true)).slice(0,80);
+  const out = [];
+  for(const k of keys){
+    const v = await sget(k, true);
+    if(v && (v.nameZh || v.nameEn)) out.push(v);
+  }
+  S.wall = out; S.wallLoading = false; render();
+}
+
+/* ---------- setup ---------- */
+function setupHTML(p){
+  p = p || {};
+  return `<div class="card">
+    <img src="${LOGO}" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>${p.id?"編輯護照資料":"申請你的 BT 護照"}</h2>
+    <div class="sub">${p.id?"改完按儲存，章不會消失。":"一年 36 格，每個月三個。蓋滿的人，年底會有一整本回憶。"}</div>
+    <label><i>中文名 / Name</i><input id="fz" value="${esc(p.nameZh||"")}" placeholder="王小明" maxlength="20"></label>
+    <label><i>英文名 / Name in English（會印在機讀碼上）</i><input id="fe" value="${esc(p.nameEn||"")}" placeholder="Ming Wang" maxlength="30"></label>
+    <label><i>所屬團隊 / Team</i><select id="ft">${TEAMS.map(t=>`<option ${p.team===t?"selected":""}>${t}</option>`).join("")}</select></label>
+    <label><i>護照上的一句話 / Your line（選填）</i><textarea id="fm" maxlength="60" placeholder="你無法選擇你從未看見的東西。">${esc(p.motto||"")}</textarea></label>
+    <div class="wnote" style="margin:0 0 16px">送出後，你的姓名、團隊與蓋章紀錄會出現在全體進度牆上，其他 BT 成員看得到。心得與照片只存在你自己的護照裡。</div>
+    <div class="row">
+      <button class="btn" data-act="issue">${p.id?"儲存":"核發護照"}</button>
+      ${p.id?`<button class="btn ghost" data-act="cancel">取消</button>`:""}
+    </div>
+  </div>`;
+}
+
+/* ---------- modal ---------- */
+function openModal(id){
+  const a = actById(id); if(!a) return;
+  const st = S.stamps[id];
+  const d = document.createElement("div");
+  d.className="scrim"; d.id="scrim";
+  d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(a.zh)}">
+    <div class="mt">${CATNAME[a.c]} · ${String(a.m).padStart(2,"0")}月</div>
+    <h3>${esc(a.zh)}</h3>
+    <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${esc(a.en)}</div>
+    <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${esc(a.hint)}</p>
+    <label><i>日期 / Date</i><input type="date" id="md" value="${st?st.date:today()}"></label>
+    <label><i>一句話 / One line（選填，最多 60 字）</i><textarea id="mn" maxlength="60" placeholder="那天發生了什麼？">${st?esc(st.note||""):""}</textarea></label>
+    <label><i>照片（選填，只存在你的護照裡）</i><input type="file" id="mf" accept="image/*"></label>
+    <img class="prev" id="mp" src="${st&&st.hasPhoto&&S.photos[id]?S.photos[id]:""}" style="${st&&st.hasPhoto?"":"display:none"}" alt="">
+    <div class="row" style="margin-top:14px">
+      <button class="btn" data-act="stamp" data-id="${id}">${st?"更新":"蓋章"}</button>
+      <button class="btn ghost" data-act="close">取消</button>
+      ${st?`<button class="btn ghost sm" data-act="unstamp" data-id="${id}" style="margin-left:auto">撕掉這格</button>`:""}
+    </div>
+  </div>`;
+  document.body.appendChild(d);
+  d.addEventListener("click", e=>{ if(e.target===d) d.remove(); });
+  const f = d.querySelector("#mf");
+  f.addEventListener("change", async ()=>{
+    const file = f.files && f.files[0]; if(!file) return;
+    try{
+      const url = await compress(file, 640, 0.68);
+      const p = d.querySelector("#mp");
+      p.src = url; p.style.display="block"; p.dataset.new = "1";
+    }catch(e){ toast("這張圖讀不到，換一張試試"); }
+  });
+  if(st && st.hasPhoto && !S.photos[id]){
+    sget(PKEY(id), false).then(v=>{
+      if(!v) return;
+      S.photos[id] = v;
+      const p = d.querySelector("#mp");
+      if(p && !p.dataset.new){ p.src = v; p.style.display="block"; }
+    });
+  }
+  setTimeout(()=>{ const n=d.querySelector("#mn"); if(n) n.focus(); }, 30);
+}
+
+async function doStamp(id){
+  const d = document.getElementById("scrim"); if(!d) return;
+  const date = d.querySelector("#md").value || today();
+  const note = d.querySelector("#mn").value.trim();
+  const p = d.querySelector("#mp");
+  const isNewPhoto = p.dataset.new === "1";
+  const hasPhoto = p.style.display !== "none" && !!p.src;
+  const fresh = !S.stamps[id];
+
+  S.stamps[id] = {date, note, hasPhoto};
+  if(hasPhoto && isNewPhoto) S.photos[id] = p.src;
+  S.justStamped = fresh ? id : null;
+  d.remove();
+  render();
+
+  if(hasPhoto && isNewPhoto){
+    const okp = await sset(PKEY(id), S.photos[id], false);
+    if(!okp){ toast("照片太大存不下，章還在，照片沒存到"); S.stamps[id].hasPhoto = false; }
+  }
+  const ok = await saveLocal();
+  if(ok){ await pushWall(); toast(fresh ? "蓋好了。" : "已更新。"); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", async e=>{
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const act = b.dataset.act;
+
+  if(act==="tab"){ S.view=b.dataset.v; render(); if(S.view==="wall" && !S.wall) loadWall(); return; }
+  if(act==="refresh"){ loadWall(); return; }
+  if(act==="prev"){ S.page=Math.max(0,S.page-1); render(); return; }
+  if(act==="next"){ S.page=Math.min(MONTHS.length,S.page+1); render(); return; }
+  if(act==="go"){ S.page=Number(b.dataset.p); render(); return; }
+  if(act==="open"){ openModal(b.dataset.id); return; }
+  if(act==="close"){ const d=document.getElementById("scrim"); if(d) d.remove(); return; }
+  if(act==="stamp"){ doStamp(b.dataset.id); return; }
+
+  if(act==="unstamp"){
+    const id=b.dataset.id;
+    if(!confirm("撕掉這格？日期、心得和照片都會不見。")) return;
+    delete S.stamps[id];
+    delete S.photos[id];
+    const d=document.getElementById("scrim"); if(d) d.remove();
+    render();
+    try{ await window.storage.delete(PKEY(id), false); }catch(err){}
+    await saveLocal(); await pushWall(); toast("撕掉了。");
+    return;
+  }
+
+  if(act==="edit"){ root().innerHTML = setupHTML(S.profile); return; }
+  if(act==="cancel"){ render(); return; }
+
+  if(act==="issue"){
+    const nameZh=document.getElementById("fz").value.trim();
+    const nameEn=document.getElementById("fe").value.trim();
+    if(!nameZh && !nameEn){ toast("至少填一個名字"); return; }
+    S.profile = Object.assign({}, S.profile||{}, {
+      id:(S.profile&&S.profile.id)||rid(),
+      issued:(S.profile&&S.profile.issued)||today(),
+      nameZh, nameEn:nameEn||nameZh,
+      team:document.getElementById("ft").value,
+      motto:document.getElementById("fm").value.trim()
+    });
+    S.view="passport"; S.page=0;
+    render();
+    await saveLocal(); await pushWall();
+    toast("護照核發完成。");
+    return;
+  }
+
+  if(act==="avatar"){
+    const i=document.createElement("input"); i.type="file"; i.accept="image/*";
+    i.onchange = async ()=>{
+      const f=i.files&&i.files[0]; if(!f) return;
+      try{
+        S.photos.avatar = await compress(f, 420, 0.7);
+        S.profile.hasAvatar = true;
+        render();
+        const okp = await sset(PKEY("avatar"), S.photos.avatar, false);
+        if(!okp){ toast("大頭照存不下，換一張小一點的"); S.profile.hasAvatar = false; }
+        await saveLocal();
+      }catch(err){ toast("這張圖讀不到，換一張試試"); }
+    };
+    i.click(); return;
+  }
+
+  if(act==="reset"){
+    if(!confirm("清除這本護照？所有的章、心得和照片都會消失，無法復原。")) return;
+    const pkeys = await slist("bt-photo:", false);
+    for(const k of pkeys){ try{ await window.storage.delete(k, false); }catch(err){} }
+    try{ await window.storage.delete(KEY, false); }catch(err){}
+    if(S.profile){ try{ await window.storage.delete("wall:"+S.profile.id, true); }catch(err){} }
+    S = {profile:null, stamps:{}, page:0, view:"passport", wall:null, wallLoading:false, photos:{}};
+    render();
+    return;
+  }
+});
+
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){ const d=document.getElementById("scrim"); if(d) d.remove(); return; }
+  if(document.getElementById("scrim") || !S.profile) return;
+  if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(S.view!=="passport") return;
+  if(e.key==="ArrowLeft" && S.page>0){ S.page--; render(); }
+  if(e.key==="ArrowRight" && S.page<MONTHS.length){ S.page++; render(); }
+});
+
+/* ---------- boot ---------- */
+(async function(){
+  const data = await sget(KEY, false);
+  if(data && data.profile){
+    S.profile = data.profile;
+    S.stamps = data.stamps || {};
+    S.page = 0;
+    if(S.profile.hasAvatar){
+      const av = await sget(PKEY("avatar"), false);
+      if(av) S.photos.avatar = av;
+    }
+  }
+  render();
+})();
+</script>
