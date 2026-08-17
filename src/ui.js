@@ -187,11 +187,15 @@ export function authHTML(mode, msg) {
     <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
     <div class="sub">${up ? "需要一組 BT 邀請碼。跟你的組長拿。" : "用你註冊時的 email 登入。"}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
-    <!-- 邀請碼那格的 autocapitalize/autocorrect/spellcheck 全部關掉，是必要的不是保險：
-         手機鍵盤預設會把第一個字母變成大寫，而邀請碼是嚴格分大小寫地比對的
-         （trigger 是 where code = v_code）。學生看不到自己被改了什麼，只會看到
-         「這個邀請碼不對」，然後把同一組碼再打十次。2026-08-17 那個把小寫碼
-         轉成大寫的 bug 就是這一類，只是發生在程式裡（見 main.js 那段註解）。
+    <!-- 邀請碼那格的 autocapitalize/autocorrect/spellcheck 全部關掉。
+         **大小寫那一半已經不再是理由**：trigger 現在是
+         where upper(btrim(code)) = upper(btrim(v_code))，手機鍵盤把第一個字母變成大寫
+         也對得到（見 supabase/migrations/2026-08-17-invite-code-case-insensitive.sql）。
+         留著這幾個屬性是為了另外那一半，而那一半沒有變：autocorrect 與 spellcheck 會把
+         它不認得的字串**換成別的字**，那是使用者看不見的竄改，資料庫救不了 ——
+         學生只會看到「這個邀請碼不對」，然後把同一組碼再打十次。
+         2026-08-17 那個把小寫碼轉成大寫的 bug 就是這一類，只是發生在程式裡
+         （見 main.js 那段註解）。
          email 那格同樣關掉：GoTrue 自己會把 email 正規化成小寫，所以大小寫不致命，
          但 autocorrect 會把不認得的字串改掉，那是同一種「使用者看不見的竄改」。
          密碼那格不必：type="password" 本來就不會自動大寫或自動更正。 -->
