@@ -441,7 +441,7 @@ begin
   -- update ... where uses_left > 0 搭配 if not found，
   -- 一次完成檢查與扣減，避免兩人同時用同一組最後一次的碼（spec §6）
   update invite_codes set uses_left = uses_left - 1
-   where code = v_code and uses_left > 0;
+   where upper(btrim(code)) = upper(btrim(v_code)) and uses_left > 0;
   if not found then
     raise exception 'invalid_invite' using errcode = 'P0001';
   end if;
@@ -2064,11 +2064,14 @@ GitHub、Supabase、網域，全部掛 beyondtaiwan2020@gmail.com。
    - `note`：發給誰，寫給人看的，例如「給課程組小明」
 4. Save
 
-**碼是逐字比對的，大小寫算數。** 你在 `code` 欄位打成什麼樣，學生就得打成什麼樣 ——
-`bt2026test` 和 `BT2026TEST` 是兩組不同的碼。前後空白會被系統自動去掉，其他都不會。
+**大小寫不算數，前後空白也不算數。** `bt2026test`、`BT2026TEST`、`  Bt2026Test  `
+系統都當成同一組碼，所以你用什麼大小寫建碼都可以，學生打成什麼樣也都對得到。
+
+也因為這樣，**不能同時建兩組只差在大小寫的碼**（`bt2026test` 和 `BT2026TEST`）——
+資料庫會擋下來，因為那兩組正規化之後長得一樣，系統分不出該扣哪一組。
 
 建議一律用同一種寫法（例如全小寫、用連字號分段：`bt-curriculum-01`），
-並且**用複製貼上的方式把碼給學生**，不要用口頭或截圖 —— 打錯一個字母就進不來，
+並且**用複製貼上的方式把碼給學生**，不要用口頭或截圖 —— 打錯一個字母還是進不來，
 而畫面上的訊息只會說「這個邀請碼不對」，不會告訴他錯在哪個字。
 
 一組碼給一個人。要發給五個人就建五列，不要建一列 `uses_left = 5` ——
@@ -2092,7 +2095,7 @@ GitHub、Supabase、網域，全部掛 beyondtaiwan2020@gmail.com。
 
 有人說「我的碼不能用了」，先查那一列的 `uses_left`：
 
-- 還是 1 → 碼沒問題。八成是**大小寫或字母打錯**（見上面），其次是 email 打錯。
+- 還是 1 → 碼沒問題。大小寫不影響，所以八成是**字母打錯**，其次是 email 打錯。
   請他把碼複製貼上，不要手打
 - 已經是 0 → 那組碼真的被人成功註冊掉了。查 `auth.users` 看是誰用的，
   可能是他自己註冊過忘了，也可能是碼被轉給別人。確認之後再發新的

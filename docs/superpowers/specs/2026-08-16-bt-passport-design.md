@@ -197,7 +197,7 @@ language plpgsql security definer as $$
 declare v_code text := new.raw_user_meta_data->>'invite';
 begin
   update invite_codes set uses_left = uses_left - 1
-   where code = v_code and uses_left > 0;
+   where upper(btrim(code)) = upper(btrim(v_code)) and uses_left > 0;
   if not found then
     raise exception 'invalid_invite' using errcode = 'P0001';
   end if;
@@ -228,9 +228,7 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 | 連不上資料庫 | 現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。 |
 | 其他未預期錯誤 | 出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。 |
 
-**判斷方式必須實測決定，不得照預期的錯誤字串寫。** trigger `raise` 之後 Supabase 回給前端的是籠統的資料庫錯誤，不會是 `invalid_invite`；實際的 `status` / `code` / `message` 只有真的註冊失敗一次才知道，而且會隨 GoTrue 版本改變。實作時先用四個情境各打一次 `signUp`，把原始回應記下來，判斷式依實測寫。
-
-目前的假設（**待實測驗證，不符就更新本節**）：signUp 回傳 500 且非下述已知情況 → 視為邀請碼問題（這是唯一會讓 signUp 拋 500 的路徑）；密碼長度由 GoTrue 以 4xx 回報。email 重複則有兩種可能形狀 —— 4xx 錯誤，或在「防止帳號列舉」開啟時回 200 且 `data.user.identities` 為空陣列，兩者都要處理。
+**判斷方式一律以實測為準，不得照預期的錯誤字串寫。** trigger `raise` 之後 Supabase 回給前端的是籠統的資料庫錯誤，不會是 `invalid_invite`。下表是 2026-08-17 在正式專案逐一觸發、記錄下來的真實回應；日後若換 GoTrue 版本或改動後台設定，必須重測後更新本表，不得憑推測修改判斷式。
 
 「email 格式不對」這一句**刻意不附組織信箱**。這是使用者自己就能修好的問題，附上信箱會把一個打錯字的狀況升級成寄信求助。其餘各句維持導向信箱的原則。
 
@@ -278,7 +276,7 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 |---|---|---|
 | 註冊成功 | **消耗 1 次** | 實測：`TEST-ONCE` 由 `uses_left = 1` 變 `0` |
 | email 已註冊，註冊失敗 | **不消耗** | 實測：`TEST-DUP` 送出後仍為 `uses_left = 1` |
-| 邀請碼本身無效 | 不消耗 | 由 trigger 的 `update … where code = v_code and uses_left > 0` 推得：不存在的碼對不到任何一列 |
+| 邀請碼本身無效 | 不消耗 | 由 trigger 的 `update … where upper(btrim(code)) = upper(btrim(v_code)) and uses_left > 0` 推得：不存在的碼對不到任何一列 |
 | 邀請碼已用完 | 不消耗 | 同上，`uses_left > 0` 的條件擋掉 |
 
 「email 已註冊」不消耗的**機制已經確定**：GoTrue 回的是 `422 user_already_exists`，這是在嘗試寫入 `auth.users` **之前**就擋下來的，所以 trigger 根本沒有執行 —— 不是「扣了之後又回滾」。
