@@ -140,15 +140,15 @@ document.addEventListener("click", async e => {
     const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim().toUpperCase() : "";
     // 欄位空的時候不要打網路。實測過（2026-08-17，probe 情境 3 的意外）：email 空著送
     // 出去，GoTrue 回的是 AuthApiError / 400 / validation_failed
-    //「Unable to validate email address: invalid format」，而這個形狀在 data.js 的
-    // RULES 裡沒有對應的一條，最後落到「出了點狀況，再試一次」——一趟往返換來一句
-    // 跟原因無關的話。擋在這裡至少不會白跑，畫面上顯示的還是同一句既有文案
-    // （authMessage(null) 就是那句，這樣文案的真相來源仍然只有 data.js 的 MSG 一處，
-    // 沒有多出第六句）。
-    // **已知不足**：這只擋得住「完全空白」，擋不住「打錯格式」（例如漏了 @）——
-    // 那種還是會走到網路、還是會拿到那句籠統的話。要給出更有用的一句，
-    // 得先加 spec §6.1 的第六句文案，那是 owner 的決定，見 task-5-report.md
-    //「需要 spec 決定」。這裡刻意不自作主張加文案。
+    //「Unable to validate email address: invalid format」—— 一趟往返，只為了知道
+    // 這一格是空的，而空不空前端自己看得到。擋在這裡就不必白跑。
+    // 畫面上顯示的是既有文案（authMessage(null) 取得，文案的真相來源仍然只有
+    // data.js 的 MSG 一處）。
+    //
+    // 「有填但格式不對」（例如 wang@gmail 漏了 .com）刻意**不**擋在這裡：那種要走到
+    // 伺服器才知道對不對，而且 spec §6.1 已經有專屬的一句（badEmail），由 data.js 的
+    // RULES 認 validation_failed 之後翻出來。不要在這裡自己寫 email 格式的正規表示式 ——
+    // 那會變成第二套判斷標準，而且一定跟 GoTrue 的不一樣。
     if (!email || !pw) {
       S.authMsg = DATA.authMessage(null);
       render();

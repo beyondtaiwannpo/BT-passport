@@ -26,6 +26,10 @@ export const supabase = client;
 const MSG = {
   invite:   "這個邀請碼不對，或是已經被用完了。跟你的組長要一組新的。",
   dupEmail: "這個 email 已經有護照了，直接登入就好。",
+  // badEmail 是六句裡唯一**刻意不附組織信箱**的一句，spec §6.1 明文寫進去的決定：
+  // 這是使用者自己就能修好的問題（打錯字），附上信箱等於把一個改一個字母的事
+  // 升級成一封求助信。**不要為了跟其他五句一致而幫它加上信箱。**
+  badEmail: "這個 email 看起來不太對，檢查一下有沒有打錯。",
   shortPw:  "密碼至少要 6 個字。",
   offline:  "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。",
   badLogin: "email 或密碼不對。忘記密碼的話寄信到 beyondtaiwan2020@gmail.com。",
@@ -52,12 +56,8 @@ const MSG = {
 //   4. 把原始回應貼進 task-5-report.md；若與 spec §6.1 的假設不符，回報並更新 spec。
 // **只准改 when()。** MSG 的文案是 spec §6.1 逐字抄來的，改文案要先改 spec。
 //
-// 已知但這張表刻意不處理的一種形狀（等 spec 決定，見 task-5-report.md「需要 spec 決定」）：
-// email 格式不對時回的是 name "AuthApiError"、status 400、code "validation_failed"、
-// message "Unable to validate email address: invalid format"（2026-08-17 實測，
-// 來自情境 3 的意外）。它會落到最後的 MSG.other「出了點狀況」。這句對「只是打錯 email」
-// 的學生沒有幫助，但 spec §6.1 的五句文案是固定的，加第六句要先改 spec，不是這裡自己加。
-// 空白欄位那一半已經在 main.js 送出前擋掉了，不會再打一次網路。
+// （原本這裡記著「email 格式不對沒有對應文案、等 spec 決定」。spec §6.1 已於 2026-08-17
+// 加上第六列，見下面 badEmail 那條。空白欄位那一半在 main.js 送出前就擋掉了。）
 //
 // 參數：e = 原始錯誤物件、m = 小寫後的 message、c = 小寫後的 code、s = 數字化的 status。
 // 由上往下比，第一條命中就用它，所以順序本身也是判斷的一部分：
@@ -100,6 +100,31 @@ const RULES = [
   // email 的學生等於白白燒掉一組碼），probe 頁的情境 B 就是為了這件事。
   { key: "dupEmail", when: (e, m, s, c) => c.includes("user_already_exists") || c.includes("email_exists")
       || m.includes("already registered") || m.includes("already been registered") || m.includes("user already") },
+
+  // email 格式不對（spec §6.1 第六列，2026-08-17 加）。**已實測**：
+  //   name "AuthApiError"、status 400、code "validation_failed"、
+  //   message "Unable to validate email address: invalid format"、rest.__isAuthError true
+  // 這筆資料是真的量到的，但**是意外量到的**：第一輪 probe 的情境 3 本來要測「重複 email」，
+  // 那一格卻是空的，送出去的空字串先被 GoTrue 的 email 格式檢查擋下來，才照出這個形狀。
+  // 也就是說：形狀本身可信（真專案、真回應），但它只涵蓋「空字串」這一種格式錯誤，
+  // 沒有涵蓋「漏了 @」「多了空白」那些；那些回的**應該**是同一個 code，但沒有量過。
+  //
+  // 兩個條件都要：code 是機器可讀的主判斷，但 validation_failed 是個比「email 格式」
+  // 更大的桶子（GoTrue 用同一個 code 回報別種欄位驗證失敗），所以再用 message 收窄。
+  //
+  // 位置：排在 dupEmail 後面是刻意的。dupEmail 到現在還沒實測過（見上一條），萬一
+  // 它的 message 也含 "validate email" 這類字眼，先比到的是 dupEmail —— 把「這個 email
+  // 已經有護照了」誤報成「你 email 打錯了」比較糟（他的 email 根本沒錯，而且該做的事
+  // 是去登入）。反過來不會發生：dupEmail 認的是 already registered / user already /
+  // user_already_exists / email_exists，這幾個字眼不可能出現在格式錯誤的回應裡。
+  // 第二輪 probe 量到重複 email 的真形狀之後，回來把這段風險註記刪掉或改寫。
+  //
+  // 這條也不會被上面任何一條吃掉：offline 認 status 0（這裡是 400）、
+  // shortPw 認 weak_password 或含 password 的訊息（這裡兩者皆非）。
+  //
+  // 完全空白的 email 走不到這裡 —— main.js 在送出前就擋掉了，根本不會發請求。
+  // 所以這條實際服務的是「有填、但格式不對」的人，例如 wang@gmail（漏了 .com）。
+  { key: "badEmail", when: (e, m, s, c) => c === "validation_failed" && m.includes("validate email") },
 
   // 登入時 email 或密碼錯。
   { key: "badLogin", when: (e, m, s, c) => c.includes("invalid_credentials")
