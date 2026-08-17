@@ -172,8 +172,10 @@ export function authMessage(err) {
     console.error(
       "註冊失敗，被歸到「邀請碼不對或已用完」那一句。\n" +
       "這一句同時涵蓋「伺服器出狀況」—— 兩者在前端完全分不出來，所以要自己查是哪一種：\n" +
-      "  1. SQL Editor：select code, uses_left from invite_codes where code = '學生實際輸入的碼';\n" +
-      "     比對是嚴格相同、**分大小寫**，管理員存什麼大小寫，學生就要打什麼大小寫。\n" +
+      "  1. SQL Editor：select code, uses_left from invite_codes\n" +
+      "       where upper(btrim(code)) = upper(btrim('學生實際輸入的碼'));\n" +
+      "     比對不分大小寫、也不分前後空白（trigger 兩邊都套 upper(btrim(...))），\n" +
+      "     所以這裡也要照同樣的寫法查，直接用 code = '...' 會查不到而誤判。\n" +
       "  2. 查不到那一列，或 uses_left = 0 → 真的是邀請碼的問題。\n" +
       "  3. 查得到而且 uses_left > 0 → 不是邀請碼，去看 Supabase 後台的 Logs，\n" +
       "     多半是資料庫或註冊 trigger 出事。\n" +
@@ -187,8 +189,9 @@ export function authMessage(err) {
 // 文案的真相來源只有 MSG 一處；config 沒問題時回空字串，呼叫端不必判斷。
 export function configMessage() { return client ? "" : MSG.offline; }
 
-// invite 進來之前已經由呼叫端（main.js 讀輸入框的那一行）trim + 轉大寫。
-// 正規化只做在輸入層一處，資料庫那邊的比對是刻意精確且分大小寫的。
+// invite 進來之前呼叫端（main.js 讀輸入框的那一行）只做了 trim，而且那個 trim 只是順手。
+// 邀請碼的正規化（前後空白、大小寫）全部由資料庫的註冊 trigger 負責，
+// 前端不改使用者打進來的值 —— 見 main.js 那一行上面的說明。
 export async function signUp(email, pw, invite) {
   if (!supabase) throw new Error(MSG.offline);
   const { data, error } = await supabase.auth.signUp({

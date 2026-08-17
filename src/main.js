@@ -134,19 +134,25 @@ document.addEventListener("click", async e => {
   if (act === "do-signin" || act === "do-signup") {
     const email = document.getElementById("ae").value.trim();
     const pw = document.getElementById("ap").value;
-    // 邀請碼**只 trim，不轉大小寫**。這兩件事看起來同一類，其實不是：
-    //   trim 拿掉的是絕對沒有意義的東西（沒有人的邀請碼是靠前後空白區分的），
-    //   轉大寫改掉的是值本身。
-    // 這裡原本有 .toUpperCase()，2026-08-17 在正式站台上咬到人：管理員建了一組
-    // 小寫的 bt2026test（uses_left = 5，SQL 裡查得到），學生怎麼打都被告知
-    // 「這個邀請碼不對，或是已經被用完了」。攔下來的封包是
+    // 邀請碼的正規化**整套都在資料庫做**，前端不負責。註冊 trigger 的比對是
+    //   where upper(btrim(code)) = upper(btrim(v_code))
+    // 兩邊都先去掉前後空白、再轉成大寫才比，所以學生打大寫、打小寫、前後多了空白，
+    // 都對得到管理員存的那一組；管理員存的是小寫還是前後帶空白，也一樣對得到。
+    //
+    // 這裡留著的 .trim() 只是順手（送出去的值乾淨一點、console 看起來清楚），
+    // **正確性不靠它** —— 就算它哪天被拿掉，資料庫那邊照樣會對到。
+    //
+    // 為什麼要講到這個地步：2026-08-17 在正式站台上咬到人。當時這一行是 .trim()
+    // 加 .toUpperCase()，管理員建了一組小寫的 bt2026test（uses_left = 5，SQL 裡查得到），
+    // 學生怎麼打都被告知「這個邀請碼不對，或是已經被用完了」。攔下來的封包是
     //   輸入 "bt2026test" → 送出 "BT2026TEST"
-    // 而 trigger 是 `where code = v_code`，嚴格相同、分大小寫，對不到 → raise → 500。
+    // 而 trigger 當時是 `where code = v_code`，嚴格相同、分大小寫，對不到 → raise → 500。
     // 前端轉大寫加上資料庫嚴格比對，等於**偷偷規定「所有邀請碼都必須用大寫存」**，
-    // 而這條規定沒有寫進 spec、沒有寫進 README、也沒有人告訴過管理員 ——
-    // 它就是第二個真相來源，只是穿了一件「只在輸入層正規化」的外衣。
-    // **不要把 .toUpperCase() 加回來。** 要讓大小寫不重要，該做的是在資料庫那邊
-    // 統一（例如 citext 或 lower() 比對）並且寫進 spec，而不是在前端偷偷改值。
+    // 而這條規定沒有寫進 spec、沒有寫進 README、也沒有人告訴過管理員。
+    // 真正的病根是「正規化被拆在前端和資料庫兩層、各做一半」，所以修法是把它整個
+    // 搬到資料庫（見 supabase/migrations/2026-08-17-invite-code-case-insensitive.sql）。
+    // **不要把 .toUpperCase()、也不要把任何其他大小寫轉換加回這一行。**
+    // 前端一旦又開始改使用者打進來的值，同一個坑就會以另一個形狀回來。
     const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim() : "";
     // 欄位空的時候不要打網路。實測過（2026-08-17，probe 情境 3 的意外）：email 空著送
     // 出去，GoTrue 回的是 AuthApiError / 400 / validation_failed

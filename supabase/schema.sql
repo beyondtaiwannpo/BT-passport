@@ -50,6 +50,19 @@ create table if not exists invite_codes (
   created_at timestamptz default now()
 );
 
+-- 邀請碼的比對不分大小寫、也不分前後空白（見最下面的註冊 trigger），
+-- 所以「只差在大小寫或前後空白」的兩組碼不可以同時存在 ——
+-- 那樣的話正規化之後它們長得一模一樣，trigger 那句 update 會一次扣到兩列，
+-- 等於一個學生註冊燒掉兩組碼。這個唯一索引就是用來擋住那種狀態。
+-- 索引的是 upper(btrim(code)) 而不是 code 本身，跟 trigger 裡的比對用同一套正規化。
+--
+-- 如果這一句在既有的資料庫上報 "could not create unique index"，代表裡面已經有撞在
+-- 一起的碼了。用這句找出來，決定留哪一組之後再重跑：
+--   select upper(btrim(code)), count(*), array_agg(code)
+--     from invite_codes group by 1 having count(*) > 1;
+create unique index if not exists invite_codes_code_normalized_key
+  on invite_codes (upper(btrim(code)));
+
 -- 護照持有人。這一列不是由前端 insert 的，是註冊時由本檔最下面的 trigger 建好，
 -- 所以「申請護照」畫面送出的是 update。
 create table if not exists passports (
@@ -194,17 +207,26 @@ begin
   -- 分成「先 select 檢查、再 update 扣減」兩句的話，兩個人同時用同一組只剩一次的碼，
   -- 會兩個都通過。這樣寫由資料庫的列鎖擋掉。
   --
-  -- 這裡的比對是嚴格相同，**大小寫算數**。前端只做 trim（拿掉前後空白，那個絕對沒有
-  -- 意義），不動大小寫 —— 所以「管理員在 invite_codes.code 存什麼，學生就要打什麼」，
-  -- 大小寫必須一模一樣。這件事要寫在 README 的邀請碼那一節，不能只留在這裡。
+  -- 比對**不分大小寫、也不分前後空白**：兩邊都先套 upper(btrim(...)) 再比。
+  -- 管理員存 bt2026test，學生打 BT2026TEST 或前後多了空白，都算同一組碼。
   --
-  -- 前端原本會 .toUpperCase()，2026-08-17 咬到人：管理員建了一組小寫的 bt2026test，
-  -- 學生怎麼打都被擋。前端轉大寫 + 這裡嚴格比對，等於偷偷規定「所有邀請碼都得用大寫存」，
-  -- 而那條規定沒寫進任何文件。已經把 .toUpperCase() 拿掉。
-  -- 之後若要讓大小寫不重要，正確的做法是改**這一邊**（citext，或 lower(code) = lower(v_code)
-  -- 加上對應的索引與唯一性處理）並且寫進 spec，不是回頭在前端偷改使用者輸入的值。
+  -- 兩邊都要包，缺一不可：
+  --   只包右邊（學生打的）→ 管理員存小寫的碼還是對不到。
+  --   只包左邊（資料庫存的）→ 學生打小寫還是對不到。
+  --
+  -- 為什麼正規化全部做在這一行、前端一個字都不改：2026-08-17 出過事，前端會
+  -- .toUpperCase() 而這裡是嚴格比對，管理員建的小寫 bt2026test 讓所有學生都註冊失敗。
+  -- 那個坑的根源是「正規化被拆在前端和資料庫兩層、各做一半」，所以現在整套都在這裡，
+  -- 連 trim 也在這裡。前端輸入框還是會 trim，但那只是順手，正確性不靠它。
+  -- **不要回頭在前端加任何大小寫轉換。**
+  --
+  -- 上面 invite_codes 那個 upper(btrim(code)) 的唯一索引是這一行的搭檔：
+  -- 沒有它的話，兩組只差在大小寫的碼會被這句 update 一次扣掉兩列。
+  --
+  -- v_code 是 null（metadata 沒填 invite）時 upper(btrim(null)) 還是 null，
+  -- 對不到任何列，會走下面的 raise。
   update invite_codes set uses_left = uses_left - 1
-   where code = v_code and uses_left > 0;
+   where upper(btrim(code)) = upper(btrim(v_code)) and uses_left > 0;
   if not found then
     raise exception 'invalid_invite' using errcode = 'P0001';
   end if;
