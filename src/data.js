@@ -161,6 +161,25 @@ export function authMessage(err) {
   const c = String(err.code || "").toLowerCase();
   const s = Number(err.status || 0);
   const hit = RULES.find(r => r.when(err, m, s, c));
+  // 「邀請碼」那條是 s >= 500，也就是**所有**伺服器錯誤都會落到它 —— 邀請碼真的不對、
+  // 邀請碼用完了、資料庫當機、trigger 壞掉，畫面上都是同一句。這是沒辦法的事：
+  // GoTrue 對這幾種情況回的東西逐字相同（500 / code null / "Database error saving new user"，
+  // 2026-08-17 實測），前端沒有任何訊號可以分辨，spec §6.1 因此讓它們共用一句。
+  // 但「使用者看到同一句」不代表「除錯的人也只能看到同一句」。原始錯誤留在 console，
+  // 免得下一個人為了知道是哪一種而去讀原始碼（2026-08-17 真的發生過）。
+  // console 是給部署／維護的人看的，畫面上永遠不會出現原始錯誤（spec §6.1）。
+  if (hit && hit.key === "invite") {
+    console.error(
+      "註冊失敗，被歸到「邀請碼不對或已用完」那一句。\n" +
+      "這一句同時涵蓋「伺服器出狀況」—— 兩者在前端完全分不出來，所以要自己查是哪一種：\n" +
+      "  1. SQL Editor：select code, uses_left from invite_codes where code = '學生實際輸入的碼';\n" +
+      "     比對是嚴格相同、**分大小寫**，管理員存什麼大小寫，學生就要打什麼大小寫。\n" +
+      "  2. 查不到那一列，或 uses_left = 0 → 真的是邀請碼的問題。\n" +
+      "  3. 查得到而且 uses_left > 0 → 不是邀請碼，去看 Supabase 後台的 Logs，\n" +
+      "     多半是資料庫或註冊 trigger 出事。\n" +
+      "原始錯誤：",
+      { name: err.name, status: err.status, code: err.code, message: err.message });
+  }
   return hit ? MSG[hit.key] : MSG.other;
 }
 

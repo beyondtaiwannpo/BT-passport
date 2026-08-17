@@ -134,10 +134,20 @@ document.addEventListener("click", async e => {
   if (act === "do-signin" || act === "do-signup") {
     const email = document.getElementById("ae").value.trim();
     const pw = document.getElementById("ap").value;
-    // 邀請碼的正規化只做在這裡（輸入層）：trim + 轉大寫。資料庫那邊的比對是刻意
-    // 精確且分大小寫的，「這組碼到底是什麼」只有一個真相來源。學生打了一個尾隨空格，
-    // 不應該被告知邀請碼無效。
-    const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim().toUpperCase() : "";
+    // 邀請碼**只 trim，不轉大小寫**。這兩件事看起來同一類，其實不是：
+    //   trim 拿掉的是絕對沒有意義的東西（沒有人的邀請碼是靠前後空白區分的），
+    //   轉大寫改掉的是值本身。
+    // 這裡原本有 .toUpperCase()，2026-08-17 在正式站台上咬到人：管理員建了一組
+    // 小寫的 bt2026test（uses_left = 5，SQL 裡查得到），學生怎麼打都被告知
+    // 「這個邀請碼不對，或是已經被用完了」。攔下來的封包是
+    //   輸入 "bt2026test" → 送出 "BT2026TEST"
+    // 而 trigger 是 `where code = v_code`，嚴格相同、分大小寫，對不到 → raise → 500。
+    // 前端轉大寫加上資料庫嚴格比對，等於**偷偷規定「所有邀請碼都必須用大寫存」**，
+    // 而這條規定沒有寫進 spec、沒有寫進 README、也沒有人告訴過管理員 ——
+    // 它就是第二個真相來源，只是穿了一件「只在輸入層正規化」的外衣。
+    // **不要把 .toUpperCase() 加回來。** 要讓大小寫不重要，該做的是在資料庫那邊
+    // 統一（例如 citext 或 lower() 比對）並且寫進 spec，而不是在前端偷偷改值。
+    const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim() : "";
     // 欄位空的時候不要打網路。實測過（2026-08-17，probe 情境 3 的意外）：email 空著送
     // 出去，GoTrue 回的是 AuthApiError / 400 / validation_failed
     //「Unable to validate email address: invalid format」—— 一趟往返，只為了知道
