@@ -245,14 +245,9 @@ async function requireUser() {
   return user;
 }
 
-export async function loadAll() {
-  const user = await currentUser();
-  // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
-  // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
-  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [] };
-
-  // 五個查詢彼此不相依，一起發。序列發的話是五個 RTT，在手機網路上很有感。
-  const [mo, ac, pa, st, en] = await Promise.all([
+// 五個查詢彼此不相依，一起發。序列發的話是五個 RTT，在手機網路上很有感。
+function fetchAll(user) {
+  return Promise.all([
     supabase.from("months").select("*").order("seq"),
     // month 之後一定要再 order("seq")：同月份有多個活動，只排 month 的話同月內順序
     // 由資料庫決定，也就是「不保證」—— 活動格子會在每次載入之間換位置，而學生記的是位置。
@@ -261,11 +256,43 @@ export async function loadAll() {
     supabase.from("stamps").select("act_id, stamped_on").eq("user_id", user.id),
     supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id)
   ]);
+}
 
-  // 任何一個查詢失敗就整批視為失敗。部分成功比全部失敗更危險：少了 stamps 的畫面
-  // 看起來就是「一個章都沒蓋」，學生會以為自己的紀錄不見了，然後重蓋一次。
-  const firstErr = [mo, ac, pa, st, en].find(r => r.error);
-  if (firstErr) throw firstErr.error;
+// 任何一個查詢失敗就整批視為失敗。部分成功比全部失敗更危險：少了 stamps 的畫面
+// 看起來就是「一個章都沒蓋」，學生會以為自己的紀錄不見了，然後重蓋一次。
+const firstError = rs => (rs.find(r => r.error) || {}).error || null;
+
+export async function loadAll() {
+  const user = await currentUser();
+  // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
+  // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
+  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [] };
+
+  let [mo, ac, pa, st, en] = await fetchAll(user);
+  let firstErr = firstError([mo, ac, pa, st, en]);
+
+  // ── PGRST303「JWT issued at future」只重試這一種，而且只重試一次 ──
+  //
+  // 實測（2026-08-17，真實專案）：**註冊完成的那一瞬間**，剛簽發的 JWT 其 iat
+  // 對 PostgREST 而言還在未來（次秒級的時鐘偏移），這批查詢會有一部分回 401 PGRST303。
+  // 哪幾條中槍是隨機的 —— 那次是 activities 中槍、其餘四條 200。
+  // 使用者看到的就是註冊完的第一個畫面寫著「活動資料讀不到」。重整一次就好，
+  // 但那是整個產品第一印象最差的位置，九月會有三十個人同時踩到。
+  //
+  // **不要把這裡改成通用重試。** 只認 PGRST303 是刻意的：
+  //   - 這個碼的語意單一（時鐘偏移），等一下必然會過，重試是真的在解決問題
+  //   - 通用重試會把「權限真的不對」「表被改壞了」這種永遠不會好的錯誤，
+  //     從「立刻失敗」拖成「轉圈很久然後失敗」—— 對使用者更糟，對除錯的人也更糟
+  // 也不要加第二次重試：一次退避就過不了的話，那就不是時鐘偏移。
+  if (firstErr && firstErr.code === "PGRST303") {
+    await new Promise(r => setTimeout(r, 1200));
+    [mo, ac, pa, st, en] = await fetchAll(user);
+    firstErr = firstError([mo, ac, pa, st, en]);
+  }
+
+  // 重試之後仍然失敗就往上丟。main.js 的 boot() 會接住並顯示
+  // 「活動資料讀不到，重新整理試試。」—— 那句是可行動的，而且畫面不會是空白（spec §8.1）。
+  if (firstErr) throw firstErr;
 
   // 兩張表都攤平成以 act_id 為鍵的物件 —— ui.js 是照這個形狀寫的（S.stamps[a.id]）。
   const stamps = {};
