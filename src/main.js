@@ -12,7 +12,7 @@ let S = {
   user: null, authMode: "in", authMsg: "",
   profile: null, stamps: {}, entries: {},
   activities: [], months: [],
-  page: 0, view: "passport", wall: null, wallLoading: false,
+  page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
   justStamped: null
 };
 
@@ -61,9 +61,19 @@ function render() {
 }
 
 async function loadWall() {
-  S.wallLoading = true; render();
-  S.wall = await DATA.loadWall();
-  S.wallLoading = false; render();
+  S.wallLoading = true; S.wallError = false; render();
+  try {
+    S.wall = await DATA.loadWall();
+  } catch (e) {
+    // Task 6 之前 loadWall 回的是本機資料，不可能失敗，所以這裡本來沒有 catch。
+    // 接上資料庫之後它會失敗，而**沒有 catch 的後果不是報錯，是永遠轉圈**：
+    // 下面的 wallLoading = false 跑不到，畫面就停在「正在讀取全體進度…」不動。
+    // 那看起來像網路很慢而不是壞掉，學生會一直等下去。
+    console.error("進度牆讀取失敗：", e);
+    S.wallError = true;
+  } finally {
+    S.wallLoading = false; render();
+  }
 }
 
 /* ---------- modal ---------- */
@@ -271,7 +281,7 @@ document.addEventListener("click", async e => {
       user: S.user, authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {},
       activities: S.activities, months: S.months,
-      page: 0, view: "passport", wall: null, wallLoading: false,
+      page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
       justStamped: null
     };
     render();

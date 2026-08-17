@@ -401,11 +401,30 @@ export async function clearAll() {
   if (p.error) throw p.error;
 }
 
-// Task 7 才改查資料庫。localStorage 版已經在 Task 6 拿掉了，所以現在回空陣列 ——
-// 進度牆在 Task 7 之前是空的。這是計畫預期的中間狀態，不是壞掉。
-// 留一個會讀到不存在資料的舊實作，比誠實回空更糟：那會看起來像「牆上真的沒人」。
+// 全體進度牆（spec §7.2）。一次查詢把所有人與各自的章一起帶回來。
+//
+// `stamps(act_id, stamped_on)` 是 PostgREST 的內嵌關聯查詢，靠 stamps.user_id → passports.id
+// 這條 FK 自動推導。**不要**改成先查 passports 再逐人查 stamps —— 三十個人就是三十一次往返，
+// 在手機網路上是好幾秒。
+//
+// ★ 這個 select 清單裡**沒有** entries，這是這面牆最重要的一件事（spec §11-1）。
+//   心得與活動照片是幹部私下寫的，其中有未成年人。但要講清楚：**真正擋住外洩的不是
+//   這行 select，是 entries_read 那條 RLS 政策**（schema.sql，only auth.uid() = user_id）。
+//   就算有人在這裡加上 entries(...)，資料庫也只會回他自己的那幾列。
+//   這裡不寫 entries 是「不要求本來就不該要的東西」，不是安全機制 ——
+//   把它當成安全機制的話，下一個人會以為改這行就能改變可見範圍。
+//
+// avatar 要：大頭照本來就是公開的，註冊與蓋章兩個畫面都明說了會出現在牆上。
+// motto 不要：那是護照內頁的東西，牆上不顯示，就不要拉回來。
 export async function loadWall() {
-  return [];
+  const { data, error } = await supabase
+    .from("passports")
+    .select("id, name_zh, name_en, team, avatar, stamps(act_id, stamped_on)");
+  if (error) throw error;
+  // 還沒填資料的人不上牆。註冊完到填完護照之間會有一段空窗，那段時間他在
+  // passports 裡已經有一列（trigger 建的）但名字是 null —— 牆上出現一個沒有名字的人
+  // 只會讓大家問「那是誰」。等他填完自己就會出現。
+  return (data || []).filter(p => p.name_zh || p.name_en);
 }
 
 // 護照號碼由 id 決定，固定不變。Task 6 之後 id 是 auth uuid，

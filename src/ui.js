@@ -142,6 +142,14 @@ export function slotHTML(S, a) {
 
 export function wallHTML(S) {
   if (S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
+  // 讀失敗要說出來，而且要留一個按得到的重新整理鍵。少了這一段的話，main.js 的
+  // loadWall() 一旦拋錯，畫面會永遠停在上面那句「正在讀取全體進度…」——
+  // 那看起來像網路很慢，學生會一直等，不會知道該按什麼。
+  if (S.wallError) return `<div class="wall">
+    <h3>全體進度牆</h3>
+    <div class="empty">進度牆讀不到。按下面的重新整理再試一次，你自己的護照不受影響。</div>
+    <div class="row" style="margin-top:20px"><button class="btn ghost sm" data-act="refresh">重新整理</button></div>
+  </div>`;
   const total = S.activities.length;
   const people = (S.wall || []).map(p => Object.assign({}, p, { count: (p.stamps || []).length }))
     .sort((a, b) => b.count - a.count);
@@ -155,7 +163,13 @@ export function wallHTML(S) {
     ${people.length === 0 ? `<div class="empty">還沒有人蓋章。去蓋第一個吧。</div>` :
       `<div class="people">${people.map(p => {
         const on = new Set((p.stamps || []).map(s => s.act_id));
+        // 大頭照只用既有的 .person 樣式加一段 inline 的圓形裁切，不新增 class（spec §3.4）。
+        // 邊框用的是允許的三個底色之一 rgba(16,42,134,…)，見 check.sh 的 §11-14。
+        const av = p.avatar
+          ? `<img src="${esc(p.avatar)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;float:right;border:1px solid rgba(16,42,134,.2)">`
+          : "";
         return `<div class="person">
+          ${av}
           <b>${esc(p.name_zh || p.name_en)}</b>
           <span class="team">${esc(p.team || "")}</span>
           <div class="track">${S.months.map(m => {
