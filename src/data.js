@@ -37,27 +37,25 @@ const MSG = {
 };
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
-// │ 判斷條件：部分已用真的專案實測（2026-08-17 第一次 probe），部分仍是暫定。 │
-// │ 每一條下面都註明「實測」還是「暫定」。改的時候只改這張表。                │
+// │ 判斷條件：signUp 路徑上的五種形狀全部已對正式專案實測（2026-08-17 兩輪    │
+// │ probe），只剩 badLogin（signIn 路徑）沒量過。改的時候只改這張表。         │
 // └───────────────────────────────────────────────────────────────────────────┘
-// 第一次 probe（.superpowers/sdd/2026-08-16-bt-passport/probe.html，對真專案跑）
-// 的結果：四個情境裡只有兩個測到了東西，另外兩個被 probe 頁自己的 bug 弄壞了。
-//   情境 1 無效邀請碼   → 有效資料，見下面 invite 那條。
-//   情境 4 密碼 "12345" → 有效資料，見下面 shortPw 那條。
-//   情境 2 已用完的碼   → 無效：送出時那組碼還有 uses_left = 1，測到的其實是
-//                        「有效碼、第一次使用」，而且真的建了一個帳號。
-//   情境 3 重複 email   → 無效：email 欄是空的，測到的是「email 格式不對」。
-// 所以「已用完的碼」與「重複 email」到現在都還沒有前端實測值，見那兩條的註解。
+// 實測值（spec §6.1 有同一張表，兩邊要一致）：
+//   邀請碼無效     AuthRetryableFetchError / 500 / code null / "Database error saving new user"
+//   邀請碼已用完   AuthRetryableFetchError / 500 / code null / "Database error saving new user"
+//   email 已註冊   AuthApiError            / 422 / user_already_exists / "User already registered"
+//   密碼太短       AuthWeakPasswordError   / 422 / weak_password      / "Password should be at least 6 characters."
+//   email 格式不對 AuthApiError            / 400 / validation_failed  / "Unable to validate email address: invalid format"
 //
-// 還沒實測的那兩項要怎麼補（順序不可以顛倒）：
-//   1. 照 probe.html 頁首的前置條件清單把資料庫狀態擺好（這是第一次失敗的原因）。
-//   2. 開 probe.html，兩個情境各按一次，複製它印出來的原始物件。
-//   3. 拿實測到的 status / code / message 校對下面的 when()，不合就改 when()。
-//   4. 把原始回應貼進 task-5-report.md；若與 spec §6.1 的假設不符，回報並更新 spec。
+// ★ 兩個一定要記住的碰撞 ★
+//   1. status 422 同時是「email 已註冊」與「密碼太短」的 status。
+//      **任何想用 status 區分這兩者的寫法都是錯的**，一律以 code 為準。
+//      下面沒有任何一條認得出 422 —— 認 status 的只有 offline（0）與 invite（>= 500），
+//      兩者都碰不到 422，所以這兩種情況不可能互相搶走對方的案例。測試兩個方向都釘住了。
+//   2. name AuthRetryableFetchError 同時是「真的連不上」與「伺服器 500」的 name。
+//      分辨兩者的只有 status（0 vs 500），見 offline 那條的註解。
+//
 // **只准改 when()。** MSG 的文案是 spec §6.1 逐字抄來的，改文案要先改 spec。
-//
-// （原本這裡記著「email 格式不對沒有對應文案、等 spec 決定」。spec §6.1 已於 2026-08-17
-// 加上第六列，見下面 badEmail 那條。空白欄位那一半在 main.js 送出前就擋掉了。）
 //
 // 參數：e = 原始錯誤物件、m = 小寫後的 message、c = 小寫後的 code、s = 數字化的 status。
 // 由上往下比，第一條命中就用它，所以順序本身也是判斷的一部分：
@@ -85,20 +83,22 @@ const RULES = [
   { key: "shortPw", when: (e, m, s, c) => c === "weak_password" || e.name === "AuthWeakPasswordError"
       || (m.includes("password") && (m.includes("6") || m.includes("short") || m.includes("weak"))) },
 
-  // email 已註冊（4xx 形狀）。另一種形狀是回 200 但 identities 為空陣列，
-  // 那個判斷在 signUp() 裡，不在這張表上 —— 因為那條路徑根本沒有 error 物件可以看。
+  // email 已註冊。**已實測（2026-08-17，第二輪 probe 情境 B）**：
+  //   name "AuthApiError"、status 422、code "user_already_exists"、
+  //   message "User already registered"、rest.__isAuthError true，而且 data.user 是 null。
+  // 跟 weak_password 同一個處理方式：主判斷用機器可讀的 code，字串比對降成舊版 GoTrue
+  // 的退路（舊版不一定給 code），所以排在 code 後面。
+  // status 是 422，跟「密碼太短」同一個 —— 見檔案上方的碰撞說明，不要用 status 分辨。
   //
-  // **仍然是暫定，一個字都還沒實測到。** 第一次 probe 的情境 3 沒有量到它：那一格的
-  // email 是空的，所以送出去的是空字串，GoTrue 先擋在 email 格式檢查（AuthApiError /
-  // 400 / validation_failed），根本沒走到「這個 email 已經有人用了」那條路。
-  // 因此下面這些 code / message 全部是照 GoTrue 原始碼與文件猜的，沒有一項來自實測。
-  //
-  // 還不知道的是：這個專案的「防止帳號列舉」設定是開還是關 —— 開著就回 200 加
-  // identities 空陣列（走 signUp() 裡那條，這張表看不到），關著才回 4xx（走這條）。
-  // 兩種形狀都必須繼續留著，直到第二次 probe 量出來到底是哪一種為止。
-  // 順帶要量的還有：失敗的重複註冊會不會把邀請碼的 uses_left 扣掉（會的話，打錯
-  // email 的學生等於白白燒掉一組碼），probe 頁的情境 B 就是為了這件事。
-  { key: "dupEmail", when: (e, m, s, c) => c.includes("user_already_exists") || c.includes("email_exists")
+  // ★ 下面那條「200 + identities 空陣列」的路徑（在 signUp() 裡，不在這張表上）
+  //   **不是死程式碼，不要刪。** 這次量到 4xx，只是因為這個專案的
+  //   「防止帳號列舉」(Prevent account enumeration / Confirm email) 目前是**關**的。
+  //   那是 Supabase 後台一個開關，任何人任何時候都可以打開；打開之後同一個情況會變成
+  //   回 200 加上 data.user.identities === []，一個字的程式都不用改，形狀就翻面了，
+  //   而且那條路上根本沒有 error 物件可以看（所以這張表看不到它）。
+  //   看到這裡的 422 已實測就把那條當多餘而刪掉的話，設定一被打開，重複註冊會變成
+  //   「看起來成功了」——學生以為註冊好了，其實沒有。兩種形狀都要繼續留著。
+  { key: "dupEmail", when: (e, m, s, c) => c === "user_already_exists" || c.includes("email_exists")
       || m.includes("already registered") || m.includes("already been registered") || m.includes("user already") },
 
   // email 格式不對（spec §6.1 第六列，2026-08-17 加）。**已實測**：
@@ -112,40 +112,45 @@ const RULES = [
   // 兩個條件都要：code 是機器可讀的主判斷，但 validation_failed 是個比「email 格式」
   // 更大的桶子（GoTrue 用同一個 code 回報別種欄位驗證失敗），所以再用 message 收窄。
   //
-  // 位置：排在 dupEmail 後面是刻意的。dupEmail 到現在還沒實測過（見上一條），萬一
-  // 它的 message 也含 "validate email" 這類字眼，先比到的是 dupEmail —— 把「這個 email
-  // 已經有護照了」誤報成「你 email 打錯了」比較糟（他的 email 根本沒錯，而且該做的事
-  // 是去登入）。反過來不會發生：dupEmail 認的是 already registered / user already /
-  // user_already_exists / email_exists，這幾個字眼不可能出現在格式錯誤的回應裡。
-  // 第二輪 probe 量到重複 email 的真形狀之後，回來把這段風險註記刪掉或改寫。
+  // 位置：排在 dupEmail 後面。當初這樣排是因為重複 email 還沒量過，怕兩者字眼撞在一起；
+  // 第二輪已經量到了，兩邊的 code 各自明確且不同（user_already_exists / validation_failed），
+  // **確定沒有重疊，順序現在只是歷史，不再承擔任何風險**。維持原樣是因為改順序沒有好處，
+  // 而每次動順序都要重新想一遍會不會被誰吃掉。
   //
   // 這條也不會被上面任何一條吃掉：offline 認 status 0（這裡是 400）、
-  // shortPw 認 weak_password 或含 password 的訊息（這裡兩者皆非）。
+  // shortPw 認 weak_password 或含 password 的訊息（這裡兩者皆非）、
+  // dupEmail 認 user_already_exists / email_exists / already registered（都不是）。
   //
   // 完全空白的 email 走不到這裡 —— main.js 在送出前就擋掉了，根本不會發請求。
   // 所以這條實際服務的是「有填、但格式不對」的人，例如 wang@gmail（漏了 .com）。
   { key: "badEmail", when: (e, m, s, c) => c === "validation_failed" && m.includes("validate email") },
 
-  // 登入時 email 或密碼錯。
+  // 登入時 email 或密碼錯。**這是唯一一條還沒實測的規則。**
+  // 兩輪 probe 都碰不到它：probe 只打 signUp，這條在 signIn 的路徑上。
+  // 所以下面的 code 與字串都還是照 GoTrue 文件寫的，沒有量過（spec §6.1 末段也這樣記著）。
+  // 補這一刀的方式不需要再寫一頁工具：brief Step 8 的手動情境裡有「用錯的密碼登入一次」，
+  // 做那一步的時候順手把 console 裡的原始錯誤記下來，回來校對這一條。
   { key: "badLogin", when: (e, m, s, c) => c.includes("invalid_credentials")
       || m.includes("invalid login credentials") },
 
   // 邀請碼：trigger raise 之後 GoTrue 回通用 500「Database error saving new user」。
-  // **已實測，spec §6.1 的假設成立（2026-08-17，probe 情境 1，邀請碼 "WRONG-CODE"）**：
-  //   name "AuthRetryableFetchError"、status 500、code null、
-  //   message "Database error saving new user"、rest.__isAuthError true
+  // **兩種邀請碼問題都已實測，而且回的東西逐字相同（2026-08-17）**：
+  //   第一輪情境 1，無效的碼 "WRONG-CODE" →
+  //     name "AuthRetryableFetchError"、status 500、code null、
+  //     message "Database error saving new user"、rest.__isAuthError true
+  //   第二輪情境 A，已用完的碼（uses_left = 0，送出前確認過）→
+  //     **一個字元都不差，跟上面完全一樣。**
+  // 也就是說：前端**真的無法分辨**「這組碼不存在」與「這組碼被用完了」。
+  // 這就是 spec §6.1 把兩者寫成同一句「這個邀請碼不對，或是已經被用完了」的原因 ——
+  // 那是被迫的結果，不是偷懶。想在畫面上分開講這兩件事，需要的是後端多給一個訊號，
+  // 不是在這裡多寫一個 if；沒有那個訊號之前，任何「猜哪一種」的程式都是在騙人。
+  //
   // 注意 code 是 null，所以能用的訊號只有 status —— 這就是為什麼這條認的是 s >= 500
   // 而不是某個 code。也因為 name 跟「真的連不上」一模一樣，分辨兩者的只有 status，
   // 上面那條 s === 0 一定要排在前面（見該條的註解）。
   // 這條最寬，會吃掉所有排在它後面的東西，所以一定要留在最後。
-  //
-  // 「邀請碼已被用完」共用這一條，但**是推論出來的，前端沒有直接量到**：
-  // supabase/rls-test.sql 的第 65 條（spec §11-5）在資料庫層證明了 trigger 對
-  // 「已用完的碼」丟的是跟「無效的碼」同一個 P0001，而 GoTrue 對 trigger 的 P0001
-  // 一律轉成上面那個通用 500，所以前端應該會拿到一模一樣的東西。第一次 probe 的
-  // 情境 2 本來要驗這件事，但送出時那組碼還有 uses_left = 1，測到的是「有效碼、
-  // 第一次使用」，等於沒測到。第二次 probe 的情境 A 就是要補這一刀。
-  // 在補到之前，這裡寫的是推論，不要在別的地方把它說成「實測過」。
+  // （資料庫層的旁證仍然成立：supabase/rls-test.sql 第 65 條，spec §11-5，
+  //   trigger 對兩者丟同一個 P0001。現在它是佐證，不再是唯一的依據。）
   { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 
@@ -172,8 +177,12 @@ export async function signUp(email, pw, invite) {
     options: { data: { invite: invite } }
   });
   if (error) throw new Error(authMessage(error));
-  // Supabase 的「防止帳號列舉」設定開啟時，重複 email 不會回錯誤，
-  // 而是回一個 identities 為空陣列的 user。這是 spec §6.1 沒有涵蓋的第三種形狀。
+  // 重複 email 的第二種形狀（spec §6.1 有寫）：Supabase 的「防止帳號列舉」設定開啟時，
+  // 重複 email 不會回錯誤，而是回一個 identities 為空陣列的 user。
+  // 2026-08-17 第二輪 probe 實測本專案走的是 4xx 那條（422 user_already_exists，
+  // data.user 為 null），代表那個設定目前是關的 —— 所以下面這段**這次沒有跑到**。
+  // **它不是死程式碼，不要刪。** 那是後台一個開關，打開之後形狀就翻面，而且翻面之後
+  // 沒有 error 物件可看，沒有這段的話重複註冊會變成「看起來成功了」。
   if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
     throw new Error(MSG.dupEmail);
   }
