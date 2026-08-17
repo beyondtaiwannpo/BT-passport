@@ -222,6 +222,7 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 |---|---|
 | 邀請碼無效或用完 | 這個邀請碼不對，或是已經被用完了。跟你的組長要一組新的。 |
 | email 已註冊 | 這個 email 已經有護照了，直接登入就好。 |
+| email 格式不對 | 這個 email 看起來不太對，檢查一下有沒有打錯。 |
 | 密碼太短 | 密碼至少要 6 個字。 |
 | 連不上資料庫 | 現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。 |
 | 其他未預期錯誤 | 出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。 |
@@ -229,6 +230,18 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 **判斷方式必須實測決定，不得照預期的錯誤字串寫。** trigger `raise` 之後 Supabase 回給前端的是籠統的資料庫錯誤，不會是 `invalid_invite`；實際的 `status` / `code` / `message` 只有真的註冊失敗一次才知道，而且會隨 GoTrue 版本改變。實作時先用四個情境各打一次 `signUp`，把原始回應記下來，判斷式依實測寫。
 
 目前的假設（**待實測驗證，不符就更新本節**）：signUp 回傳 500 且非下述已知情況 → 視為邀請碼問題（這是唯一會讓 signUp 拋 500 的路徑）；密碼長度由 GoTrue 以 4xx 回報。email 重複則有兩種可能形狀 —— 4xx 錯誤，或在「防止帳號列舉」開啟時回 200 且 `data.user.identities` 為空陣列，兩者都要處理。
+
+「email 格式不對」這一句**刻意不附組織信箱**。這是使用者自己就能修好的問題，附上信箱會把一個打錯字的狀況升級成寄信求助。其餘各句維持導向信箱的原則。
+
+判斷條件（2026-08-17 實測，`code` 為機器可讀值，不靠字串猜測）：
+
+| 情況 | 觀察到的形狀 |
+|---|---|
+| 邀請碼無效 | `status 500`、`code: null`、`message: "Database error saving new user"` |
+| 密碼太短 | `status 422`、`code: "weak_password"`、`reasons: ["length"]` |
+| email 格式不對 | `status 400`、`code: "validation_failed"`、message 含 `validate email` |
+
+「邀請碼已用完」未在前端直接觀察到，是從資料庫層推論的：`rls-test.sql` 的 §11-5 證明 trigger 對「無效」與「已用完」丟出同一個 P0001，所以 GoTrue 應回同一個 500。註解須據實標示為推論。
 
 任何錯誤訊息都**不得出現個人姓名或個人聯絡方式**，一律導向 `beyondtaiwan2020@gmail.com`。
 
