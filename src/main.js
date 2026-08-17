@@ -270,6 +270,69 @@ document.addEventListener("click", async e => {
     i.click(); return;
   }
 
+  if (act === "export") {
+    try {
+      const b = await DATA.exportPassport();
+      const blob = new Blob([JSON.stringify(b, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bt-passport-${b.passport_no}-${b.exported_at.slice(0, 10)}.json`;
+      a.click();
+      // **不要**在 click() 的下一行就 revoke。下載是非同步開始的，網址在瀏覽器真的
+      // 去讀它之前被撤銷的話，下載會安靜地失敗 —— 沒有錯誤、沒有檔案，而使用者
+      // 剛剛才看到「備份下載好了」。延後釋放，寧可多佔一下記憶體。
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast("備份下載好了。收在你自己的雲端硬碟裡。");
+    } catch (e) { toast(e.message); }
+    return;
+  }
+
+  if (act === "import") {
+    const i = document.createElement("input");
+    i.type = "file"; i.accept = "application/json,.json";
+    i.onchange = async () => {
+      const f = i.files && i.files[0]; if (!f) return;
+      let b;
+      // 這裡用 alert 不是 toast：接下來就是一個會蓋掉資料的決定，
+      // 而 toast 兩秒就消失。看不到的錯誤訊息等於沒有錯誤訊息。
+      try { b = DATA.parseBackup(await f.text()); }
+      catch (e) { alert(e.message); return; }
+
+      // 匯入前顯示摘要（spec §7.4）。passport_no 可能不存在（手工改過的檔案
+      // 仍可能通過格式檢查），那時候就不要印出「原本屬於護照 undefined」。
+      const summary = `這個備份檔有 ${b.stamps.length} 個章，`
+        + `匯出日期 ${String(b.exported_at || "不明").slice(0, 10)}`
+        + (b.passport_no ? `，原本屬於護照 ${b.passport_no}。` : "。");
+      const has = Object.keys(S.stamps).length;
+
+      let mode = "overwrite";
+      if (has > 0) {
+        // 目前護照已有內容時，明確詢問覆蓋還是合併；預設覆蓋，並說清楚會蓋掉什麼。
+        mode = confirm(
+          `${summary}\n\n`
+          + `你現在的護照已經有 ${has} 個章。\n\n`
+          + `按「確定」＝ 覆蓋：現在這 ${has} 個章、心得和照片會全部刪掉，換成備份檔裡的。\n`
+          + `按「取消」＝ 合併：兩邊都留，同一格以備份檔的內容為準。`
+        ) ? "overwrite" : "merge";
+      } else if (!confirm(`${summary}\n\n要還原到你現在的帳號嗎？`)) {
+        return;
+      }
+
+      try {
+        const r = await DATA.importPassport(b, mode);
+        toast(`還原了 ${r.written} 個章。`);
+        await boot();
+      } catch (e) {
+        // 這句話能說得這麼肯定，是因為 importPassport 是先寫後刪的（見該函式的註解）。
+        // 換成先刪後寫的話這裡就是在騙人：資料早就沒了。改那個順序之前先改這句話。
+        console.error("匯入失敗：", e);
+        toast("還原失敗，資料沒有被改動。再試一次。");
+      }
+    };
+    i.click(); return;
+  }
+
   if (act === "reset") {
     if (!confirm("清除這本護照？所有的章、心得和照片都會消失，無法復原。")) return;
     try {

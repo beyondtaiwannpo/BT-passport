@@ -401,6 +401,107 @@ export async function clearAll() {
   if (p.error) throw p.error;
 }
 
+/* ---------- 匯出與匯入（spec §7.4）---------- */
+// 免費方案沒有自動備份，所以這不是加分項。spec 的原話：**不能還原的備份不算備份**。
+
+export const BACKUP_VERSION = 1;
+
+export async function exportPassport() {
+  // 刻意重查一次而不是用畫面上的 S：備份要備的是資料庫裡真正有的東西。
+  // 畫面可能因為某次儲存失敗而跟資料庫不一致，那時候匯出 S 會把「看起來有」的
+  // 東西寫進備份檔，而那個檔案還原回去會少東西 —— 備份檔說謊比沒有備份更糟。
+  const all = await loadAll();
+  if (!all.profile) throw new Error("還沒有護照可以匯出。");
+  return {
+    version: BACKUP_VERSION,          // 供日後格式變更判斷（spec §7.4）
+    exported_at: new Date().toISOString(),
+    passport_no: passportNo(all.profile.id),
+    profile: {
+      name_zh: all.profile.name_zh, name_en: all.profile.name_en,
+      team: all.profile.team, motto: all.profile.motto,
+      avatar: all.profile.avatar, issued: all.profile.issued
+    },
+    // 章與心得合在一起，一個檔案就是完整備份，不需要 zip 函式庫。
+    stamps: Object.keys(all.stamps).map(id => ({
+      act_id: id,
+      stamped_on: all.stamps[id].date,
+      note: (all.entries[id] && all.entries[id].note) || "",
+      photo: (all.entries[id] && all.entries[id].photo) || null
+    }))
+  };
+}
+
+// 格式不對時給人話，不丟 JSON parse 錯誤（spec §7.4）。
+// 三種壞法分別給三句不同的話，因為使用者的下一步不一樣：
+// 讀不出來 → 換一個檔；是 JSON 但不是備份 → 選對檔；版本太新 → 找人幫忙。
+export function parseBackup(text) {
+  let j;
+  try { j = JSON.parse(text); }
+  catch (e) { throw new Error("這個檔案讀不出來，可能不是護照備份檔，或是在傳送過程中壞掉了。"); }
+  if (!j || typeof j !== "object" || !Array.isArray(j.stamps) || !j.profile) {
+    throw new Error("這是一個 JSON 檔，但不是護照備份檔。請選你從護照按「匯出備份」下載的那個檔案。");
+  }
+  if (Number(j.version) > BACKUP_VERSION) {
+    throw new Error("這個備份檔來自比較新的版本，這個網站讀不了。請寄信到 beyondtaiwan2020@gmail.com。");
+  }
+  return j;
+}
+
+// 寫入**目前登入的帳號**，不是備份檔裡記的那個 uuid —— 換帳號也要能還原（spec §7.4）。
+//
+// ★ 寫入順序：先寫，後刪。這跟直覺相反（覆蓋不是應該先清空嗎），但直覺的順序有一個
+//   會吃掉資料的破綻：先刪再寫的話，寫入失敗時使用者的章已經沒了，而呼叫端能說的只有
+//   「還原失敗」。最可能失敗的正是寫入那一步 —— 照片是 base64，那包 payload 是整個
+//   程式裡最大的一包，手機網路上斷在那裡完全不稀奇。
+//   先寫後刪之後，兩種失敗都不會吃資料：
+//     寫入階段失敗 → 一列都還沒刪，舊資料原封不動，呼叫端說「資料沒有被改動」是真的
+//     刪除階段失敗 → 使用者拿到的是兩邊聯集（等同合併模式的結果），沒有任何東西不見
+//   換句話說，這個順序讓「最糟的情況」從「資料沒了」降級成「多了幾格」。
+export async function importPassport(backup, mode) {
+  const user = await requireUser();
+
+  const rows = backup.stamps.filter(s => s.act_id && s.stamped_on);
+
+  if (rows.length) {
+    const s = await supabase.from("stamps").upsert(
+      rows.map(r => ({ user_id: user.id, act_id: r.act_id, stamped_on: r.stamped_on })),
+      { onConflict: "user_id,act_id" });
+    if (s.error) throw s.error;
+
+    const e = await supabase.from("entries").upsert(
+      rows.map(r => ({ user_id: user.id, act_id: r.act_id, note: r.note || "", photo: r.photo || null })),
+      { onConflict: "user_id,act_id" });
+    if (e.error) throw e.error;
+  }
+
+  if (mode === "overwrite") {
+    // 覆蓋 = 最後的狀態要跟備份檔一模一樣，所以刪掉備份檔裡沒有的那些格。
+    // 備份檔一個章都沒有時就是全刪 —— 這時候不能用 not.in.()，空的括號 PostgREST 不吃。
+    const keep = rows.map(r => r.act_id);
+    let ds = supabase.from("stamps").delete().eq("user_id", user.id);
+    let de = supabase.from("entries").delete().eq("user_id", user.id);
+    if (keep.length) {
+      const list = "(" + keep.join(",") + ")";
+      ds = ds.not("act_id", "in", list);
+      de = de.not("act_id", "in", list);
+    }
+    const re = await de; if (re.error) throw re.error;
+    const rs = await ds; if (rs.error) throw rs.error;
+  }
+
+  // issued 不還原 —— 核發日屬於這個帳號，不屬於備份檔。跨帳號還原時尤其明顯：
+  // B 的護照上印 A 的核發日是錯的，那一天 B 根本還沒有護照。
+  const p = backup.profile || {};
+  const up = await supabase.from("passports").update({
+    name_zh: p.name_zh, name_en: p.name_en, team: p.team,
+    motto: p.motto, avatar: p.avatar,
+    updated_at: new Date().toISOString()
+  }).eq("id", user.id);
+  if (up.error) throw up.error;
+
+  return { written: rows.length };
+}
+
 // 全體進度牆（spec §7.2）。一次查詢把所有人與各自的章一起帶回來。
 //
 // `stamps(act_id, stamped_on)` 是 PostgREST 的內嵌關聯查詢，靠 stamps.user_id → passports.id

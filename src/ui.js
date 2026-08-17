@@ -95,6 +95,8 @@ export function idPageHTML(S) {
     <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
     <div class="row" style="margin-top:18px">
       <button class="btn ghost sm" data-act="edit">編輯資料</button>
+      <button class="btn ghost sm" data-act="export">匯出備份</button>
+      <button class="btn ghost sm" data-act="import">匯入還原</button>
       <button class="btn ghost sm" data-act="reset">清除這本護照</button>
     </div>`;
 }
