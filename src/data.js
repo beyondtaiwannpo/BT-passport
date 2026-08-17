@@ -33,19 +33,31 @@ const MSG = {
 };
 
 // ┌───────────────────────────────────────────────────────────────────────────┐
-// │ 判斷條件：暫定，尚未用真的專案實測。改的時候只改這張表。                  │
+// │ 判斷條件：部分已用真的專案實測（2026-08-17 第一次 probe），部分仍是暫定。 │
+// │ 每一條下面都註明「實測」還是「暫定」。改的時候只改這張表。                │
 // └───────────────────────────────────────────────────────────────────────────┘
-// 為什麼是暫定：trigger `raise` 之後，Supabase 回給前端的是籠統的資料庫錯誤，
-// 不會是 `invite_invalid` 這種好認的字串；實際的 status / code / message 三者長什麼樣，
-// 只有真的失敗一次才知道，而且會隨 GoTrue 版本變（brief Step 3）。寫這段程式時手上
-// 還沒有專案網址與金鑰，所以下面每一條 when() 都是照 spec §6.1 的假設寫的猜測。
+// 第一次 probe（.superpowers/sdd/2026-08-16-bt-passport/probe.html，對真專案跑）
+// 的結果：四個情境裡只有兩個測到了東西，另外兩個被 probe 頁自己的 bug 弄壞了。
+//   情境 1 無效邀請碼   → 有效資料，見下面 invite 那條。
+//   情境 4 密碼 "12345" → 有效資料，見下面 shortPw 那條。
+//   情境 2 已用完的碼   → 無效：送出時那組碼還有 uses_left = 1，測到的其實是
+//                        「有效碼、第一次使用」，而且真的建了一個帳號。
+//   情境 3 重複 email   → 無效：email 欄是空的，測到的是「email 格式不對」。
+// 所以「已用完的碼」與「重複 email」到現在都還沒有前端實測值，見那兩條的註解。
 //
-// 拿到金鑰之後要做的事（順序不可以顛倒）：
-//   1. 把 src/config.js 換成真值。
-//   2. 開 probe.html，跑完四個情境，複製它印出來的原始錯誤物件。
-//   3. 拿實測到的 status / code / message 逐條校對下面的 when()，不合就改 when()。
-//   4. 把四次原始回應貼進 task-5-report.md；若與 spec §6.1 的假設不符，回報並更新 spec。
+// 還沒實測的那兩項要怎麼補（順序不可以顛倒）：
+//   1. 照 probe.html 頁首的前置條件清單把資料庫狀態擺好（這是第一次失敗的原因）。
+//   2. 開 probe.html，兩個情境各按一次，複製它印出來的原始物件。
+//   3. 拿實測到的 status / code / message 校對下面的 when()，不合就改 when()。
+//   4. 把原始回應貼進 task-5-report.md；若與 spec §6.1 的假設不符，回報並更新 spec。
 // **只准改 when()。** MSG 的文案是 spec §6.1 逐字抄來的，改文案要先改 spec。
+//
+// 已知但這張表刻意不處理的一種形狀（等 spec 決定，見 task-5-report.md「需要 spec 決定」）：
+// email 格式不對時回的是 name "AuthApiError"、status 400、code "validation_failed"、
+// message "Unable to validate email address: invalid format"（2026-08-17 實測，
+// 來自情境 3 的意外）。它會落到最後的 MSG.other「出了點狀況」。這句對「只是打錯 email」
+// 的學生沒有幫助，但 spec §6.1 的五句文案是固定的，加第六句要先改 spec，不是這裡自己加。
+// 空白欄位那一半已經在 main.js 送出前擋掉了，不會再打一次網路。
 //
 // 參數：e = 原始錯誤物件、m = 小寫後的 message、c = 小寫後的 code、s = 數字化的 status。
 // 由上往下比，第一條命中就用它，所以順序本身也是判斷的一部分：
@@ -63,13 +75,29 @@ const RULES = [
       || m.includes("failed to fetch") || m.includes("fetch failed")
       || m.includes("networkerror") || m.includes("load failed") },
 
-  // 密碼太短：GoTrue 對 signUp 的密碼長度檢查。本機用假的 422 回應驗證過形狀是
-  // name "AuthWeakPasswordError"、code "weak_password"；真實訊息文字未實測。
-  { key: "shortPw", when: (e, m, s, c) => c.includes("weak_password") || e.name === "AuthWeakPasswordError"
+  // 密碼太短。**已實測（2026-08-17，probe 情境 4，密碼 "12345"）**：
+  //   name "AuthWeakPasswordError"、status 422、code "weak_password"、
+  //   message "Password should be at least 6 characters."、rest.reasons ["length"]
+  // 比預期好：有一個機器可讀而且穩定的 code，所以主判斷就用 code，不必去讀英文句子。
+  // name 是同一次實測到的第二個訊號，留著當備援。
+  // 最後那段字串比對只是給舊版 GoTrue 的退路（舊版不一定給 code），不是主判斷 ——
+  // 它比較鬆，所以永遠排在 code 後面。
+  { key: "shortPw", when: (e, m, s, c) => c === "weak_password" || e.name === "AuthWeakPasswordError"
       || (m.includes("password") && (m.includes("6") || m.includes("short") || m.includes("weak"))) },
 
   // email 已註冊（4xx 形狀）。另一種形狀是回 200 但 identities 為空陣列，
   // 那個判斷在 signUp() 裡，不在這張表上 —— 因為那條路徑根本沒有 error 物件可以看。
+  //
+  // **仍然是暫定，一個字都還沒實測到。** 第一次 probe 的情境 3 沒有量到它：那一格的
+  // email 是空的，所以送出去的是空字串，GoTrue 先擋在 email 格式檢查（AuthApiError /
+  // 400 / validation_failed），根本沒走到「這個 email 已經有人用了」那條路。
+  // 因此下面這些 code / message 全部是照 GoTrue 原始碼與文件猜的，沒有一項來自實測。
+  //
+  // 還不知道的是：這個專案的「防止帳號列舉」設定是開還是關 —— 開著就回 200 加
+  // identities 空陣列（走 signUp() 裡那條，這張表看不到），關著才回 4xx（走這條）。
+  // 兩種形狀都必須繼續留著，直到第二次 probe 量出來到底是哪一種為止。
+  // 順帶要量的還有：失敗的重複註冊會不會把邀請碼的 uses_left 扣掉（會的話，打錯
+  // email 的學生等於白白燒掉一組碼），probe 頁的情境 B 就是為了這件事。
   { key: "dupEmail", when: (e, m, s, c) => c.includes("user_already_exists") || c.includes("email_exists")
       || m.includes("already registered") || m.includes("already been registered") || m.includes("user already") },
 
@@ -78,8 +106,21 @@ const RULES = [
       || m.includes("invalid login credentials") },
 
   // 邀請碼：trigger raise 之後 GoTrue 回通用 500「Database error saving new user」。
-  // spec §6.1 假設這是唯一會讓 signUp 拋 500 的路徑，所以 500 一律視為邀請碼問題。
-  // 這條最寬，一定要留在最後。**這是最需要實測確認的一條。**
+  // **已實測，spec §6.1 的假設成立（2026-08-17，probe 情境 1，邀請碼 "WRONG-CODE"）**：
+  //   name "AuthRetryableFetchError"、status 500、code null、
+  //   message "Database error saving new user"、rest.__isAuthError true
+  // 注意 code 是 null，所以能用的訊號只有 status —— 這就是為什麼這條認的是 s >= 500
+  // 而不是某個 code。也因為 name 跟「真的連不上」一模一樣，分辨兩者的只有 status，
+  // 上面那條 s === 0 一定要排在前面（見該條的註解）。
+  // 這條最寬，會吃掉所有排在它後面的東西，所以一定要留在最後。
+  //
+  // 「邀請碼已被用完」共用這一條，但**是推論出來的，前端沒有直接量到**：
+  // supabase/rls-test.sql 的第 65 條（spec §11-5）在資料庫層證明了 trigger 對
+  // 「已用完的碼」丟的是跟「無效的碼」同一個 P0001，而 GoTrue 對 trigger 的 P0001
+  // 一律轉成上面那個通用 500，所以前端應該會拿到一模一樣的東西。第一次 probe 的
+  // 情境 2 本來要驗這件事，但送出時那組碼還有 uses_left = 1，測到的是「有效碼、
+  // 第一次使用」，等於沒測到。第二次 probe 的情境 A 就是要補這一刀。
+  // 在補到之前，這裡寫的是推論，不要在別的地方把它說成「實測過」。
   { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 

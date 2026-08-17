@@ -138,6 +138,22 @@ document.addEventListener("click", async e => {
     // 精確且分大小寫的，「這組碼到底是什麼」只有一個真相來源。學生打了一個尾隨空格，
     // 不應該被告知邀請碼無效。
     const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim().toUpperCase() : "";
+    // 欄位空的時候不要打網路。實測過（2026-08-17，probe 情境 3 的意外）：email 空著送
+    // 出去，GoTrue 回的是 AuthApiError / 400 / validation_failed
+    //「Unable to validate email address: invalid format」，而這個形狀在 data.js 的
+    // RULES 裡沒有對應的一條，最後落到「出了點狀況，再試一次」——一趟往返換來一句
+    // 跟原因無關的話。擋在這裡至少不會白跑，畫面上顯示的還是同一句既有文案
+    // （authMessage(null) 就是那句，這樣文案的真相來源仍然只有 data.js 的 MSG 一處，
+    // 沒有多出第六句）。
+    // **已知不足**：這只擋得住「完全空白」，擋不住「打錯格式」（例如漏了 @）——
+    // 那種還是會走到網路、還是會拿到那句籠統的話。要給出更有用的一句，
+    // 得先加 spec §6.1 的第六句文案，那是 owner 的決定，見 task-5-report.md
+    //「需要 spec 決定」。這裡刻意不自作主張加文案。
+    if (!email || !pw) {
+      S.authMsg = DATA.authMessage(null);
+      render();
+      return;
+    }
     try {
       if (act === "do-signup") await DATA.signUp(email, pw, inv);
       else await DATA.signIn(email, pw);
