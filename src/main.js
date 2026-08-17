@@ -305,6 +305,11 @@ document.addEventListener("click", async e => {
         + `匯出日期 ${String(b.exported_at || "不明").slice(0, 10)}`
         + (b.passport_no ? `，原本屬於護照 ${b.passport_no}。` : "。");
       const has = Object.keys(S.stamps).length;
+      // spec §7.4 要的是「說清楚會蓋掉什麼」。護照資料**兩種模式都會被覆蓋** ——
+      // 合併只合併章與心得，姓名那些一律換成備份檔裡的。不講的話，選了「合併」的人
+      // 會以為自己什麼都沒被動到，然後發現名字變成別人的（跨帳號還原時特別明顯）。
+      // 2026-08-17 實測跨帳號合併時撞到：B 選了合併，名字變成 A 的，而對話框從頭到尾沒提。
+      const profileNote = "還原也會把你的姓名、團隊、標語和大頭照換成備份檔裡的。";
 
       let mode = "overwrite";
       if (has > 0) {
@@ -313,9 +318,10 @@ document.addEventListener("click", async e => {
           `${summary}\n\n`
           + `你現在的護照已經有 ${has} 個章。\n\n`
           + `按「確定」＝ 覆蓋：現在這 ${has} 個章、心得和照片會全部刪掉，換成備份檔裡的。\n`
-          + `按「取消」＝ 合併：兩邊都留，同一格以備份檔的內容為準。`
+          + `按「取消」＝ 合併：兩邊的章都留，同一格以備份檔的內容為準。\n\n`
+          + `${profileNote}（兩種選擇都一樣）`
         ) ? "overwrite" : "merge";
-      } else if (!confirm(`${summary}\n\n要還原到你現在的帳號嗎？`)) {
+      } else if (!confirm(`${summary}\n\n${profileNote}\n\n要還原到你現在的帳號嗎？`)) {
         return;
       }
 

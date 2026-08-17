@@ -273,6 +273,17 @@ export function setupHTML(p, user) {
     <div class="row">
       <button class="btn" data-act="issue">${p.id ? "儲存" : "核發護照"}</button>
       ${p.id ? `<button class="btn ghost" data-act="cancel">取消</button>` : ""}
+      <!-- 沒有名字 = 這個人現在**到不了資料頁**，而匯入還原的另一顆按鈕就在資料頁上。
+           不放這一顆的話，spec §11-10 的「匯出 → 清除護照 → 匯入還原」根本走不完：
+           清完之後畫面就停在這一頁，只有「核發護照」跟「登出」，備份檔沒有地方可以餵進去。
+           spec §7.4 的跨帳號還原也一樣卡住 —— 剛註冊完的帳號同樣停在這一頁。
+           （2026-08-17 實測確認過這個死路，不是推測。）
+
+           判斷條件是「有沒有名字」而不是「有沒有 p.id」：清除護照之後那一列還在
+           （clearAll 只把欄位設成 null，不刪列），所以重整一次 p.id 就會有值，
+           用 p.id 判斷的話這顆按鈕會在重整後消失，死路又回來了。
+           從資料頁按「編輯資料」進來的人一定有名字，所以那條路上不會多出這顆。 -->
+      ${(p.name_zh || p.name_en) ? "" : `<button class="btn ghost sm" data-act="import">匯入還原</button>`}
       ${user ? `<button class="btn ghost sm" data-act="signout" style="margin-left:auto">登出</button>` : ""}
     </div>
   </div>`;
