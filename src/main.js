@@ -88,6 +88,10 @@ function openModal(id) {
     <h3>${UI.esc(a.title_zh)}</h3>
     <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
     <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
+    <!-- 回望區塊的位置：在活動說明之後、要填的東西之前（spec §7.3「顯示在題目上方」）。
+         這個順序是有意義的 —— 先看到自己九月寫的，接著就是今天要寫的那一格，
+         視線是連續的。放到輸入框下面的話，人已經開始打字了才看到，等於沒有回望。 -->
+    ${UI.callbackHTML(S, a)}
     <label><i>日期 / Date</i><input type="date" id="md" value="${UI.esc(st ? st.date : UI.today())}"></label>
     <label><i>一句話 / One line（選填，最多 60 字）</i><textarea id="mn" maxlength="60" placeholder="那天發生了什麼？">${st ? UI.esc(entry.note || "") : ""}</textarea></label>
     <label><i>照片（選填，只存在你的護照裡）</i><input type="file" id="mf" accept="image/*"></label>

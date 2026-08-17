@@ -124,6 +124,36 @@ export function monthPageHTML(S, m) {
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
 
+// 07B 的回望（spec §7.3）。由 activities.callback_to 驅動，**不寫死 07B** ——
+// 未來任何一格在資料庫設了 callback_to，打開時就自動有這個行為，一行程式都不用改。
+//
+// 兩句文案逐字抄自 spec §7.3（「你在九月寫的」／「你九月沒有寫這格」），改文案要先改 spec。
+// 這裡刻意不用「先組一句再 replace 成另一句」的寫法：那種接龍看起來省事，
+// 但只要有人動了其中一句的措辭，另一句就會靜靜地產出半句不通的中文，而且沒有東西會報錯。
+//
+// 日期取自 stamps 不是 entries —— entries 沒有日期欄位（spec §7.3 明說）。
+export function callbackHTML(S, act) {
+  if (!act.callback_to) return "";
+  const src = S.activities.find(a => a.id === act.callback_to);
+  // 來源那格可能被停用（boot 會濾掉 active === false），這時候講不出是哪個月，
+  // 退成不提月份的說法。不能因此整塊不顯示：那個人的心得還在，還是該給他看。
+  const when = src ? MONTH_ZH[src.month] : "";
+  const e = S.entries[act.callback_to];
+  const st = S.stamps[act.callback_to];
+
+  if (!e || !e.note) {
+    // spec §7.3：沒寫過時照樣可作答，**不阻擋**。所以這裡只是一段說明，
+    // 不是警告，也不會關掉下面的輸入框。
+    const none = when ? `你${when}沒有寫這格` : "你之前沒有寫這格";
+    return `<div class="wnote" style="margin:0 0 16px">${esc(none)}。沒關係，這格照樣可以寫。</div>`;
+  }
+  const label = when ? `你在${when}寫的` : "你之前寫的";
+  return `<div class="wnote" style="margin:0 0 16px">
+    <b>${esc(label)}</b>${st ? `　<span style="opacity:.7">${esc(st.date)}</span>` : ""}
+    <div style="margin-top:6px;font-size:13px;opacity:.9">「${esc(e.note)}」</div>
+  </div>`;
+}
+
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
