@@ -224,6 +224,7 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 | email 已註冊 | 這個 email 已經有護照了，直接登入就好。 |
 | email 格式不對 | 這個 email 看起來不太對，檢查一下有沒有打錯。 |
 | 密碼太短 | 密碼至少要 6 個字。 |
+| 登入時 email 或密碼不對 | email 或密碼不對。忘記密碼的話寄信到 beyondtaiwan2020@gmail.com。 |
 | 連不上資料庫 | 現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。 |
 | 其他未預期錯誤 | 出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。 |
 
