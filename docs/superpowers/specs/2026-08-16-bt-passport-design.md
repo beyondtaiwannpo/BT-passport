@@ -233,15 +233,25 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 
 「email 格式不對」這一句**刻意不附組織信箱**。這是使用者自己就能修好的問題，附上信箱會把一個打錯字的狀況升級成寄信求助。其餘各句維持導向信箱的原則。
 
-判斷條件（2026-08-17 實測，`code` 為機器可讀值，不靠字串猜測）：
+判斷條件（2026-08-17 於正式專案實測，全部為觀察值）：
 
-| 情況 | 觀察到的形狀 |
-|---|---|
-| 邀請碼無效 | `status 500`、`code: null`、`message: "Database error saving new user"` |
-| 密碼太短 | `status 422`、`code: "weak_password"`、`reasons: ["length"]` |
-| email 格式不對 | `status 400`、`code: "validation_failed"`、message 含 `validate email` |
+| 情況 | `name` | `status` | `code` | `message` |
+|---|---|---|---|---|
+| 邀請碼無效 | `AuthRetryableFetchError` | 500 | `null` | `Database error saving new user` |
+| 邀請碼已用完 | `AuthRetryableFetchError` | 500 | `null` | `Database error saving new user` |
+| email 已註冊 | `AuthApiError` | 422 | `user_already_exists` | `User already registered` |
+| 密碼太短 | `AuthWeakPasswordError` | 422 | `weak_password` | `Password should be at least 6 characters.`（`reasons: ["length"]`）|
+| email 格式不對 | `AuthApiError` | 400 | `validation_failed` | `Unable to validate email address: invalid format` |
 
-「邀請碼已用完」未在前端直接觀察到，是從資料庫層推論的：`rls-test.sql` 的 §11-5 證明 trigger 對「無效」與「已用完」丟出同一個 P0001，所以 GoTrue 應回同一個 500。註解須據實標示為推論。
+「無效」與「已用完」在前端**完全無法區分**（逐字相同），所以 §6.1 的文案把兩者寫成同一句是必要的，不是偷懶。
+
+**422 同時是「email 已註冊」與「密碼太短」的 status，判斷一律以 `code` 為準，不得用 status 區分。**
+
+「連不上資料庫」與「伺服器 500」在 supabase-js 裡是同一個錯誤類別 `AuthRetryableFetchError`，只有 `status` 不同（0 vs 500）。**不得用 `name` 區分這兩者**，否則邀請碼打錯的人會被告知資料庫連不上。
+
+「email 已註冊」另有第二種可能形狀：Supabase 的「防止帳號列舉」設定開啟時，會回 200 且 `data.user.identities` 為空陣列，而非 4xx。本專案實測為 4xx，代表該設定目前關閉；但那是後台可切換的專案設定，**兩種形狀都必須繼續處理**。
+
+登入失敗（`signIn` 路徑）的形狀尚未實測，維持 `invalid login credentials` 的字串比對。
 
 任何錯誤訊息都**不得出現個人姓名或個人聯絡方式**，一律導向 `beyondtaiwan2020@gmail.com`。
 
@@ -270,7 +280,9 @@ trigger `raise` 之後 Supabase 回的是通用的 500「Database error saving n
 | 邀請碼本身無效 | 不消耗 | 由 trigger 的 `update … where code = v_code and uses_left > 0` 推得：不存在的碼對不到任何一列 |
 | 邀請碼已用完 | 不消耗 | 同上，`uses_left > 0` 的條件擋掉 |
 
-機制上這是 trigger 跑在註冊那筆交易裡的必然結果：扣減之後若交易的任何一步失敗，扣減會跟著回滾。§6 的併發測試也驗證過 `uses_left` 不會變成負數。
+「email 已註冊」不消耗的**機制已經確定**：GoTrue 回的是 `422 user_already_exists`，這是在嘗試寫入 `auth.users` **之前**就擋下來的，所以 trigger 根本沒有執行 —— 不是「扣了之後又回滾」。
+
+其餘情況即使 trigger 跑過，扣減也在註冊那筆交易裡，任何一步失敗都會一併回滾。§6 的併發測試另外驗證過 `uses_left` 不會變成負數。
 
 **對發碼的實務影響：** 一組碼配一個人、`uses_left = 1` 就夠了，**不需要為了怕學生打錯而多發備用碼**。學生用同一組碼重試不會把它燒掉；真正會用掉它的只有「註冊成功」這一件事。若有人回報「碼不能用了」，先查 `uses_left` —— 是 0 就代表那組碼真的被人成功註冊過，不是被失敗的嘗試耗掉的。
 

@@ -2141,6 +2141,20 @@ GitHub repo → Actions → 「ping supabase」→ 最近有沒有綠勾。
 - 絕對不要把 secret key 放進程式碼、放進 GitHub、貼進群組、或截圖露出來
 - 這個專案完全不需要 secret key
 - 如果哪天覺得「好像要用 secret key 才做得到」，那是規則寫錯了，去修規則
+
+### 不要照著錯誤訊息裡的「hint」做
+
+資料庫拒絕存取時，回來的訊息常常附一個 `hint` 欄位，直接告訴你怎麼把限制解除。例如：
+
+> `permission denied for table invite_codes`
+> hint: `Grant the required privileges to the current role with: GRANT SELECT ON public.invite_codes TO authenticated;`
+
+**那句 hint 不要照做。** 它是資料庫在機械式地告訴你「怎麼讓這個錯誤消失」，
+不是在建議你該怎麼做。`invite_codes` 讀不到就是我們刻意設計的 ——
+照著做等於把全部邀請碼公開給每一個登入的人。
+
+遇到 `permission denied`，正確的反應是問「為什麼這裡會需要讀這張表」，
+不是把權限開下去。
 ```
 
 - [ ] **Step 7: 「不要刪活動」（spec §9-7）**
