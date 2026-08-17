@@ -1,8 +1,14 @@
-// 暫時的 localStorage 儲存層。Task 6 會把每個函式的內容換成 Supabase，
-// 簽名不變。這一版的存在是為了讓拆檔可以獨立驗證。
+// 儲存層。auth 與護照內容都走 Supabase，這個檔案是前端唯一碰資料庫的地方 ——
+// ui.js 只畫畫面、main.js 只接事件，兩者都不認識 supabase client。
 //
-// 下面的 auth 區段（Task 5）已經是真的 Supabase，不是 localStorage —— 登入註冊
-// 沒有本機版可言。護照內容的讀寫要等 Task 6 才一起換過去。
+// Task 6（2026-08-17）把護照內容從 localStorage 換成 Supabase，七個函式的簽名一個都沒動，
+// ui.js 一行都不用改。那是拆檔設計的驗證點，不是巧合：Task 4 就先把回傳形狀對齊資料表欄位
+// （snake_case、description 而不是 desc），localStorage 版只是同一個形狀的另一種來源。
+//
+// 安全性不在這個檔案裡，在資料庫裡。這裡每一句 .eq("user_id", user.id) 都只是「少傳一點
+// 資料回來」的效率措施，**不是**防止讀到別人心得的機制 —— 那是 RLS 的工作（schema.sql
+// 的 entries_read）。把這裡的條件拿掉，資料庫仍然只會回自己的列；反過來說，
+// 這裡寫得再嚴，RLS 一鬆就全破。改動時不要把這兩層搞混。
 import { createClient } from "../vendor/supabase-js.js";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js";
 
@@ -226,89 +232,140 @@ export async function currentUser() {
   return (data && data.user) || null;
 }
 
-/* ---------- 護照內容（Task 6 會換成 Supabase） ---------- */
-const KEY = "bt-passport:local";
+/* ---------- 護照內容 ---------- */
 
-// 活動與月份在正式版來自資料庫。這一版先從 activities.json 讀，
-// 讓拆檔階段就用「非同步取得活動」的形狀，Task 6 換來源時不必改 ui.js。
-async function seedFromJson() {
-  const r = await fetch("./activities.json");
-  const j = await r.json();
-  return {
-    months: j.months,
-    activities: j.activities.map(a => ({
-      id: a.id, month: a.month, category: a.category,
-      title_zh: a.title_zh, title_en: a.title_en,
-      description: a.desc, needs_host: a.needs_host,
-      callback_to: a.callback_to || null, active: true
-    }))
-  };
+// 每個寫入函式開頭都重新問一次 currentUser()，而不是信任呼叫端傳進來的 id。
+// 理由：id 若由呼叫端提供，「寫誰的資料」就變成畫面狀態說了算，而畫面狀態可能是
+// 上一個使用者留下的（同一台電腦換人登入、session 過期後又登入別的帳號）。
+// getUser() 讀的是 client 手上的 session，跟資料庫實際認的身分同一個來源。
+// 成本是每次寫入多一次本地查詢，不是多一趟網路 —— supabase-js 有 session 快取。
+async function requireUser() {
+  const user = await currentUser();
+  if (!user) throw new Error("尚未登入");
+  return user;
 }
-
-function readLocal() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
-  catch (e) { return {}; }
-}
-function writeLocal(o) { localStorage.setItem(KEY, JSON.stringify(o)); }
 
 export async function loadAll() {
-  const { months, activities } = await seedFromJson();
-  const d = readLocal();
+  const user = await currentUser();
+  // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
+  // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
+  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [] };
+
+  // 五個查詢彼此不相依，一起發。序列發的話是五個 RTT，在手機網路上很有感。
+  const [mo, ac, pa, st, en] = await Promise.all([
+    supabase.from("months").select("*").order("seq"),
+    // month 之後一定要再 order("seq")：同月份有多個活動，只排 month 的話同月內順序
+    // 由資料庫決定，也就是「不保證」—— 活動格子會在每次載入之間換位置，而學生記的是位置。
+    supabase.from("activities").select("*").eq("active", true).order("month").order("seq"),
+    supabase.from("passports").select("*").eq("id", user.id).maybeSingle(),
+    supabase.from("stamps").select("act_id, stamped_on").eq("user_id", user.id),
+    supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id)
+  ]);
+
+  // 任何一個查詢失敗就整批視為失敗。部分成功比全部失敗更危險：少了 stamps 的畫面
+  // 看起來就是「一個章都沒蓋」，學生會以為自己的紀錄不見了，然後重蓋一次。
+  const firstErr = [mo, ac, pa, st, en].find(r => r.error);
+  if (firstErr) throw firstErr.error;
+
+  // 兩張表都攤平成以 act_id 為鍵的物件 —— ui.js 是照這個形狀寫的（S.stamps[a.id]）。
+  const stamps = {};
+  (st.data || []).forEach(r => { stamps[r.act_id] = { date: r.stamped_on }; });
+  const entries = {};
+  (en.data || []).forEach(r => { entries[r.act_id] = { note: r.note, photo: r.photo }; });
+
   return {
-    profile: d.profile || null,
-    stamps: d.stamps || {},
-    entries: d.entries || {},
-    months, activities
+    // maybeSingle() 沒找到時 data 是 null 而不是報錯。正常情況一定找得到 ——
+    // 註冊 trigger 會先建好這一列（schema.sql 的 handle_new_user）。拿到 null 只有兩種可能：
+    // 這個帳號是 trigger 存在之前建的，或是有人手動刪了那一列。兩者都會讓畫面停在
+    // 「填護照資料」頁，而使用者存不進去（passports 沒有 insert policy，補不回來）。
+    profile: pa.data || null,
+    stamps, entries,
+    activities: ac.data || [],
+    months: mo.data || []
   };
 }
 
+// update 不是 insert（spec §5.1）：那一列在註冊時就由 trigger 建好了。
+// 沒有邀請碼就沒有 passports 列，前端補不出來 —— 這是刻意的，見 schema.sql 的
+// passports_write 註解。所以這裡永遠是改既有的列。
 export async function saveProfile(p) {
-  const d = readLocal();
-  d.profile = Object.assign({ issued: new Date().toISOString().slice(0, 10) }, d.profile, p);
-  if (!d.profile.id) d.profile.id = "local-" + Math.random().toString(36).slice(2, 10);
-  writeLocal(d);
+  const user = await requireUser();
+  // 不寫 issued：核發日是 trigger 建列時的 current_date，也就是註冊那天。
+  // 從這裡寫的話，每次改暱稱都會把核發日改成今天。
+  const { error } = await supabase.from("passports").update({
+    name_zh: p.name_zh, name_en: p.name_en, team: p.team, motto: p.motto,
+    updated_at: new Date().toISOString()
+  }).eq("id", user.id);
+  if (error) throw error;
 }
 
 export async function saveAvatar(dataUrl) {
-  const d = readLocal();
-  if (!d.profile) return;
-  d.profile.avatar = dataUrl;
-  writeLocal(d);
+  const user = await requireUser();
+  const { error } = await supabase.from("passports")
+    .update({ avatar: dataUrl, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (error) throw error;
 }
 
+// 章與心得分兩張表，不是為了正規化，是因為兩者的可見範圍不同（spec §5.1）：
+// 章要公開給進度牆看，心得和照片只有本人能讀。混在同一張表的話，進度牆為了讀章
+// 就必須讀得到那一列，RLS 沒有「同一列的這幾欄看得到、那幾欄看不到」這種東西。
 export async function saveStamp(actId, { date, note, photo }) {
-  const d = readLocal();
-  d.stamps = d.stamps || {}; d.entries = d.entries || {};
-  d.stamps[actId] = { date };
-  d.entries[actId] = { note: note || "", photo: photo || null };
-  writeLocal(d);
+  const user = await requireUser();
+
+  // upsert 而不是 insert：重蓋同一格是允許的（改日期、補心得），
+  // 主鍵是 (user_id, act_id)，所以衝突時更新同一列。
+  const s = await supabase.from("stamps")
+    .upsert({ user_id: user.id, act_id: actId, stamped_on: date }, { onConflict: "user_id,act_id" });
+  if (s.error) throw s.error;
+
+  // 章先寫、心得後寫。順序是有意義的：中間斷線的話，結果是「章在、心得空」——
+  // 學生看得到自己蓋過，補打一次心得就好。反過來寫的話會變成心得存在資料庫裡
+  // 但畫面上那格沒蓋章，學生只會再蓋一次、然後心得被這次的覆蓋掉。
+  const e = await supabase.from("entries")
+    .upsert({ user_id: user.id, act_id: actId, note: note || "", photo: photo || null },
+            { onConflict: "user_id,act_id" });
+  if (e.error) throw e.error;
 }
 
 export async function removeStamp(actId) {
-  const d = readLocal();
-  if (d.stamps) delete d.stamps[actId];
-  if (d.entries) delete d.entries[actId];
-  writeLocal(d);
+  const user = await requireUser();
+  // 刪的順序跟寫的順序相反：先刪心得再刪章。中間斷線的話結果是「章在、心得沒了」,
+  // 跟上面同一個道理 —— 留下看得見的痕跡，比留下看不見的殘留好。
+  const e = await supabase.from("entries").delete().eq("user_id", user.id).eq("act_id", actId);
+  if (e.error) throw e.error;
+  const s = await supabase.from("stamps").delete().eq("user_id", user.id).eq("act_id", actId);
+  if (s.error) throw s.error;
 }
 
-// 清除這個人自己的整本護照。localStorage 版直接砍掉那把 key；Task 6 換
-// Supabase 之後，這裡要做的是刪掉這個使用者自己名下的 passport/stamps 列
-// （RLS 保證刪不到別人的）。加進六個函式的介面清單，是因為 spec §11 的驗收
-// 標準要求「匯出 → 清除護照 → 匯入還原」要真的能動作；沒有這個函式時，
-// main.js 只能繞過 data.js 直接戳 localStorage，Task 6 換後端後這個「清除」
-// 會變成只清畫面、資料庫裡的資料還在，卻沒有任何錯誤訊息可以看出來。
+// 清除這個人自己的整本護照（spec §11-10 的「匯出 → 清除 → 匯入還原」）。
+// 這個函式當初被加進介面清單，就是為了預防它現在最容易出的錯：計畫的 Task 6
+// 只列了六個函式、沒有這一個，照著做的話「清除護照」會留在 localStorage 版本 ——
+// 畫面清空、資料庫原封不動、重整後全部回來，而且不會有任何錯誤訊息。
+// 那條驗收會通過，但通過的是假的。
+//
+// **不刪 passports 那一列，只把欄位設回 null。** 這不是風格選擇：schema.sql 刻意
+// 沒有給 passports 任何 insert policy，那一列只在註冊時由 trigger 建立一次。
+// 刪掉之後前端補不回來，帳號會變成一本永遠填不了的空護照，而且無法自行修復。
+// 章與心得則是真的刪除 —— 它們有 insert policy，重蓋就會回來。
 export async function clearAll() {
-  localStorage.removeItem(KEY);
+  const user = await requireUser();
+  const e = await supabase.from("entries").delete().eq("user_id", user.id);
+  if (e.error) throw e.error;
+  const s = await supabase.from("stamps").delete().eq("user_id", user.id);
+  if (s.error) throw s.error;
+  const p = await supabase.from("passports").update({
+    name_zh: null, name_en: null, team: null, motto: null, avatar: null,
+    updated_at: new Date().toISOString()
+  }).eq("id", user.id);
+  if (p.error) throw p.error;
 }
 
+// Task 7 才改查資料庫。localStorage 版已經在 Task 6 拿掉了，所以現在回空陣列 ——
+// 進度牆在 Task 7 之前是空的。這是計畫預期的中間狀態，不是壞掉。
+// 留一個會讀到不存在資料的舊實作，比誠實回空更糟：那會看起來像「牆上真的沒人」。
 export async function loadWall() {
-  const d = readLocal();
-  if (!d.profile) return [];
-  return [{
-    id: d.profile.id, name_zh: d.profile.name_zh, name_en: d.profile.name_en,
-    team: d.profile.team, avatar: d.profile.avatar || null,
-    stamps: Object.keys(d.stamps || {}).map(k => ({ act_id: k, stamped_on: d.stamps[k].date }))
-  }];
+  return [];
 }
 
 // 護照號碼由 id 決定，固定不變。Task 6 之後 id 是 auth uuid，

@@ -231,6 +231,10 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "avatar") {
+    // spec §6.2 的再次告知。位置是刻意的：**在開檔案選擇器之前**問。
+    // 挑完照片才問等於「都選好了，不上傳很可惜」，那不是同意，是沉沒成本。
+    // 大頭照跟心得照片不同 —— 心得只有自己看得到，大頭照會出現在全體進度牆上。
+    if (!confirm("你的大頭照會出現在全體進度牆上，其他 BT 幹部看得到。要繼續上傳嗎？")) return;
     const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
     i.onchange = async () => {
       const f = i.files && i.files[0]; if (!f) return;
