@@ -226,6 +226,30 @@ export async function signIn(email, pw) {
 
 export async function signOut() { if (supabase) await supabase.auth.signOut(); }
 
+// 「查不出是誰」有兩種完全不同的原因，而畫面上該顯示的東西正好相反：
+//   沒登入 / session 過期 → 登入頁
+//   連不上伺服器           → 休眠頁（spec §8.1）
+// getUser() 對這兩種都是回 error 而不是 throw，currentUser() 也都回 null，
+// 所以 boot() 光看 null 是分不出來的 —— 分不出來的後果是：資料庫一休眠，
+// 所有登入中的人都會看到登入頁，以為自己被登出、資料沒了。
+//
+// 判斷「是不是連不上」直接借用 RULES 裡 offline 那一條，不另外寫一份 ——
+// 那條是實測校準過的（status 0 vs 500 的差別見它的註解），複製一份出來
+// 就會有兩個真相來源，而且只有其中一個會被後續的實測更新到。
+export function isOfflineError(err) {
+  if (!err) return false;
+  const r = RULES.find(x => x.key === "offline");
+  return !!r.when(err, String(err.message || "").toLowerCase(),
+                  Number(err.status || 0), String(err.code || "").toLowerCase());
+}
+
+// 回 { user, offline }。boot() 用它，其他地方用上面那個 currentUser() 就好。
+export async function currentUserDetailed() {
+  if (!supabase) return { user: null, offline: true };
+  const { data, error } = await supabase.auth.getUser();
+  return { user: (data && data.user) || null, offline: isOfflineError(error) };
+}
+
 export async function currentUser() {
   if (!supabase) return null;
   const { data } = await supabase.auth.getUser();

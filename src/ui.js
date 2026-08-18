@@ -259,6 +259,25 @@ export function authHTML(mode, msg) {
 
 // user 有值時多一顆登出。這個畫面沒有 barHTML，沒有這顆的話，註冊完但還沒填資料的人
 // 在這裡是走不掉的 —— 唯一的登出鍵在他還看不到的那條 bar 上。
+// DB 連不上時的畫面（spec §8.1）。**這一頁存在的唯一理由是「不得空白」**。
+//
+// 文案逐字照 spec §8.1，一個字都不要改，也不要加上任何人的名字或私人聯絡方式
+// （spec §11-20 全站規則）。
+//
+// 它說的是「休眠中」，但實際上任何讀取失敗都會走到這裡 —— 真的休眠、網路斷掉、
+// 政策改壞了，畫面上都是同一句。這是刻意的：對學生來說下一步都一樣（寄信給組織），
+// 分辨原因是維護者的事，所以原始錯誤留在 console（見 main.js 的 boot）。
+export function downHTML() {
+  return `<div class="card">
+    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>資料庫休眠中</h2>
+    <div class="wnote" style="margin:16px 0 0">
+      資料庫休眠中，你的資料都還在。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
+    </div>
+    <div class="row" style="margin-top:18px"><button class="btn ghost" data-act="retry">再試一次</button></div>
+  </div>`;
+}
+
 export function setupHTML(p, user) {
   p = p || {};
   return `<div class="card">

@@ -13,7 +13,7 @@ let S = {
   profile: null, stamps: {}, entries: {},
   activities: [], months: [],
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-  justStamped: null
+  down: false, justStamped: null
 };
 
 function compress(file, maxDim, quality) {
@@ -53,6 +53,9 @@ const root = () => document.getElementById("bt-root");
 
 function render() {
   const el = root();
+  // 這一條要排在所有其他分支前面：連不上資料庫的時候，S.user / S.profile 全是空的，
+  // 少了它畫面會掉回登入頁，等於對一個明明登入著的人說「請登入」（spec §8.1）。
+  if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg); return; }
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
@@ -270,6 +273,15 @@ document.addEventListener("click", async e => {
     i.click(); return;
   }
 
+  if (act === "retry") {
+    // 不先 render()：那會在 S.down 已經是 false、資料卻還沒回來的時候閃一下登入頁或申請頁。
+    // 直接寫一句「正在重新連線…」，讓按下去的人知道有反應 —— 重試最長要等 7 秒（見 boot）。
+    S.down = false;
+    root().innerHTML = `<div class="empty">正在重新連線…</div>`;
+    await boot();
+    return;
+  }
+
   if (act === "export") {
     try {
       const b = await DATA.exportPassport();
@@ -354,7 +366,7 @@ document.addEventListener("click", async e => {
       user: S.user, authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {},
       activities: S.activities, months: S.months,
-      page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
+      page: 0, view: "passport", wall: null, wallLoading: false, wallError: false, down: false,
       justStamped: null
     };
     render();
@@ -380,18 +392,39 @@ export async function boot() {
     // config.js 填錯時 client 建不出來，這裡拿到空字串以外的東西，
     // 登入頁就會帶著「現在連不上資料庫」那句出現，而不是一片空白（spec §8.1）。
     S.authMsg = DATA.configMessage();
-    S.user = await DATA.currentUser();
-    if (!S.user) { render(); return; }
+    // 不能只看「查不查得到人」：連不上的時候也查不到，而那時候顯示登入頁
+    // 等於告訴一個登入中的人「你被登出了」。兩者要分開處理（見 data.js 的 currentUserDetailed）。
+    const who = await DATA.currentUserDetailed();
+    if (who.offline) { S.down = true; render(); return; }
+    S.user = who.user;
+    if (!S.user) { S.down = false; render(); return; }
 
-    const all = await DATA.loadAll();
+    // 連不上資料庫時 loadAll 要 **7 秒** 才會失敗（2026-08-17 實測：postgrest-js 對網路
+    // 失敗有內建重試與退避，五個查詢各重試四次，總共 20 次 fetch）。那 7 秒裡畫面上
+    // 只有 index.html 的「載入護照中…」，看起來是「很慢」而不是「出事了」，學生會一直等。
+    //
+    // 這裡**不縮短**那 7 秒，也不加逾時：逾時等於在網路慢的時候，把一條還會成功的連線
+    // 主動砍掉，那是拿「已經壞掉的體驗」去換「本來會好的結果」。改成等太久就換句話說。
+    const slow = setTimeout(() => {
+      const el = root();
+      if (el) el.innerHTML = `<div class="empty">還在連資料庫…<br>如果一直停在這裡，可能是資料庫休眠了。</div>`;
+    }, 2500);
+    let all;
+    try { all = await DATA.loadAll(); } finally { clearTimeout(slow); }
+
     S.activities = all.activities.filter(a => a.active !== false);
     S.months = all.months;
     S.profile = all.profile;
     S.stamps = all.stamps;
     S.entries = all.entries;
+    S.down = false;
     render();
   } catch (e) {
-    root().innerHTML = `<div class="empty">活動資料讀不到，重新整理試試。</div>`;
+    // 畫面上永遠是 spec §8.1 那一句，但**維護者要看得到真正的原因**：休眠、網路斷、
+    // 政策改壞了，對學生來說下一步都一樣（寄信給組織），對修的人完全不一樣。
+    console.error("載入失敗，畫面顯示的是「資料庫休眠中」那一頁。真正的原因：", e);
+    S.down = true;
+    render();
   }
 }
 boot();
