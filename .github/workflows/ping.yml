@@ -1,0 +1,64 @@
+# Supabase 免費方案閒置 7 天會暫停。本站是月頻使用，一定會踩到。
+# 這個 workflow 每天對 activities 做一次查詢，讓專案保持活著。
+# 停掉它，網站會在某個沒人用的兩週後變成空白。**不要停。**
+#
+# ⚠ GitHub 會把「repo 連續 60 天沒有任何 commit」的排程 workflow 自動停用，並寄信通知。
+#   這個專案正好是那種很久沒人動的 repo，所以那封信不是廣告，收到就去 Actions 頁面
+#   按 "Enable workflow"。README §9 有寫。
+name: ping supabase
+
+on:
+  schedule:
+    - cron: "17 3 * * *"     # 每天 UTC 03:17（台灣 11:17）
+  workflow_dispatch:          # 也可以在 Actions 頁面手動按
+
+permissions: {}               # 這個 job 不需要碰 repo 的任何東西
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: count activities
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -u
+          code=$(curl -s -o /tmp/out.txt -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/activities?select=id&limit=1" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY")
+          echo "HTTP $code"
+          cat /tmp/out.txt; echo
+
+          # ── 為什麼不能只看 HTTP 狀態碼 ──
+          # activities 的 select 政策限 authenticated，而這個 ping 是未登入的，
+          # 所以「一切正常」的回應是 401 而不是 200。問題是**設錯 key 也是 401**。
+          # 2026-08-17 對正式專案實測三種情況，狀態碼完全一樣，只有 body 不同：
+          #   key 正確   → 401 {"code":"42501", ... "permission denied for table activities"}
+          #                 ← Postgres 真的回答了，休眠計時器已重置
+          #   key 錯誤   → 401 {"message":"Invalid API key"}
+          #   key 沒設   → 401 {"message":"No API key found in request"}
+          #                 ← 這兩種是閘道擋下的，**請求根本沒有碰到資料庫**
+          # 只看狀態碼的話，secret 一旦設錯或忘了設，這個 workflow 會永遠是綠勾，
+          # 而專案在背後安靜地休眠 —— 正是它存在要防止的那件事，而且沒有人會發現。
+          # 所以判斷條件是「200，或是 401 且 body 裡有 42501」。
+          if [ "$code" = "200" ]; then
+            echo "OK：資料庫有回應。"
+            exit 0
+          fi
+          if [ "$code" = "401" ] && grep -q '42501' /tmp/out.txt; then
+            echo "OK：拿到 42501（權限不足）——這正是未登入身分該有的回應，"
+            echo "     而且它來自 Postgres，代表請求真的走到資料庫了。"
+            exit 0
+          fi
+          if [ "$code" = "401" ]; then
+            echo "失敗：401 但不是 42501。這表示請求被閘道擋在資料庫之前，"
+            echo "      多半是 SUPABASE_PUBLISHABLE_KEY 這個 secret 設錯或沒設。"
+            echo "      去 repo Settings → Secrets and variables → Actions 檢查。"
+            echo "      **這種情況下保活是無效的，專案仍然會休眠。**"
+            exit 1
+          fi
+          echo "失敗：資料庫沒有回應（HTTP $code），可能已經休眠。"
+          echo "      去 Supabase 後台把專案恢復，再手動跑一次這個 workflow。"
+          exit 1
