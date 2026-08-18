@@ -248,7 +248,11 @@
     .mrz{font-size:10.5px;letter-spacing:.08em}
   }
   @media (prefers-reduced-motion:reduce){
-    .stamp.land,.page.turn{animation:none}
+    /* 三個動畫全部關掉。.overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
+       它跟 .stamp.land 共用同一組 land keyframe，卻一直漏在這條規則外面 ——
+       因為它只在集滿的那一刻出現，平常根本測不到。2026-08-18 做 §11-17
+       驗收時用 CSSOM 逐條比對才抓到。新增動畫時記得回來加進這一行。 */
+    .stamp.land,.page.turn,.overprint.land{animation:none}
   }
 </style>
 </head>
