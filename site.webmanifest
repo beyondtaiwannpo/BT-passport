@@ -1,0 +1,15 @@
+{
+  "name": "Beyond Taiwan Passport",
+  "short_name": "BT 護照",
+  "description": "Beyond Taiwan 幹部數位護照。學年制 11 個月 33 格。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EDE5D8",
+  "theme_color": "#102A86",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

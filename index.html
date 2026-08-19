@@ -4,6 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beyond Taiwan Passport</title>
+<!-- 圖示：三十位幹部會把這個網站釘在手機主畫面，那個位置沒圖示會是一張白紙。
+     背景色用 #EDE5D8 不是隨便挑的 —— logo 本來就是坐在卡片的那個紙色上設計的
+     （它同時有深色與淺色筆畫，換成別的底色其中一半會消失）。
+     圖示四周留了 14% 的邊：iOS 會把主畫面圖示切圓角，貼邊的話 logo 會被切掉。
+     apple-touch-icon 是 iOS 用的，manifest 裡的 192/512 是 Android 用的，兩邊都要。
+     32/48 這兩個小尺寸**只用左邊的台灣圖形，不含 Beyond Taiwan 字樣** ——
+     整組橫式 logo 縮到 32px 會糊成一團，看不出是什麼。圖形與文字之間的切點
+     （原圖 x=160）是量出來的，不是目測：那裡有一段 35px 全透明的空白。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="manifest" href="./site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="BT 護照">
+<meta name="theme-color" content="#102A86">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
