@@ -2,7 +2,24 @@
 // passportNo 從 data.js import（data.js 不可以反向依賴這裡，見該檔案的註解）。
 import { passportNo } from "./data.js";
 
-const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team", "Sponsorship Team", "Internship Team", "Community Relations Team", "President's Office"];
+// BT 的六個組。**這裡只放團隊，不放職位。**
+// 原本第七項是 "President's Office"，2026-08-22 拿掉 —— 那不是 BT 的正式團隊，
+// 是原型階段自己加的。
+//
+// 常見的下一個問題：President 與 Vice President 不屬於任何一組，他們選什麼？
+// 答案是**選自己原本出身的那一組**（一進來就是 P/VP、沒有出身組的話，
+// 選最常一起做事的那一組）。要讓頭銜看得見的話寫在「護照上的一句話」，
+// 那是自由文字，例如「President 2026-27」。
+//
+// **不要為了他們在這個清單裡加一個選項。** 那正是剛剛拿掉 President's Office 的原因：
+// 清單裡一旦混進一個職位，它就不再是「一種東西的清單」，
+// 而下一個問題馬上會來 —— 秘書呢？顧問呢？同時在兩個組的人呢？
+// 而那一欄顯示在進度牆上，它要回答的是「這個人跟哪一組做事」，不是「他的頭銜是什麼」。
+//
+// 順帶一提，機讀碼的 teamCode 取團隊名的前六個字母，六個組各自對到
+// CURRIC / MENTOR / MARKET / SPONSO / INTERN / COMMUN，互不重複。加東西進來前先確認不會撞。
+const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
+               "Sponsorship Team", "Internship Team", "Community Relations Team"];
 
 export const CATNAME = {
   gather: "聚會 GATHER",
