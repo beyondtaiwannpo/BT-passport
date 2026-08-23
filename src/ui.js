@@ -88,23 +88,55 @@ export function barHTML(S) {
   </div>`;
 }
 
+// 書本的頁序。**頁碼只有這裡一個定義點** —— dots、上一頁／下一頁、鍵盤左右、
+// bookHTML 的內容分派全部問它，不准任何地方再自己算 page - 1 或 months.length。
+//
+// 這個函式存在之前，頁碼算術散在六個地方（ui.js 三處、main.js 三處）。
+// 在中間插一頁要同時改對六處，漏一處的表現是「翻到某一頁顯示的是別的月份」，
+// 不會報錯。之後要再插頁（例如年度回顧），只改這個函式。
+//
+// S.page 的語意是這個陣列的 0 起算索引。它沒有被持久化到任何地方
+// （不進 localStorage、不進備份檔、不進網址），所以改變頁序沒有相容性問題。
+export function pagesOf(S) {
+  return [
+    { kind: "id", label: "資料頁" },
+    ...S.months.map(m => ({
+      kind: "month", month: m, label: MONTH_ZH[m.month] || String(m.month)
+    }))
+  ];
+}
+
+// 這個月的圓點要不要塗橘色。**acts.length 那一半不可以省**：
+// [].every(...) 回 true，少了它的話，一個還沒有任何活動的月份會顯示成「已蓋滿」。
+function dotOn(S, m) {
+  const acts = S.activities.filter(a => a.month === m.month);
+  return acts.length && acts.every(a => S.stamps[a.id]) ? 1 : 0;
+}
+
 export function bookHTML(S) {
+  const pages = pagesOf(S);
+  // S.page 落在範圍外時退回第一頁而不是畫出 undefined。正常情況走不到這裡，
+  // 但月份資料變少（有人停用了一整個月）時 S.page 可能指向已經不存在的頁。
+  const cur = pages[S.page] || pages[0];
   return `<div class="book">
-    <div class="page turn">${S.page === 0 ? idPageHTML(S) : monthPageHTML(S, S.months[S.page - 1])}</div>
+    <div class="page turn">${pageBodyHTML(S, cur)}</div>
     <div class="nav">
       <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>← 前一頁</button>
       <div class="dots">
-        <button data-act="go" data-p="0" aria-current="${S.page === 0}" aria-label="資料頁" title="資料頁"></button>
-        ${S.months.map((m, i) => {
-          const acts = S.activities.filter(a => a.month === m.month);
-          const on = acts.every(a => S.stamps[a.id]) ? 1 : 0;
-          const zh = MONTH_ZH[m.month] || String(m.month);
-          return `<button data-act="go" data-p="${i + 1}" data-on="${on}" aria-current="${S.page === i + 1}" aria-label="${zh}" title="${zh}"></button>`;
+        ${pages.map((p, i) => {
+          const on = p.kind === "month" ? ` data-on="${dotOn(S, p.month)}"` : "";
+          return `<button data-act="go" data-p="${i}"${on} aria-current="${S.page === i}" aria-label="${esc(p.label)}" title="${esc(p.label)}"></button>`;
         }).join("")}
       </div>
-      <button class="arrow" data-act="next" ${S.page === S.months.length ? "disabled" : ""}>下一頁 →</button>
+      <button class="arrow" data-act="next" ${S.page === pages.length - 1 ? "disabled" : ""}>下一頁 →</button>
     </div>
   </div>`;
+}
+
+// 一頁的內容由 kind 決定。新增頁型只要在 pagesOf 加一種 kind、在這裡加一條分支。
+function pageBodyHTML(S, page) {
+  if (page.kind === "id") return idPageHTML(S);
+  return monthPageHTML(S, page.month);
 }
 
 export function idPageHTML(S) {

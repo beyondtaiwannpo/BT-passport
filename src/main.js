@@ -203,7 +203,8 @@ document.addEventListener("click", async e => {
   if (act === "tab") { S.view = b.dataset.v; render(); if (S.view === "wall" && !S.wall) loadWall(); return; }
   if (act === "refresh") { loadWall(); return; }
   if (act === "prev") { S.page = Math.max(0, S.page - 1); render(); return; }
-  if (act === "next") { S.page = Math.min(S.months.length, S.page + 1); render(); return; }
+  // 邊界問 pagesOf，不要自己算 months.length —— 書裡不是只有月份頁。
+  if (act === "next") { S.page = Math.min(UI.pagesOf(S).length - 1, S.page + 1); render(); return; }
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
   if (act === "open") { openModal(b.dataset.id); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
@@ -380,7 +381,7 @@ document.addEventListener("keydown", e => {
   if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (S.view !== "passport") return;
   if (e.key === "ArrowLeft" && S.page > 0) { S.page--; render(); }
-  if (e.key === "ArrowRight" && S.page < S.months.length) { S.page++; render(); }
+  if (e.key === "ArrowRight" && S.page < UI.pagesOf(S).length - 1) { S.page++; render(); }
 });
 
 /* ---------- boot ---------- */
