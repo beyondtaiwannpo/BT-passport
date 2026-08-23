@@ -46,7 +46,16 @@
     margin:0 auto;
     padding:0 0 40px;
   }
-  #bt-root button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  /* 這條 reset 的選擇器**必須**包在 :where() 裡。
+     裸寫 #bt-root button 的特異性是 (1,0,1)，會蓋掉所有用 class 描述外觀的規則 ——
+     .btn 的深藍實心底、.btn.ghost 與 .nav .arrow 的外框、.slot 的虛線框、
+     .tabs 選中時的深藍底、.photo 的框、.dots 的圓框與蓋滿轉橘，一條都沒有生效過。
+     這個站從原型 a2a26c2 到 2026-08-22 為止，畫面上所有按鈕的外觀都是死的，
+     唯一看得見的圓點是 .dots [aria-current] 的 outline —— outline 不受 border/background 影響。
+     :where() 的特異性恆為零，所以這條規則仍然蓋得過瀏覽器預設樣式
+     （作者樣式表無論特異性多低都排在 UA 樣式表前面），但輸給任何一條 class 規則。
+     **不要把 :where() 拿掉**，check.sh 有一條檢查在守它。見 spec 2026-08-22 §1。 */
+  :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 
   /* ---------- shell ---------- */

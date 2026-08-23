@@ -121,6 +121,16 @@ else
   ok "§11-20 只有組織信箱"
 fi
 
+# 按鈕 reset 必須是零特異性。裸寫 #bt-root button 的特異性 (1,0,1) 會蓋掉所有
+# 用 class 描述外觀的規則，全站按鈕的邊框與底色會靜靜地全部消失 ——
+# 不會報錯，只是東西不見了，而 .dots 只剩 aria-current 的 outline 撐著一顆圓點。
+# 這個站從原型到 2026-08-22 都是這個狀態。見 spec 2026-08-22 §1。
+if grep -q ':where(#bt-root button)' index.html; then
+  ok "按鈕 reset 是零特異性（:where）"
+else
+  bad "index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
+fi
+
 # CNAME 不可掉
 if [ -f CNAME ]; then
   ok "CNAME 存在"
