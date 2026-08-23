@@ -3,7 +3,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pagesOf, bookHTML } from "../src/ui.js";
+import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML } from "../src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -18,18 +18,22 @@ const S = page => ({
 
 const dotCount = html => (html.match(/data-act="go"/g) || []).length;
 
-test("pagesOf：資料頁在最前，之後才是月份", () => {
+test("pagesOf：資料頁 → 說明頁 → 月份，九月在索引 2", () => {
   const pages = pagesOf(S(0));
   assert.equal(pages[0].kind, "id");
-  assert.equal(pages[1].kind, "month");
-  assert.equal(pages[1].month.month, 9);
-  assert.equal(pages.length, months.length + 1);
+  assert.equal(pages[1].kind, "guide");
+  assert.equal(pages[2].kind, "month");
+  assert.equal(pages[2].month.month, 9);
+  assert.equal(pages.length, months.length + 2);
 });
 
-test("圓點數等於 pagesOf 的長度", () => {
-  // 回報的 bug（「圓點只剩一個」）根因在 CSS，但頁面模型這一層也要有守門員：
-  // 少一顆圓點等於有一頁翻不到，而畫面上不會有任何錯誤。
+test("圓點數等於 pagesOf 的長度，而且就是 months + 2 顆", () => {
+  // 兩個斷言缺一不可：
+  // 第一個確認 bookHTML 的圓點迴圈跟 pagesOf 的陣列一一對應（抓 bookHTML 漏畫）。
+  // 第二個釘住字面數字（抓 pagesOf 自己少一項）—— 只有第一個的話兩邊同源，
+  // pagesOf 少掉資料頁或說明頁時它會一起變小而不會紅。
   assert.equal(dotCount(bookHTML(S(1))), pagesOf(S(1)).length);
+  assert.equal(dotCount(bookHTML(S(1))), months.length + 2);
 });
 
 test("圓點的 data-p 是 0 起算的連號", () => {
@@ -50,4 +54,21 @@ test("沒有活動的月份，圓點不算蓋滿", () => {
   // acts.every() 對空陣列回 true，直接用會讓一個沒有任何活動的月份顯示成「已蓋滿」。
   const html = bookHTML(S(1));
   assert.ok(!/data-on="1"/.test(html), "沒有活動就不該有橘色圓點");
+});
+
+test("說明頁的三張卡也是 聚會 → 題目 → 鏡頭", () => {
+  const html = guideCardsHTML();
+  const [g, p, f] = ["聚會 GATHER", "題目 PROMPT", "鏡頭 FRAME"].map(n => html.indexOf(n));
+  assert.ok(g >= 0 && p >= 0 && f >= 0);
+  assert.ok(g < p && p < f);
+});
+
+test("說明頁用的是 .slot 而不是可點的 button", () => {
+  const html = guidePageHTML();
+  assert.ok(html.includes('<div class="slot">'), "三張卡是 div，不可點");
+  assert.ok(!html.includes('data-act="open"'), "說明頁不該有蓋章入口");
+});
+
+test("翻到說明頁時 bookHTML 畫的是說明頁", () => {
+  assert.ok(bookHTML(S(1)).includes(guideCardsHTML()));
 });

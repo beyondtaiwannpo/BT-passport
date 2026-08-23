@@ -100,6 +100,7 @@ export function barHTML(S) {
 export function pagesOf(S) {
   return [
     { kind: "id", label: "資料頁" },
+    { kind: "guide", label: "怎麼用" },
     ...S.months.map(m => ({
       kind: "month", month: m, label: MONTH_ZH[m.month] || String(m.month)
     }))
@@ -136,6 +137,7 @@ export function bookHTML(S) {
 // 一頁的內容由 kind 決定。新增頁型只要在 pagesOf 加一種 kind、在這裡加一條分支。
 function pageBodyHTML(S, page) {
   if (page.kind === "id") return idPageHTML(S);
+  if (page.kind === "guide") return guidePageHTML();
   return monthPageHTML(S, page.month);
 }
 
@@ -251,6 +253,50 @@ export function slotHTML(S, a) {
         ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}`
       : `<span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
   </button>`;
+}
+
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │ 三張卡的文案。**兩處共用這一份**：第一次核發護照後的引導頁（introHTML）  │
+// │ 與書裡固定的說明頁（guidePageHTML）。改文案只改這裡，兩邊永遠不會        │
+// │ 講不一樣的話。                                                            │
+// │                                                                          │
+// │ 【文案待補】body 現在是佔位字，等使用者提供。**不要自己編一份看起來像    │
+// │ 成品的文案** —— 那會混進正式站而沒有人發現它不是人寫的。                 │
+// └──────────────────────────────────────────────────────────────────────────┘
+const GUIDE = {
+  gather: { title: "聚會", body: "【待補文案】" },
+  prompt: { title: "題目", body: "【待補文案】" },
+  frame:  { title: "鏡頭", body: "【待補文案】" }
+};
+
+// 順序直接用 SLOT_ORDER 產生，不在這裡再寫死一次三個 category ——
+// 那會變成第二個順序的真相來源，而兩個真相來源遲早會不一致。
+// 卡片是 <div class="slot"> 不是 <button>：它不可點，沒有蓋章入口。
+export function guideCardsHTML() {
+  return `<div class="slots">${SLOT_ORDER.map(c => {
+    const g = GUIDE[c];
+    if (!g) return "";
+    return `<div class="slot">
+      <span class="cat">${esc(CATNAME[c] || "")}</span>
+      <span class="ttl">${esc(g.title)}</span>
+      <span class="hint">${esc(g.body)}</span>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+// 書裡固定的說明頁。位置在資料頁之後、九月之前（見 pagesOf）。
+//
+// .mnum 那一格**要放東西不能留空**：少了左邊那個 76px 的字，.mhead 的重心會偏，
+// 說明頁看起來就不像跟其他頁同一本書。現在放的是問號，理由是不必新增任何資產，
+// 而且跟 00（資料頁）與 01-12（月份）都不會混淆。
+// **這是暫定值**，使用者看過之後可能改成 BT 的台灣圖形或 00 —— 所以它就是
+// 這一行字，不要把它編織進任何版面計算裡。
+export function guidePageHTML() {
+  return `<div class="mhead">
+      <div class="mnum">?</div>
+      <div class="mzh">怎麼用這本護照</div>
+    </div>
+    ${guideCardsHTML()}`;
 }
 
 export function wallHTML(S) {
