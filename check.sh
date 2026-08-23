@@ -131,6 +131,24 @@ else
   bad "index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
 fi
 
+# 月份頁的時刻放大只能掛在 .mtheme.clock b 上。直接改 .mtheme b 的話，
+# 資料頁右上角的「BEYOND TAIWAN / Passport · 2026」會跟著變 34px 把版面撐爆 ——
+# 而那是一個沒有任何東西會報錯的視覺回歸。2026-08-22 實測過：把選擇器改回
+# .mtheme b 之後，check.sh 與全部單元測試都還是綠的，所以需要這兩條。
+# 單元測試碰不到這件事：它是 CSS 級聯，要真的瀏覽器才量得出 computed style。
+if grep -q '\.mtheme\.clock b{' index.html; then
+  ok "時刻放大掛在 .mtheme.clock b 上"
+else
+  bad "index.html 找不到 .mtheme.clock b，時刻放大可能被改到 .mtheme b（spec 2026-08-22 §5.2）"
+fi
+
+# 基底規則不可以帶放大值。抓的是「.mtheme b{...}」這一行裡出現 34px。
+if grep -E '^\s*\.mtheme b\{' index.html | grep -q '34px'; then
+  bad "index.html 的 .mtheme b 帶了 34px，資料頁右上角會被撐爆（spec 2026-08-22 §5.2）"
+else
+  ok ".mtheme b 沒有被塞進放大值"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #
