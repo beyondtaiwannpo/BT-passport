@@ -122,6 +122,12 @@
   .mtheme{margin-left:auto;text-align:right;line-height:1.25}
   .mtheme b{font-family:var(--display);font-size:23px;font-weight:600;letter-spacing:.04em;display:block}
   .mtheme span{font-size:10px;font-weight:600;letter-spacing:.2em;opacity:.55;text-transform:uppercase}
+  /* 月份頁的右上角放時間數字（07:00），要比主題字大一級才撐得起那個位置，
+     並用 tabular-nums 讓每一頁的冒號對齊。字體不用指定：.mtheme b 本來就是
+     var(--display)，也就是 Barlow Condensed，跟左邊 76px 的月份數字同一套。
+     **不可以直接改 .mtheme b** —— 資料頁的右上角共用同一個元件，
+     那裡放的是「BEYOND TAIWAN / Passport · 2026」，跟著變 34px 會撐爆版面。 */
+  .mtheme.clock b{font-size:34px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 
   .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .slot{

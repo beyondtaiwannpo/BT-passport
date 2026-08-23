@@ -188,6 +188,12 @@ export function stampHTML(act, st, animate) {
   </div></div>`;
 }
 
+// theme_zh 現在放的是時間數字（07:00），theme_en 是空字串。
+// 空的時候**不產生**那個 span。
+// 這條規則跟版面無關：2026-08-22 實測 <span></span>、<span> </span>、
+// <span>\n</span> 與完全不渲染的 .mtheme 高度都是 42.50，一模一樣 ——
+// 空的 inline 元素不產生行框。理由是不要在 DOM 裡留一個永遠是空的元素，
+// 下一個人看到會以為渲染壞了然後去「修」它。見 spec 2026-08-22 §5.2。
 export function monthPageHTML(S, m) {
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.every(a => S.stamps[a.id]);
@@ -196,7 +202,7 @@ export function monthPageHTML(S, m) {
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
       <div class="mzh">${zh}</div>
-      <div class="mtheme"><b>${esc(m.theme_zh)}</b><span>${esc(m.theme_en)}</span></div>
+      <div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
