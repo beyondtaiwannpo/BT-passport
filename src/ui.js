@@ -268,7 +268,7 @@ export function slotHTML(S, a) {
     <span class="cat">${esc(CATNAME[a.category] || "")}</span>
     <span class="ttl">${esc(a.title_zh)}</span>
     <span class="en">${esc(a.title_en)}</span>
-    ${st ? `${stampHTML(a, st, anim)}
+    ${st ? `<span class="hint">${esc(a.description)}</span>${stampHTML(a, st, anim)}
         ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
         ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}`
       : `<span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}

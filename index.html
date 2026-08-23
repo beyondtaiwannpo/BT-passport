@@ -162,6 +162,8 @@
   }
   .slot:hover .cta{opacity:.85}
   .slot[data-done="1"]{border-style:solid;border-color:rgba(16,42,134,.18);background:rgba(255,196,108,.1)}
+  /* 蓋章之後說明留著但淡化，讓標題與章之間的內容連續、不留一片空白（2026-08-23 Task 10）。 */
+  .slot[data-done="1"] .hint{opacity:.42}
 
   /* 說明頁的三張卡不要固定高度，讓它跟著文案長。
      .slot 的 min-height:270px 是給月份頁的活動格子用的 —— 蓋章前要先留出章的位置，
@@ -183,7 +185,7 @@
   .slots.guide .slot .ttl{min-height:2.2em}
 
   /* ---------- the stamp ---------- */
-  .stampwrap{margin:auto 0 0;display:flex;justify-content:center;padding:6px 0 2px}
+  .stampwrap{margin:14px 0 0;display:flex;justify-content:center;padding:6px 0 2px}
   .tilt{transform-origin:center}
   .stamp{
     border:2.5px solid currentColor;border-radius:7px;
