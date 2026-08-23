@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML,
-         CATEGORY, CATNAME, SLOT_ORDER } from "../src/ui.js";
+         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -157,4 +157,16 @@ test("CATNAME 的每個值都等於 CATEGORY 的 label —— 兩者不准漂移
     assert.equal(CATNAME[k], v.label);
   }
   assert.deepEqual(Object.keys(CATNAME).sort(), Object.keys(CATEGORY).sort());
+});
+
+test("清除護照的按鈕降級，另外三顆不變", () => {
+  // 那顆會刪掉一整年的資料且不可復原，不該跟可逆的三顆等重。
+  // 這是安全設計不是視覺偏好，所以釘住。
+  const html = idPageHTML(S(0));
+  assert.match(html, /class="btn sm quiet" data-act="reset"/);
+  for (const act of ["edit", "export", "import"]) {
+    const m = html.match(new RegExp(`class="([^"]*)" data-act="${act}"`));
+    assert.ok(m, `找不到 data-act="${act}" 的按鈕`);
+    assert.ok(!m[1].includes("quiet"), `data-act="${act}" 不該被降級`);
+  }
 });

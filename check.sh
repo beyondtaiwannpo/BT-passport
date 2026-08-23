@@ -157,6 +157,21 @@ else
   bad "index.html 找不到 .slots.guide .slot .ttl，說明頁三張卡的第一句會錯開（spec 2026-08-22 §4.2）"
 fi
 
+# 「清除這本護照」必須維持降級的外觀。它會刪掉一整年的章、心得與照片且不可復原，
+# 跟旁邊三顆可逆的操作長得一樣重的話，遲早有人手滑按到。
+# 這不是視覺偏好是安全設計 —— 視覺偏好可以被下一個人推翻，安全設計不行，所以釘住它。
+if grep -q 'class="btn sm quiet" data-act="reset"' src/ui.js; then
+  ok "清除護照的按鈕維持降級外觀（.btn.quiet）"
+else
+  bad "src/ui.js 的「清除這本護照」不是 class=\"btn sm quiet\"，它會跟可逆操作等重"
+fi
+
+if grep -q '\.btn\.quiet{' index.html; then
+  ok ".btn.quiet 的樣式定義還在"
+else
+  bad "index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #

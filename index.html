@@ -86,6 +86,14 @@
     border-radius:var(--r);
     position:relative;overflow:hidden;
     min-height:520px;
+    /* min-height 讓書維持固定高度，翻頁時大小不變、上一頁／下一頁不會移動。
+       但內容比 520px 短的時候，多出來的高度會變成 nav 底下一條空白帶
+       （實測：月份頁 44.7px、說明頁 134.2px）。
+       改成 flex column 讓 .page 吸收那段高度、nav 貼著書的底部，
+       死白就變成頁面自己的餘白，而不是書裡的一個破洞。
+       **不要改成「短頁面就拿掉 min-height」** —— 那會讓書在翻到說明頁時變矮，
+       上一頁／下一頁按鈕跟著往上跳。會動的東西比死白更糟。 */
+    display:flex;flex-direction:column;
   }
   .book::before{ /* spine */
     content:"";position:absolute;left:0;top:0;bottom:0;width:9px;
@@ -96,7 +104,7 @@
     background-image:radial-gradient(rgba(16,42,134,.05) 1px, transparent 1px);
     background-size:5px 5px;
   }
-  .page{padding:26px 26px 26px 34px;position:relative;z-index:1}
+  .page{padding:26px 26px 26px 34px;position:relative;z-index:1;flex:1}
   .page.turn{animation:turn .34s ease}
   @keyframes turn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
@@ -277,6 +285,15 @@
   .btn:hover{opacity:.86}
   .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
   .btn.sm{font-size:15px;padding:7px 14px}
+  /* 「清除這本護照」會刪掉一整年的章、心得與照片，而且不可復原
+     （clearAll() 真的刪 stamps 與 entries 的列）。它不該跟旁邊那三顆等重 ——
+     編輯資料、匯出備份、匯入還原都是可逆的，只有這顆不是。
+     拿掉外框、顏色降到 50%、用 margin-left:auto 推到那一列的最右邊，
+     跟前三顆之間空出距離。目標是「找得到，但不會手滑按到」。
+     **這不是視覺偏好，是安全設計** —— 視覺偏好可以被下一個人推翻，安全設計不行，
+     所以 check.sh 有兩條檢查在守它。 */
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.5);margin-left:auto}
+  .btn.quiet:hover{color:var(--ink)}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
 
   .scrim{position:fixed;inset:0;background:rgba(16,42,134,.45);display:flex;align-items:center;
