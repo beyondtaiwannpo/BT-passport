@@ -27,6 +27,30 @@ export const CATNAME = {
   frame:  "鏡頭 FRAME"
 };
 
+// 三格的順序：聚會 → 題目 → 鏡頭。**這是設計決定，不是資料庫的字母序。**
+// 理由是難度遞增：聚會最輕鬆、題目最花心思、鏡頭最快，收尾在最輕的一格。
+//
+// 為什麼要寫在前端：data.js 的查詢是 .order("month").order("seq")，而 seed 裡
+// **同一個月三格的 seq 是同一個值**（09A/09B/09C 全是 1），等於同月內完全沒有
+// 排序鍵，順序由 Postgres 當下決定、不保證、今天對明天可能就跑掉，而且不報錯。
+// 依 category 的字母序排也不行 —— 那會變成 frame/gather/prompt，鏡頭跑到最前面。
+//
+// 改動這個陣列會讓 test/ui-order.test.mjs 紅掉，那是刻意的。
+export const SLOT_ORDER = ["gather", "prompt", "frame"];
+
+// 認不得的 category **排到最後，不丟掉**。這條比順序本身更重要：
+// 若哪天有人把 category 改名而忘了同步上面那張表，錯誤的表現必須是「順序不對」
+// 而不是「那一格從畫面上消失」——  消失沒有任何東西會報錯，而學生會以為
+// 自己的章不見了。Array.prototype.sort 自 ES2019 起保證穩定，所以兩個都認不得的
+// 格子會維持它們進來時的相對順序。
+function orderSlots(acts) {
+  const rank = c => {
+    const i = SLOT_ORDER.indexOf(c);
+    return i === -1 ? SLOT_ORDER.length : i;
+  };
+  return acts.slice().sort((a, b) => rank(a.category) - rank(b.category));
+}
+
 // 中文月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
 const MONTH_ZH = { 1:"一月",2:"二月",3:"三月",4:"四月",5:"五月",6:"六月",
                    7:"七月",8:"八月",9:"九月",10:"十月",11:"十一月",12:"十二月" };
@@ -131,7 +155,7 @@ export function stampHTML(act, st, animate) {
 }
 
 export function monthPageHTML(S, m) {
-  const acts = S.activities.filter(a => a.month === m.month);
+  const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.every(a => S.stamps[a.id]);
   const zh = MONTH_ZH[m.month] || String(m.month);
   return `${full ? `<div class="overprint">MONTH CLEARED</div>` : ""}
@@ -178,8 +202,16 @@ export function slotHTML(S, a) {
   const entry = S.entries[a.id] || {};
   const anim = st && S.justStamped === a.id;
   if (anim) S.justStamped = null;
+  // CATNAME 取不到就印空字串。取不到代表有人改了 category 名稱，
+  // 那時候該壞的是順序（排到最後），不是在畫面上出現「undefined」四個字。
+  //
+  // 這段刻意是 JS 註解而不是 template literal 裡的 HTML 註解：
+  // 放進 template 的話它會變成輸出的一部分，而 test/ui-order.test.mjs 的
+  // mutation 測試斷言的正是「輸出裡不准出現 undefined 這個字」——
+  // 註解自己會把那個測試弄紅。另外 slotHTML 每次整頁渲染會被呼叫 33 次，
+  // HTML 註解等於同一段文字送 33 份到瀏覽器。
   return `<button class="slot" data-act="open" data-id="${a.id}" data-done="${st ? 1 : 0}">
-    <span class="cat">${CATNAME[a.category]}</span>
+    <span class="cat">${esc(CATNAME[a.category] || "")}</span>
     <span class="ttl">${esc(a.title_zh)}</span>
     <span class="en">${esc(a.title_en)}</span>
     ${st ? `${stampHTML(a, st, anim)}

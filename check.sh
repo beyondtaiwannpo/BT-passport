@@ -131,6 +131,22 @@ else
   bad "index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
 fi
 
+# 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
+# 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
+#
+# **參數要寫成 test/*.test.mjs，不要寫成 test/。** 實測（node 24.17.0）：
+# `node --test test/` 不會遞迴進目錄，它把目錄本身當成一支測試檔去執行，
+# 然後 MODULE_NOT_FOUND —— 而那個失敗長得像「測試沒過」，不像「指令寫錯」。
+if command -v node >/dev/null 2>&1; then
+  if node --test test/*.test.mjs >/dev/null 2>&1; then
+    ok "單元測試通過（node --test test/*.test.mjs）"
+  else
+    bad "單元測試沒過。跑 node --test test/*.test.mjs 看細節"
+  fi
+else
+  bad "找不到 node，單元測試沒有跑到（這不是通過）"
+fi
+
 # CNAME 不可掉
 if [ -f CNAME ]; then
   ok "CNAME 存在"

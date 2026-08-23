@@ -87,7 +87,7 @@ function openModal(id) {
   const d = document.createElement("div");
   d.className = "scrim"; d.id = "scrim";
   d.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${UI.esc(a.title_zh)}">
-    <div class="mt">${UI.CATNAME[a.category]} · ${String(a.month).padStart(2, "0")}月</div>
+    <div class="mt">${UI.esc(UI.CATNAME[a.category] || "")} · ${String(a.month).padStart(2, "0")}月</div>
     <h3>${UI.esc(a.title_zh)}</h3>
     <div style="font-size:10px;font-weight:600;letter-spacing:.14em;opacity:.45;text-transform:uppercase;margin-bottom:12px">${UI.esc(a.title_en)}</div>
     <p style="font-size:13.5px;opacity:.7;margin:0 0 18px">${UI.esc(a.description)}</p>
