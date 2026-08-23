@@ -163,6 +163,17 @@
      三張卡本來就等高。多寫一條沒有作用的宣告，只會讓下一個人以為它在做事。 */
   .slots.guide .slot{min-height:0}
 
+  /* 說明頁三張卡的標題固定兩行高。三段文案刻意都以「一個月一次／一題／一張」開頭，
+     要的就是並排時第一句對齊；而「一個寫的題目，只有自己看得到」在 22px 下
+     251px 放不下、會折成兩行，把那張卡的說明往下推 24.2px（實測），
+     三張的第一句就錯開了。給標題固定兩行高，說明才會從同一條線開始。
+     2.2em 不是隨便挑的：.slot .ttl 的 line-height 是 1.1，兩行正好 2.2em，
+     em 對的是元素自己的 font-size，所以字級改了它也跟著對。
+     代價是聚會與鏡頭的標題下面各多一行空白 —— 那是對齊的代價，是刻意的。
+     **月份頁的 .ttl 不要跟著改**：那裡放的是活動名稱，長度本來就不一，
+     而且下面接的是說明與章，沒有要對齊的東西。 */
+  .slots.guide .slot .ttl{min-height:2.2em}
+
   /* ---------- the stamp ---------- */
   .stampwrap{margin:auto 0 0;display:flex;justify-content:center;padding:6px 0 2px}
   .tilt{transform-origin:center}

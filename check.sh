@@ -149,6 +149,14 @@ else
   ok ".mtheme b 沒有被塞進放大值"
 fi
 
+# 說明頁三張卡的標題要固定兩行高，否則使用者刻意寫成同樣開頭的第一句會錯開。
+# 這件事單元測試碰不到（是版面高度，要真瀏覽器才量得到），只能在這裡守著寫法。
+if grep -q '\.slots\.guide \.slot \.ttl{' index.html; then
+  ok "說明頁標題固定兩行高（.slots.guide .slot .ttl）"
+else
+  bad "index.html 找不到 .slots.guide .slot .ttl，說明頁三張卡的第一句會錯開（spec 2026-08-22 §4.2）"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #
