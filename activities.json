@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "term": "2026-2027",
-  "note": "學年制：9 月至隔年 7 月，共 11 個月 33 格。每月固定一格聚會 gather、一格題目 prompt、一格鏡頭 frame。【2026-08-17 起】這個檔案是 supabase/seed.sql 的人類可讀原稿，執行期不再被讀取 —— 前端的活動與月份一律來自資料庫。改了這裡不會影響任何人看到的畫面，要生效必須同步改 seed.sql 並在 Supabase 執行。兩邊不一致時以資料庫為準。",
+  "note": "學年制：9 月至隔年 7 月，共 11 個月 33 格。每月固定一格聚會 gather、一格題目 prompt、一格鏡頭 frame。【2026-08-17 起】這個檔案是 supabase/seed.sql 的人類可讀原稿，執行期不再被讀取 —— 前端的活動與月份一律來自資料庫。改了這裡不會影響任何人看到的畫面，要生效必須同步改 seed.sql 並在 Supabase 執行。兩邊不一致時以資料庫為準。【2026-08-22 起】months 的 theme_zh 從月份主題改成時刻，theme_en 清空；08:40 與 23:50 兩個零頭是刻意不整點的，不是打字錯誤。",
   "categoriesNote": "下面 categories 的 desc 跟 src/ui.js 的 CATEGORY[c].define 是同一份文字，用在說明頁卡片的定義句。執行期的真相在 src/ui.js 的 CATEGORY（這裡不會被讀取，只是文件）——改一邊要同步改另一邊，兩邊不一致時以 src/ui.js 為準。",
   "categories": {
     "gather": { "zh": "聚會", "en": "GATHER", "desc": "全 BT 一起做的事", "private": false },
@@ -9,17 +9,17 @@
     "frame":  { "zh": "鏡頭", "en": "FRAME",  "desc": "一張照片題目", "private": true }
   },
   "months": [
-    { "seq": 1,  "month": 9,  "theme_zh": "開學",   "theme_en": "FIRST WEEK" },
-    { "seq": 2,  "month": 10, "theme_zh": "換季",   "theme_en": "TURNING" },
-    { "seq": 3,  "month": 11, "theme_zh": "低潮期", "theme_en": "THE DIP" },
-    { "seq": 4,  "month": 12, "theme_zh": "收尾",   "theme_en": "WRAP" },
-    { "seq": 5,  "month": 1,  "theme_zh": "起頭",   "theme_en": "OPENING" },
-    { "seq": 6,  "month": 2,  "theme_zh": "配對季", "theme_en": "MATCHING" },
-    { "seq": 7,  "month": 3,  "theme_zh": "長跑",   "theme_en": "THE LONG RUN" },
-    { "seq": 8,  "month": 4,  "theme_zh": "春天",   "theme_en": "SPRING" },
-    { "seq": 9,  "month": 5,  "theme_zh": "生日月", "theme_en": "BIRTH MONTH" },
-    { "seq": 10, "month": 6,  "theme_zh": "大場面", "theme_en": "SHOWTIME" },
-    { "seq": 11, "month": 7,  "theme_zh": "散場",   "theme_en": "CURTAIN" }
+    { "seq": 1,  "month": 9,  "theme_zh": "07:00", "theme_en": "" },
+    { "seq": 2,  "month": 10, "theme_zh": "08:00", "theme_en": "" },
+    { "seq": 3,  "month": 11, "theme_zh": "08:40", "theme_en": "" },
+    { "seq": 4,  "month": 12, "theme_zh": "10:00", "theme_en": "" },
+    { "seq": 5,  "month": 1,  "theme_zh": "12:30", "theme_en": "" },
+    { "seq": 6,  "month": 2,  "theme_zh": "14:00", "theme_en": "" },
+    { "seq": 7,  "month": 3,  "theme_zh": "16:00", "theme_en": "" },
+    { "seq": 8,  "month": 4,  "theme_zh": "18:00", "theme_en": "" },
+    { "seq": 9,  "month": 5,  "theme_zh": "19:30", "theme_en": "" },
+    { "seq": 10, "month": 6,  "theme_zh": "21:00", "theme_en": "" },
+    { "seq": 11, "month": 7,  "theme_zh": "23:50", "theme_en": "" }
   ],
   "activities": [
     { "id": "09A", "month": 9,  "category": "gather", "title_zh": "開學電影夜",       "title_en": "OPENING NIGHT",   "desc": "新學年第一次全員上線，選片權給今年的新幹部", "needs_host": true },
