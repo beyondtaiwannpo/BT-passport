@@ -3,7 +3,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML } from "../src/ui.js";
+import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML } from "../src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -61,6 +61,37 @@ test("說明頁的三張卡也是 聚會 → 題目 → 鏡頭", () => {
   const [g, p, f] = ["聚會 GATHER", "題目 PROMPT", "鏡頭 FRAME"].map(n => html.indexOf(n));
   assert.ok(g >= 0 && p >= 0 && f >= 0);
   assert.ok(g < p && p < f);
+});
+
+test("說明頁卡片的 .ttl 放的是定義句，不是分類短名", () => {
+  // 2026-08-23 使用者的決定（對照圖 B）：三句定義已經在 activities.json 定義過，
+  // .ttl 不准再寫一次分類短名（那會讓「聚會」在同一張卡上出現兩次）。
+  const html = guideCardsHTML();
+  assert.ok(html.includes("全 BT 一起做的事"), "gather 那張卡要顯示定義句");
+  assert.ok(!html.includes('<span class="ttl">聚會</span>'), ".ttl 不准放分類短名");
+});
+
+test("說明頁的 .mhead 帶 solo，且不含 mnum", () => {
+  // 2026-08-23 使用者的決定（對照圖 C）：那一頁不是月份，00 已經給了資料頁，
+  // .mnum 留空、標題放大到 52px（由 .mhead.solo 這個修飾詞在 CSS 端接手）。
+  const html = guidePageHTML();
+  assert.ok(html.includes('<div class="mhead solo">'), "說明頁的 .mhead 要帶 solo");
+  assert.ok(!html.includes("mnum"), "說明頁不准出現 mnum");
+});
+
+test("月份頁的 .mhead 不帶 solo", () => {
+  // solo 只准掛在說明頁，否則月份頁的月份數字那一格會被牽連（見 index.html 的
+  // .mhead.solo .mzh 只掛在 .mhead.solo 上，不是裸的 .mzh）。
+  const month = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
+  const state = { activities: [], months: [month], stamps: {}, entries: {}, justStamped: null };
+  const html = monthPageHTML(state, month);
+  assert.ok(html.includes('<div class="mhead">'), "月份頁的 .mhead 不帶 solo");
+  assert.ok(!html.includes('<div class="mhead solo">'), "月份頁不准出現 mhead solo");
+});
+
+test(".hint 仍然是待補文案的佔位字，不是自己編的成品文案", () => {
+  const html = guideCardsHTML();
+  assert.equal((html.match(/【待補文案】/g) || []).length, 3, "三張卡都還沒有正式文案");
 });
 
 test("說明頁用的是 .slot 而不是可點的 button", () => {

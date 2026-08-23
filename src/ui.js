@@ -21,11 +21,25 @@ import { passportNo } from "./data.js";
 const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
                "Sponsorship Team", "Internship Team", "Community Relations Team"];
 
-export const CATNAME = {
-  gather: "聚會 GATHER",
-  prompt: "題目 PROMPT",
-  frame:  "鏡頭 FRAME"
+// 三個分類的**唯一定義點**。label / short / define 三個欄位分別餵給
+// 月份格子的分類標籤、說明頁卡片的標題、說明頁卡片的定義句。
+//
+// define 那三句跟 activities.json 的 categories.desc 是同一份文字。
+// **兩邊消不掉。** activities.json 執行期不會被讀（它是 seed.sql 的人類可讀原稿，
+// 前端一律吃資料庫），所以它是文件不是來源；真正要單一來源的話得把分類定義
+// 搬進資料庫，那是多一張表加一次查詢，為了三句不會變的話不划算。
+// 折衷是兩邊互相指路：改了這裡要同步 activities.json，反之亦然。
+const CATEGORY = {
+  gather: { label: "聚會 GATHER", short: "聚會", define: "全 BT 一起做的事" },
+  prompt: { label: "題目 PROMPT", short: "題目", define: "一個寫的題目，只有自己看得到" },
+  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "一張照片題目" }
 };
+
+// CATNAME 從 CATEGORY 衍生，不要各寫一份 —— 那就又變回兩個真相來源了。
+// 保留這個匯出名稱是因為 slotHTML、main.js 的 modal、以及
+// test/ui-order.test.mjs 的「SLOT_ORDER 的鍵必須等於 CATNAME 的鍵」都在用它。
+export const CATNAME = Object.fromEntries(
+  Object.entries(CATEGORY).map(([k, v]) => [k, v.label]));
 
 // 三格的順序：聚會 → 題目 → 鏡頭。**這是設計決定，不是資料庫的字母序。**
 // 理由是難度遞增：聚會最輕鬆、題目最花心思、鏡頭最快，收尾在最輕的一格。
@@ -266,40 +280,39 @@ export function slotHTML(S, a) {
 // │ 與書裡固定的說明頁（guidePageHTML）。改文案只改這裡，兩邊永遠不會        │
 // │ 講不一樣的話。                                                            │
 // │                                                                          │
-// │ 【文案待補】body 現在是佔位字，等使用者提供。**不要自己編一份看起來像    │
-// │ 成品的文案** —— 那會混進正式站而沒有人發現它不是人寫的。                 │
+// │ .ttl 放的是 CATEGORY[c].define（那三句定義），不是分類短名 ——            │
+// │ 分類短名已經在 .cat 那一格出現過一次，再放一次 .ttl 會讓「聚會」在同一   │
+// │ 張卡上出現兩次。2026-08-23 使用者看過對照圖後的決定。                    │
+// │                                                                          │
+// │ .hint 印的是 CATEGORY[c].body。現在每個分類都還沒有這個欄位，所以會落到 │
+// │ 預設字串「【待補文案】」。**不要自己編一份看起來像成品的文案** ——        │
+// │ 那會混進正式站而沒有人發現它不是人寫的。之後補文案時只要在 CATEGORY     │
+// │ 每個分類加一個 body 欄位就好，這個函式不用再動。                         │
 // └──────────────────────────────────────────────────────────────────────────┘
-const GUIDE = {
-  gather: { title: "聚會", body: "【待補文案】" },
-  prompt: { title: "題目", body: "【待補文案】" },
-  frame:  { title: "鏡頭", body: "【待補文案】" }
-};
-
 // 順序直接用 SLOT_ORDER 產生，不在這裡再寫死一次三個 category ——
 // 那會變成第二個順序的真相來源，而兩個真相來源遲早會不一致。
 // 卡片是 <div class="slot"> 不是 <button>：它不可點，沒有蓋章入口。
 export function guideCardsHTML() {
   return `<div class="slots guide">${SLOT_ORDER.map(c => {
-    const g = GUIDE[c];
+    const g = CATEGORY[c];
     if (!g) return "";
     return `<div class="slot">
-      <span class="cat">${esc(CATNAME[c] || "")}</span>
-      <span class="ttl">${esc(g.title)}</span>
-      <span class="hint">${esc(g.body)}</span>
+      <span class="cat">${esc(g.label)}</span>
+      <span class="ttl">${esc(g.define)}</span>
+      <span class="hint">${esc(g.body || "【待補文案】")}</span>
     </div>`;
   }).join("")}</div>`;
 }
 
 // 書裡固定的說明頁。位置在資料頁之後、九月之前（見 pagesOf）。
 //
-// .mnum 那一格**要放東西不能留空**：少了左邊那個 76px 的字，.mhead 的重心會偏，
-// 說明頁看起來就不像跟其他頁同一本書。現在放的是問號，理由是不必新增任何資產，
-// 而且跟 00（資料頁）與 01-12（月份）都不會混淆。
-// **這是暫定值**，使用者看過之後可能改成 BT 的台灣圖形或 00 —— 所以它就是
-// 這一行字，不要把它編織進任何版面計算裡。
+// 沒有 .mnum：那一頁不是月份，本來就不該有月份數字，而且 00 已經給了資料頁，
+// 硬塞一個符號進去只會讓人多看一眼想「這是第幾頁」。少了左邊的數字，
+// .mhead 的重心會偏，所以改用 .mhead.solo 把標題推到數字那一級的大小來補
+// （CSS 在 index.html 的 .mhead.solo .mzh，52px 跟月份頁「09 九月」的
+// 視覺重量對得上）。2026-08-23 使用者看過對照圖後的決定。
 export function guidePageHTML() {
-  return `<div class="mhead">
-      <div class="mnum">?</div>
+  return `<div class="mhead solo">
       <div class="mzh">怎麼用這本護照</div>
     </div>
     ${guideCardsHTML()}`;

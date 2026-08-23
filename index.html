@@ -119,6 +119,12 @@
   .mhead{display:flex;align-items:flex-end;gap:16px;border-bottom:2px solid var(--bt-navy);padding-bottom:10px;margin-bottom:22px}
   .mnum{font-family:var(--display);font-size:76px;font-weight:700;line-height:.78;letter-spacing:-.02em}
   .mzh{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;margin-bottom:2px}
+  /* 說明頁沒有月份數字：那一頁不是月份，00 又已經給了資料頁，硬塞一個符號進去
+     只會讓人多看一眼想「這是第幾頁」。少了左邊 76px 的數字，.mhead 的重心會偏，
+     所以改用把標題推到數字那一級來補 —— 52px 跟月份頁「09 九月」的視覺重量對得上。
+     **只能掛在 .mhead.solo 上。** 直接改 .mzh 的話，月份頁的「九月」與資料頁的
+     「持照人資料」會一起變 52px，兩頁的版面都會爆。 */
+  .mhead.solo .mzh{font-size:52px;margin-bottom:0}
   .mtheme{margin-left:auto;text-align:right;line-height:1.25}
   .mtheme b{font-family:var(--display);font-size:23px;font-weight:600;letter-spacing:.04em;display:block}
   .mtheme span{font-size:10px;font-weight:600;letter-spacing:.2em;opacity:.55;text-transform:uppercase}
