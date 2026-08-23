@@ -279,7 +279,7 @@ const GUIDE = {
 // 那會變成第二個順序的真相來源，而兩個真相來源遲早會不一致。
 // 卡片是 <div class="slot"> 不是 <button>：它不可點，沒有蓋章入口。
 export function guideCardsHTML() {
-  return `<div class="slots">${SLOT_ORDER.map(c => {
+  return `<div class="slots guide">${SLOT_ORDER.map(c => {
     const g = GUIDE[c];
     if (!g) return "";
     return `<div class="slot">

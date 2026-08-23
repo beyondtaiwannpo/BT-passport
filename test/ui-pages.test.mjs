@@ -67,6 +67,8 @@ test("說明頁用的是 .slot 而不是可點的 button", () => {
   const html = guidePageHTML();
   assert.ok(html.includes('<div class="slot">'), "三張卡是 div，不可點");
   assert.ok(!html.includes('data-act="open"'), "說明頁不該有蓋章入口");
+  assert.ok(html.includes('<div class="slots guide">'),
+    "說明頁的 .slots 要帶 guide 修飾詞，桌機的 min-height 靠它拿掉");
 });
 
 test("翻到說明頁時 bookHTML 畫的是說明頁", () => {
