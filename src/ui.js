@@ -29,10 +29,10 @@ const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
 // 前端一律吃資料庫），所以它是文件不是來源；真正要單一來源的話得把分類定義
 // 搬進資料庫，那是多一張表加一次查詢，為了三句不會變的話不划算。
 // 折衷是兩邊互相指路：改了這裡要同步 activities.json，反之亦然。
-const CATEGORY = {
-  gather: { label: "聚會 GATHER", short: "聚會", define: "全 BT 一起做的事" },
-  prompt: { label: "題目 PROMPT", short: "題目", define: "一個寫的題目，只有自己看得到" },
-  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "一張照片題目" }
+export const CATEGORY = {
+  gather: { label: "聚會 GATHER", short: "聚會", define: "全 BT 一起做的事", body: "一個月一次，全 BT 一起做一件事。玩遊戲、交換歌單、猜這張照片是誰的。一年下來，你會知道二十九個人的相簿長什麼樣、聽什麼歌、高中是什麼樣子。" },
+  prompt: { label: "題目 PROMPT", short: "題目", define: "一個寫的題目，只有自己看得到", body: "一個月一題，寫給七月的自己。九月你寫下想要什麼，七月護照會拿出來給你看。這裡寫的東西只有你看得到，別人打不開，所以可以誠實一點。" },
+  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "一張照片題目", body: "一個月一張照片。從醒來、出門、中午、傍晚，一路到關燈前。十一張排起來，是你這一年的一天——同一個中午，有人在教室，有人還在睡。" }
 };
 
 // CATNAME 從 CATEGORY 衍生，不要各寫一份 —— 那就又變回兩個真相來源了。
@@ -284,10 +284,9 @@ export function slotHTML(S, a) {
 // │ 分類短名已經在 .cat 那一格出現過一次，再放一次 .ttl 會讓「聚會」在同一   │
 // │ 張卡上出現兩次。2026-08-23 使用者看過對照圖後的決定。                    │
 // │                                                                          │
-// │ .hint 印的是 CATEGORY[c].body。現在每個分類都還沒有這個欄位，所以會落到 │
-// │ 預設字串「【待補文案】」。**不要自己編一份看起來像成品的文案** ——        │
-// │ 那會混進正式站而沒有人發現它不是人寫的。之後補文案時只要在 CATEGORY     │
-// │ 每個分類加一個 body 欄位就好，這個函式不用再動。                         │
+// │ .hint 印的是 CATEGORY[c].body，2026-08-23 使用者親手寫的三段文案，       │
+// │ 逐字收在 CATEGORY 裡。**這裡沒有預設字串**：少一個分類的 body 就是      │
+// │ esc(undefined)，讓測試紅掉，不會靜靜地印一行佔位字給幹部看。             │
 // └──────────────────────────────────────────────────────────────────────────┘
 // 順序直接用 SLOT_ORDER 產生，不在這裡再寫死一次三個 category ——
 // 那會變成第二個順序的真相來源，而兩個真相來源遲早會不一致。
@@ -299,7 +298,7 @@ export function guideCardsHTML() {
     return `<div class="slot">
       <span class="cat">${esc(g.label)}</span>
       <span class="ttl">${esc(g.define)}</span>
-      <span class="hint">${esc(g.body || "【待補文案】")}</span>
+      <span class="hint">${esc(g.body)}</span>
     </div>`;
   }).join("")}</div>`;
 }

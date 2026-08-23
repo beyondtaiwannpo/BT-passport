@@ -3,7 +3,8 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML } from "../src/ui.js";
+import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML,
+         CATEGORY, CATNAME, SLOT_ORDER } from "../src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -89,9 +90,9 @@ test("月份頁的 .mhead 不帶 solo", () => {
   assert.ok(!html.includes('<div class="mhead solo">'), "月份頁不准出現 mhead solo");
 });
 
-test(".hint 仍然是待補文案的佔位字，不是自己編的成品文案", () => {
+test(".hint 不再是待補文案的佔位字 —— 三段文案 2026-08-23 已經填進 CATEGORY", () => {
   const html = guideCardsHTML();
-  assert.equal((html.match(/【待補文案】/g) || []).length, 3, "三張卡都還沒有正式文案");
+  assert.equal((html.match(/【待補文案】/g) || []).length, 0, "文案已經填入，不該再出現佔位字");
 });
 
 test("說明頁用的是 .slot 而不是可點的 button", () => {
@@ -117,4 +118,43 @@ test("引導頁與說明頁用的是同一份三張卡", () => {
 test("引導頁有一顆送出鍵，而且只有一顆", () => {
   const html = introHTML();
   assert.equal((html.match(/data-act="intro-done"/g) || []).length, 1);
+});
+
+test("三張卡的文案都以「一個月一」開頭 —— 並排時第一句要對齊", () => {
+  // 使用者的版面要求：三張並排時第一句要對得起來。
+  // 開頭統一是那個對齊的基礎，改掉任何一張的開頭就破壞它。
+  for (const c of SLOT_ORDER) {
+    assert.ok(CATEGORY[c].body.startsWith("一個月一"),
+      `${c} 的文案要以「一個月一」開頭，實際是「${CATEGORY[c].body.slice(0, 6)}…」`);
+  }
+});
+
+test("每個分類都有非空的文案 —— 少一張不准靜靜地印佔位字", () => {
+  for (const c of SLOT_ORDER) {
+    assert.ok(CATEGORY[c].body && CATEGORY[c].body.length > 0, `${c} 沒有文案`);
+  }
+  assert.ok(!guideCardsHTML().includes("待補"), "說明頁不准出現佔位字");
+});
+
+test("題目那張必須講「別人打不開」", () => {
+  // **這條不是文案偏好，是告知義務。** 使用者的原話：
+  // 「那是這裡面有未成年幹部的情況下，唯一必須在第一眼講清楚的事。」
+  // 心得與照片只有本人看得到（schema.sql 的 entries_read RLS），
+  // 而學生要在寫下第一個字之前就知道這件事。
+  // 有人為了讓三張卡等長而刪掉這五個字的話，這條會紅。
+  assert.ok(CATEGORY.prompt.body.includes("別人打不開"),
+    "題目卡的文案必須包含「別人打不開」");
+  assert.ok(guideCardsHTML().includes("別人打不開"),
+    "「別人打不開」必須真的渲染到說明頁上");
+});
+
+test("CATNAME 的每個值都等於 CATEGORY 的 label —— 兩者不准漂移", () => {
+  // Task 8a 的審查指出：把 CATNAME 改成手寫的字面物件，測試不會紅。
+  // 那是真的，而且測不出來 —— 「衍生」是機制，從外面看不見。
+  // 所以這裡測的是那個機制要保證的**性質**：兩邊永遠一致。
+  // 今天（衍生）與「手寫且剛好一樣」都會綠，但任何一邊被改而另一邊沒跟上就紅。
+  for (const [k, v] of Object.entries(CATEGORY)) {
+    assert.equal(CATNAME[k], v.label);
+  }
+  assert.deepEqual(Object.keys(CATNAME).sort(), Object.keys(CATEGORY).sort());
 });
