@@ -74,6 +74,10 @@ create table if not exists passports (
   motto      text,
   avatar     text,                   -- base64 jpeg
   issued     date default current_date,
+  -- 第一次核發護照後的引導頁看過沒有。**介面狀態，不是護照內容** ——
+  -- 所以它不進匯出的備份檔，importPassport 也不碰它（見 data.js）。
+  -- 跟著帳號走而不是跟著瀏覽器走：換裝置登入時老幹部不該再被擋一次引導。
+  intro_seen boolean not null default false,
   updated_at timestamptz default now()
 );
 

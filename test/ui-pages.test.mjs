@@ -3,7 +3,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML } from "../src/ui.js";
+import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML } from "../src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -73,4 +73,17 @@ test("說明頁用的是 .slot 而不是可點的 button", () => {
 
 test("翻到說明頁時 bookHTML 畫的是說明頁", () => {
   assert.ok(bookHTML(S(1)).includes(guideCardsHTML()));
+});
+
+test("引導頁與說明頁用的是同一份三張卡", () => {
+  // 兩處各自寫一份文案的話，改了一邊忘了另一邊是遲早的事，
+  // 而那時候護照會對同一件事講兩種說法。
+  const cards = guideCardsHTML();
+  assert.ok(introHTML().includes(cards), "引導頁要包含那三張卡");
+  assert.ok(guidePageHTML().includes(cards), "說明頁要包含那三張卡");
+});
+
+test("引導頁有一顆送出鍵，而且只有一顆", () => {
+  const html = introHTML();
+  assert.equal((html.match(/data-act="intro-done"/g) || []).length, 1);
 });

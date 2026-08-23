@@ -371,6 +371,17 @@ export async function saveAvatar(dataUrl) {
   if (error) throw error;
 }
 
+// 記住引導頁看過了。**這是介面狀態，不是護照內容** —— 所以 exportPassport
+// 不帶它、importPassport 不碰它、clearAll 不清它（見 spec 2026-08-22 §4.5）。
+// 跨帳號還原時，「引導看過沒有」是這個帳號的事，不是備份檔的事。
+export async function markIntroSeen() {
+  const user = await requireUser();
+  const { error } = await supabase.from("passports")
+    .update({ intro_seen: true, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (error) throw error;
+}
+
 // 章與心得分兩張表，不是為了正規化，是因為兩者的可見範圍不同（spec §5.1）：
 // 章要公開給進度牆看，心得和照片只有本人能讀。混在同一張表的話，進度牆為了讀章
 // 就必須讀得到那一列，RLS 沒有「同一列的這幾欄看得到、那幾欄看不到」這種東西。

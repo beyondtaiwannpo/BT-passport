@@ -60,6 +60,18 @@ function render() {
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
   if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
+  // 引導頁擋在這裡，**在「已經有護照」之後**：三張卡講的是護照裡的東西，
+  // 先有護照再解釋它，順序才通。核發完 main.js 會 boot() 一次，
+  // 那時候 intro_seen 還是 false，所以不必另外呼叫什麼，這一條就會接住。
+  //
+  // 這裡刻意用嚴格比較 `=== false` 而不是 `!S.profile.intro_seen`：
+  // 程式碼會先進 commit，遷移是使用者稍後才手動跑的。這中間欄位不存在，
+  // S.profile.intro_seen 是 undefined。用 !undefined 判斷的話結果為真，
+  // 引導頁擋住每一個人，而 markIntroSeen() 又會因為欄位不存在而寫入失敗——
+  // 只在 console 留一筆——下次載入再擋一次，那是一個進不去護照的死結。
+  // 嚴格比較讓這個功能自己等資料庫準備好：欄位不存在時 undefined !== false，
+  // 引導頁不出現；遷移跑完之後 default false 才開始生效。
+  if (S.profile.intro_seen === false) { el.innerHTML = UI.introHTML(); return; }
   el.innerHTML = UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
@@ -199,6 +211,19 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "signout") { await DATA.signOut(); location.reload(); return; }
+
+  if (act === "intro-done") {
+    // 樂觀更新：先讓畫面走，再背景寫資料庫。
+    S.profile.intro_seen = true;
+    render();
+    try { await DATA.markIntroSeen(); }
+    catch (e) {
+      // **不跳 toast**。寫失敗的後果只是下次登入再看一次引導頁，
+      // 那不值得用一句錯誤訊息去打斷一個剛核發完護照的人。
+      console.error("intro_seen 沒有寫進資料庫，下次登入會再看到引導頁：", e);
+    }
+    return;
+  }
 
   if (act === "tab") { S.view = b.dataset.v; render(); if (S.view === "wall" && !S.wall) loadWall(); return; }
   if (act === "refresh") { loadWall(); return; }

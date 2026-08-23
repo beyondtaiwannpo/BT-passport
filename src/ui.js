@@ -305,6 +305,23 @@ export function guidePageHTML() {
     ${guideCardsHTML()}`;
 }
 
+// 第一次核發護照之後擋一次的引導頁。看完就進護照，之後不再出現
+// （記在 passports.intro_seen）。內容跟書裡的說明頁是同一份卡（guideCardsHTML）。
+//
+// 沿用 .card，只用 inline style 放寬 max-width —— .card 預設 560px 放不下三欄，
+// 那是尺寸不是新元件，仍符合原規格 §3.4。
+export function introHTML() {
+  return `<div class="card" style="max-width:940px">
+    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>怎麼用這本護照</h2>
+    <div class="sub">一年 33 格，每個月三格。這一頁之後在護照裡隨時翻得到。</div>
+    ${guideCardsHTML()}
+    <div class="row" style="margin-top:22px">
+      <button class="btn" data-act="intro-done">開始蓋章</button>
+    </div>
+  </div>`;
+}
+
 export function wallHTML(S) {
   if (S.wallLoading) return `<div class="wall"><div class="empty">正在讀取全體進度…</div></div>`;
   // 讀失敗要說出來，而且要留一個按得到的重新整理鍵。少了這一段的話，main.js 的
