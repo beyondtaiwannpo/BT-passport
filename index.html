@@ -95,9 +95,19 @@
        上一頁／下一頁按鈕跟著往上跳。會動的東西比死白更糟。 */
     display:flex;flex-direction:column;
   }
-  .book::before{ /* spine */
+  .book::before{ /* 裝訂線 */
     content:"";position:absolute;left:0;top:0;bottom:0;width:9px;
-    background:var(--bt-navy);opacity:.9;
+    /* 等距的米白圓點打在深藍上，讀起來像縫線的針孔。
+       圓點用 var(--paper) 實色不用 rgba 的米白：check.sh 的 §11-14 只允許三個
+       rgba 底色（16,42,134 / 255,196,108 / 255,255,255），米白 237,229,216 那個
+       rgba 底色不在允許清單裡，寫了會被擋。
+       半徑 1.6px、間距 22px 是配著 9px 的書脊寬挑的 —— 點再大就變成虛線，
+       再密就糊成一條淺色帶，兩者都不像針孔。
+       opacity 從 .9 拿掉改成 1：原本那條是用來讓深藍不要太實，但現在上面有圓點，
+       整條再壓一次會讓圓點也跟著糊掉。深藍本身的份量改用漸層那層的實色控制。 */
+    background:
+      radial-gradient(circle at 50% 50%, var(--paper) 1.6px, transparent 1.7px) 0 0 / 9px 22px repeat-y,
+      var(--bt-navy);
   }
   .book::after{ /* guilloche：120x40 貼片、每片兩排、四條干涉正弦波，2026-08-23 定案 */
     /* stroke 用 rgba(16,42,134,0.035) 不用 #102A86 + stroke-opacity：
