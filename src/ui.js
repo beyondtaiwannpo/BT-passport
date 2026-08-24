@@ -134,7 +134,9 @@ export function bookHTML(S) {
   // 但月份資料變少（有人停用了一整個月）時 S.page 可能指向已經不存在的頁。
   const cur = pages[S.page] || pages[0];
   return `<div class="book">
-    <div class="page turn">${pageBodyHTML(S, cur)}</div>
+    <div class="page turn">${pageBodyHTML(S, cur)}
+      <div class="pageno">PAGE ${String(S.page + 1).padStart(2, "0")} / ${pages.length}</div>
+    </div>
     <div class="nav">
       <button class="arrow" data-act="prev" ${S.page === 0 ? "disabled" : ""}>← 前一頁</button>
       <div class="dots">
