@@ -248,8 +248,17 @@
     55%{transform:scale(.93) rotate(2deg);opacity:.95}
     100%{opacity:.86}
   }
+  /* top:60px 是量出來的，不是目測。疊印**刻意**壓住右上角的時刻
+     （.mtheme.clock）——那是使用者的裁定：真的入境章也會壓到頁碼和邊框，
+     章壓過底下的東西是章該有的樣子，不要「修掉」。
+     但它**不可以**切到活動格子裡的任何東西。原本 top:70px 時會切掉
+     九月三格全蓋滿時第三格（鏡頭 FRAME）分類標籤 .cat 的上半
+     （1280px 實測重疊 251.0×5.2px），所以改成 60px，讓分類標籤下方多出 4.8px 餘裕。
+     之後如果調整 .mhead 的高度、.slot 的 padding 或 .cat 的字級，
+     **要回來重量這個距離**——它是兩個獨立絕對定位/旋轉元素的幾何關係，
+     沒有任何測試守得住。 */
   .overprint{
-    position:absolute;top:70px;right:26px;z-index:2;pointer-events:none;
+    position:absolute;top:60px;right:26px;z-index:2;pointer-events:none;
     transform:rotate(-11deg);
     color:var(--bt-navy);background:var(--bt-orange);
     opacity:.85;
