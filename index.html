@@ -376,6 +376,14 @@
     .pageno{right:18px;bottom:20px}
     .nav{padding-left:24px}
     .mrz{font-size:10.5px;letter-spacing:.08em}
+    /* 手機的疊印要縮小並上移。桌機的 21px 疊印在 390px 下橫跨 274px，
+       幾乎跟整個頁面一樣寬，會壓到月份數字、月名、還有第一格的分類標籤與標題
+       （實測 265.2x10.5 與 265.2x1.3）。
+       縮到 13px 之後框變成 183x66，配上 top:26px 剛好落在「九月」與右上角時刻之間。
+       **壓住時刻是刻意保留的**（見桌機那條規則的註解），但月名跟格子裡的東西不能碰 ——
+       時刻是裝飾，月名是資訊，而手機是三十個幹部主要的使用裝置。
+       改動這裡或 .mhead 的任何尺寸之後，要回來重量一次：這是幾何關係，沒有測試守得住。 */
+    .overprint{font-size:13px;top:26px}
   }
   @media (prefers-reduced-motion:reduce){
     /* 三個動畫全部關掉。.overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
