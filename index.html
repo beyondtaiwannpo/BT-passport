@@ -345,7 +345,16 @@
     .photo{width:130px;height:164px}
     .fields{grid-template-columns:1fr}
     .mnum{font-size:56px}
-    .page{padding:20px 18px 20px 24px}
+    /* 頁碼絕對定位在 .page 右下角，資料頁的按鈕列最右邊正好是「清除這本護照」——
+       要留出頁碼那一行的空間，不然兩者會疊在一起。這裡留 40px 夠不夠要看下面
+       .pageno 縮到多小的 inset，算式見那條規則的註解。 */
+    .page{padding:20px 18px 40px 24px}
+    /* 頁碼在手機也要跟著版面的邊界縮進來。桌機的 inset 是 26px，但這裡 .page 的
+       padding 是 20/18，頁碼再用 26px 就會比其他東西多縮 8px，跟邊界節奏對不上。
+       改成 18/20 之後，需要留的空間是 bottom(20) + 頁碼高度(18.59) = 38.59，
+       所以上面那行的 padding-bottom 40px 剛好夠，餘裕 1.4px —— 跟桌機的
+       26 + 18.59 = 44.59 對 46px 是同一個餘裕。兩邊對稱不是巧合，是同一條算式。 */
+    .pageno{right:18px;bottom:20px}
     .nav{padding-left:24px}
     .mrz{font-size:10.5px;letter-spacing:.08em}
   }
