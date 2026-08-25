@@ -385,16 +385,18 @@ document.addEventListener("click", async e => {
       toast("沒有清除成功，再試一次。");
       return;
     }
-    // user / authMode / authMsg 一定要帶過去。清除的是護照內容，不是登入狀態 ——
-    // 漏掉 user 的話，下一次 render() 會撞上 `if (!S.user)` 掉回登入頁，
-    // session 明明還好好的，學生卻以為自己被登出了。
-    S = {
-      user: S.user, authMode: "in", authMsg: "",
+    // **列出要清掉的，不是列出要保留的。** 要清的正好是「護照內容」，
+    // 那是一組穩定的東西；要保留的（user、activities、months、milestones⋯）
+    // 每次新增參考資料都要記得加，而那件事已經漏過（見 boot 的註解）。
+    // 用 Object.assign 就地覆寫而不是 S = {...}：後者會把沒列到的 key 整個丟掉。
+    // 注意 user 不在清單裡——清除的是護照內容不是登入狀態，就地覆寫不列它
+    // 就等於不動它，不需要像原本的寫法那樣特地寫 user: S.user 才能保住它。
+    Object.assign(S, {
+      authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {},
-      activities: S.activities, months: S.months,
-      page: 0, view: "passport", wall: null, wallLoading: false, wallError: false, down: false,
-      justStamped: null
-    };
+      page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
+      down: false, justStamped: null
+    });
     render();
     return;
   }
@@ -438,11 +440,15 @@ export async function boot() {
     let all;
     try { all = await DATA.loadAll(); } finally { clearTimeout(slow); }
 
+    // **整包裝進去，不要手寫逐欄指派。** 手寫的話 loadAll 每多回傳一個東西，
+    // 這裡就要記得加一行 —— 而那件事已經漏過：milestones 從上線起就沒被裝進 S，
+    // 里程碑 UI 在正式站上是死的，而 milestoneState 的 (S.milestones || [])
+    // 讓它不 throw、安靜地不渲染，所以沒有人發現（2026-08-25 抓到）。
+    // Object.assign 讓這個 bug class 不存在，而不是被守住。
+    Object.assign(S, all);
+    // active === false 的活動要濾掉。這一行留在這裡而不是搬進 data.js：
+    // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。
     S.activities = all.activities.filter(a => a.active !== false);
-    S.months = all.months;
-    S.profile = all.profile;
-    S.stamps = all.stamps;
-    S.entries = all.entries;
     S.down = false;
     render();
   } catch (e) {

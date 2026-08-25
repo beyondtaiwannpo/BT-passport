@@ -200,6 +200,16 @@ else
   bad "src/data.js 的 firstError 清單被動過，milestones 失敗會拖垮整本護照"
 fi
 
+# boot() 必須整包裝填，不可以退回手寫逐欄指派。手寫的話 loadAll 每多回傳一個東西
+# 就要記得加一行，而那件事已經漏過 —— milestones 從上線起就沒被裝進 S，
+# 里程碑 UI 在正式站上是死的，而 (S.milestones || []) 的防呆讓它安靜地不渲染，
+# 所以沒有人發現（2026-08-25）。單元測試碰不到：main.js 一條測試都沒有。
+if grep -q 'Object\.assign(S, all)' src/main.js; then
+  ok "boot() 整包裝填 loadAll 的結果"
+else
+  bad "src/main.js 的 boot() 不是 Object.assign(S, all)，新欄位會靜靜地不進 S"
+fi
+
 # 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
 # barHTML 的「N / 33」、idPageHTML 的 FULL 疊印、里程碑的達成判斷，全部吃它的結果。
 # 這條守的是架構不是行為，測試碰不到：兩邊各自用同一條公式算一次的話，
