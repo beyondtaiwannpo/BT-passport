@@ -140,11 +140,11 @@ export function pagesOf(S) {
   ];
 }
 
-// 這個月的圓點要不要塗橘色。**acts.length 那一半不可以省**：
+// 這個月的圓點要不要塗橘色。**acts.length > 0 那一半不可以省**：
 // [].every(...) 回 true，少了它的話，一個還沒有任何活動的月份會顯示成「已蓋滿」。
 function dotOn(S, m) {
   const acts = S.activities.filter(a => a.month === m.month);
-  return acts.length && acts.every(a => S.stamps[a.id]) ? 1 : 0;
+  return acts.length > 0 && acts.every(a => S.stamps[a.id]) ? 1 : 0;
 }
 
 export function bookHTML(S) {
@@ -255,9 +255,15 @@ export function stampHTML(act, st, animate) {
 // <span>\n</span> 與完全不渲染的 .mtheme 高度都是 42.50，一模一樣 ——
 // 空的 inline 元素不產生行框。理由是不要在 DOM 裡留一個永遠是空的元素，
 // 下一個人看到會以為渲染壞了然後去「修」它。見 spec 2026-08-22 §5.2。
+// full 判斷「這個月是不是蓋滿了」。**acts.length > 0 不可省**：空集合讓
+// .every() 無條件成立，這個 repo 已經被同一個 bug class 咬過三次——dotOn 的圓點
+// （2026-08-22 修）、idPageHTML 的 FULL 疊印（2026-08-25 修）、以及這裡。
+// 這一處還跟 dotOn 互相矛盾過：dotOn 先加了守衛，這裡沒加，於是同一個沒有
+// 活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
+// 判斷「全部完成」的時候，先問「有沒有東西可以完成」。
 export function monthPageHTML(S, m) {
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
-  const full = acts.every(a => S.stamps[a.id]);
+  const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
   const zh = MONTH_ZH[m.month] || String(m.month);
   return `${full ? `<div class="overprint">MONTH CLEARED</div>` : ""}
     <div class="mhead">

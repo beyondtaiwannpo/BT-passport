@@ -70,6 +70,31 @@ test("沒有活動的月份，圓點不算蓋滿", () => {
   assert.ok(!/data-on="1"/.test(html), "沒有活動就不該有橘色圓點");
 });
 
+test("MONTH CLEARED：蓋滿才出現，而且沒有活動的月份不算蓋滿", () => {
+  // 空集合讓 .every() 無條件成立 —— 這個 repo 被同一個 bug class 咬過三次。
+  // 這一處還跟圓點互相矛盾過：dotOn 在 2026-08-22 就加了守衛，
+  // 所以同一個沒有活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
+  const m = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
+  const mk = acts => ({ activities: acts, stamps: {}, entries: {}, justStamped: null, months: [m], milestones: [] });
+  const A = { id: "09A", month: 9, seq: 1, category: "gather", title_zh: "開學電影夜", title_en: "OPENING NIGHT", description: "d" };
+  const has = s => monthPageHTML(s, m).includes("MONTH CLEARED");
+
+  assert.equal(has(mk([])), false, "沒有活動的月份不算蓋滿");
+  assert.equal(has(mk([A])), false, "有一格未蓋章不算蓋滿");
+  const done = { ...mk([A]), stamps: { "09A": { date: "2026-09-01" } } };
+  assert.equal(has(done), true, "全部蓋章才算蓋滿");
+});
+
+test("沒有活動的月份，圓點與頁面說的是同一件事", () => {
+  // 兩處各自判斷「蓋滿」，曾經一個修了一個沒修，於是同一個月份
+  // 圓點說未蓋滿、頁面說 MONTH CLEARED。
+  const m = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
+  const S2 = { page: 2, months: [m], activities: [], stamps: {}, entries: {}, justStamped: null, milestones: [] };
+  const book = bookHTML(S2);
+  assert.ok(!book.includes('data-on="1"'), "圓點不該是蓋滿");
+  assert.ok(!book.includes("MONTH CLEARED"), "頁面也不該蓋 MONTH CLEARED");
+});
+
 test("說明頁的三張卡也是 聚會 → 題目 → 鏡頭", () => {
   const html = guideCardsHTML();
   const [g, p, f] = ["聚會 GATHER", "題目 PROMPT", "鏡頭 FRAME"].map(n => html.indexOf(n));
