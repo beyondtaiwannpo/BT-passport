@@ -269,7 +269,7 @@ async function requireUser() {
   return user;
 }
 
-// 五個查詢彼此不相依，一起發。序列發的話是五個 RTT，在手機網路上很有感。
+// 六個查詢彼此不相依，一起發。序列發的話是六個 RTT，在手機網路上很有感。
 function fetchAll(user) {
   return Promise.all([
     supabase.from("months").select("*").order("seq"),
@@ -278,21 +278,42 @@ function fetchAll(user) {
     supabase.from("activities").select("*").eq("active", true).order("month").order("seq"),
     supabase.from("passports").select("*").eq("id", user.id).maybeSingle(),
     supabase.from("stamps").select("act_id, stamped_on").eq("user_id", user.id),
-    supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id)
+    supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id),
+    supabase.from("milestones").select("*").eq("active", true).order("threshold")
   ]);
 }
 
 // 任何一個查詢失敗就整批視為失敗。部分成功比全部失敗更危險：少了 stamps 的畫面
 // 看起來就是「一個章都沒蓋」，學生會以為自己的紀錄不見了，然後重蓋一次。
+//
+// **milestones 刻意不在這張清單裡。** 上面那個理由對它不成立：
+// milestones 讀不到的表現是「沒有里程碑 UI」，不會讓任何人誤以為自己的
+// stamps／entries 不見了，跟其他五個查詢的風險完全不同。
+// 把它留在外面還有一個實際好處：部署順序不再有先後 —— 前端先上、
+// 對應的 SQL 遷移還沒貼進 Supabase 的話，milestones 查詢會 404，
+// 但護照其餘部分照常運作，只是暫時沒有里程碑區塊。
+// 這個例外只准套用在 milestones 一個查詢上，不要把它當成「以後新增查詢
+// 都不用加進 firstError」的先例 —— stamps／entries／activities／months／
+// passports 這五個失敗了就是要整批擋下來，理由見上面那句。
 const firstError = rs => (rs.find(r => r.error) || {}).error || null;
+
+// milestones 的錯誤不往上拋（見 firstError 那段的註解）。失敗就當沒有里程碑，
+// 但要在 console 留下線索 —— 靜靜地回空陣列的話，維護者會以為是資料表空的。
+function milestonesOf(ms) {
+  if (ms.error) {
+    console.error("里程碑讀取失敗，這一次就當沒有里程碑（護照其餘部分不受影響）：", ms.error);
+    return [];
+  }
+  return ms.data || [];
+}
 
 export async function loadAll() {
   const user = await currentUser();
   // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
   // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
-  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [] };
+  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [], milestones: [] };
 
-  let [mo, ac, pa, st, en] = await fetchAll(user);
+  let [mo, ac, pa, st, en, ms] = await fetchAll(user);
   let firstErr = firstError([mo, ac, pa, st, en]);
 
   // ── PGRST303「JWT issued at future」只重試這一種，而且只重試一次 ──
@@ -323,7 +344,7 @@ export async function loadAll() {
   // 換句話說：調小它能省下的是不存在的成本，賠上的是真實的失敗率。
   if (firstErr && firstErr.code === "PGRST303") {
     await new Promise(r => setTimeout(r, 2000));
-    [mo, ac, pa, st, en] = await fetchAll(user);
+    [mo, ac, pa, st, en, ms] = await fetchAll(user);
     firstErr = firstError([mo, ac, pa, st, en]);
   }
 
@@ -345,7 +366,8 @@ export async function loadAll() {
     profile: pa.data || null,
     stamps, entries,
     activities: ac.data || [],
-    months: mo.data || []
+    months: mo.data || [],
+    milestones: milestonesOf(ms)
   };
 }
 

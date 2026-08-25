@@ -65,6 +65,24 @@ function orderSlots(acts) {
   return acts.slice().sort((a, b) => rank(a.category) - rank(b.category));
 }
 
+// 里程碑的狀態**只有這一個定義點**。頂欄那行提示與資料頁的清單都問它，
+// 不准任何一邊自己再算一次 —— 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
+//
+// done 用 Object.keys(S.stamps).length，跟 barHTML 的那個數字**同源**。
+// test/ui-milestone.test.mjs 有一條測試釘住這件事。
+//
+// 沒有「誰達成了什麼」的資料表，達成與否一律即時算（見 supabase/schema.sql 的註解）。
+export function milestoneState(S) {
+  const done = Object.keys(S.stamps).length;
+  // 同門檻時用 id 打破平手，順序才不會在每次載入之間跳動 —— 跟 activities
+  // 的 seq 相同時那個坑一樣（見 SLOT_ORDER 的註解）。
+  const list = (S.milestones || []).slice()
+    .sort((a, b) => a.threshold - b.threshold || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const reached = list.filter(m => done >= m.threshold);
+  const next = list.find(m => done < m.threshold) || null;
+  return { done, list, reached, next, remaining: next ? next.threshold - done : 0 };
+}
+
 // 中文月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
 const MONTH_ZH = { 1:"一月",2:"二月",3:"三月",4:"四月",5:"五月",6:"六月",
                    7:"七月",8:"八月",9:"九月",10:"十月",11:"十一月",12:"十二月" };

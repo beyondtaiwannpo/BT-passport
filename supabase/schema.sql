@@ -42,6 +42,22 @@ create table if not exists activities (
   active      boolean default true   -- 已經有人蓋過的活動請停用，不要刪
 );
 
+-- 里程碑。蓋到第 N 個章時解鎖的東西。
+-- **獎勵是護照本身長出東西，不是抽獎也不是實體獎品。** 這不是省錢，是設計：
+-- 有幾格（11B 最想放棄的那一刻、06B 我沒做到的事）需要人誠實面對自己，
+-- 背後有獎品的話那幾格會被隨便寫掉。
+--
+-- **刻意沒有「誰達成了什麼」的表**：達成與否用 stamps 的 count 即時算就好。
+-- 存一份重複的狀態會有不同步問題，而且會多一張帶使用者資料的表要管 RLS。
+create table if not exists milestones (
+  id          text primary key,      -- 'm05'，人看得懂又穩定
+  threshold   int  not null,         -- 需要幾個章
+  title_zh    text not null,
+  title_en    text not null,
+  description text,
+  active      boolean default true   -- 已經有人達成過的請停用，不要刪
+);
+
 -- 邀請碼。note 是寫給人看的（這組發給誰），不會出現在任何畫面上。
 create table if not exists invite_codes (
   code       text primary key,
@@ -108,6 +124,7 @@ create table if not exists entries (
 
 alter table months       enable row level security;
 alter table activities   enable row level security;
+alter table milestones   enable row level security;
 alter table invite_codes enable row level security;
 alter table passports    enable row level security;
 alter table stamps       enable row level security;
@@ -120,6 +137,11 @@ create policy months_read on months
 drop policy if exists activities_read on activities;
 create policy activities_read on activities
   for select to authenticated using (true);
+
+drop policy if exists milestones_read on milestones;
+create policy milestones_read on milestones
+  for select to authenticated using (true);
+-- 沒有寫入政策，跟 months / activities 一樣：內容由後台維護。
 
 -- invite_codes：故意一條 policy 都不給，等於對所有登入身分關閉。
 -- 表層級的權限也要一起收掉，收在下面的 grant 段落。
@@ -190,9 +212,9 @@ create policy entries_delete on entries
 -- 之後新增 policy 若忘了寫 to authenticated，就等於對未登入的人開門。
 
 revoke all on invite_codes from anon, authenticated;
-revoke all on months, activities, passports, stamps, entries from anon, authenticated;
+revoke all on months, activities, milestones, passports, stamps, entries from anon, authenticated;
 
-grant select on months, activities to authenticated;
+grant select on months, activities, milestones to authenticated;
 grant select, insert, update, delete on passports, stamps, entries to authenticated;
 
 -- ---------- 註冊 trigger ----------
