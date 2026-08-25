@@ -306,6 +306,22 @@
     55%{transform:scale(.93) rotate(2deg);opacity:.95}
     100%{opacity:.86}
   }
+  /* 翻面用 animation 不用 transition：main.js 的 render() 是 el.innerHTML = ...，
+     整棵子樹每次都被拆掉重建，transition 永遠不會跑（要過渡的元素沒活到下一幀）。
+     既有的 .stamp.land 與 .page.turn 會動也正是這個原因。
+     **不要「改善」成 transition，也不要為了它去改 render() 的重繪方式**
+     —— 那是拿一個穩定的架構去換一個動畫（spec §5.1）。 */
+  @keyframes flipToBack{from{transform:rotateY(0)}to{transform:rotateY(180deg)}}
+  @keyframes flipToFront{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+  .flip.turning-back{animation:flipToBack .42s ease}
+  .flip.turning-front{animation:flipToFront .42s ease}
+  /* 蓋章之後：先翻面、翻完再落章。用 animation-delay 串接**不要用 JS 計時器** ——
+     計時器會跟下一次 render() 競態（使用者在動畫沒跑完時翻頁或蓋下一個章，
+     計時器仍然會觸發，而它要操作的 DOM 已經不在了）。animation-delay 沒有這個問題：
+     元素被移除，動畫跟著消失。
+     animation-fill-mode:backwards 不可省：land 的 0% 是 opacity 0，
+     少了它的話章會在延遲的那 .42 秒裡先以最終樣子出現，然後才彈一次。 */
+  .flip.turning-back .stamp.land{animation-delay:.42s;animation-fill-mode:backwards}
   /* top:60px 是量出來的，不是目測。疊印**刻意**壓住右上角的時刻
      （.mtheme.clock）——那是使用者的裁定：真的入境章也會壓到頁碼和邊框，
      章壓過底下的東西是章該有的樣子，不要「修掉」。
@@ -444,11 +460,13 @@
     .overprint{font-size:13px;top:26px}
   }
   @media (prefers-reduced-motion:reduce){
-    /* 三個動畫全部關掉。.overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
+    /* 五個動畫全部關掉：.stamp.land、.page.turn、.overprint.land、
+       .flip.turning-back、.flip.turning-front（2026-08-25 翻面加的兩個）。
+       .overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
        它跟 .stamp.land 共用同一組 land keyframe，卻一直漏在這條規則外面 ——
        因為它只在集滿的那一刻出現，平常根本測不到。2026-08-18 做 §11-17
        驗收時用 CSSOM 逐條比對才抓到。新增動畫時記得回來加進這一行。 */
-    .stamp.land,.page.turn,.overprint.land{animation:none}
+    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front{animation:none}
   }
 </style>
 </head>

@@ -100,3 +100,20 @@ test("一格仍然只有一個 .slot —— 既有的 slotCount 不能被拆成�
   const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
   assert.equal(html.split('class="slot"').length - 1, 1);
 });
+
+test("剛翻過的那一格帶動畫 class，而且旗標被消耗掉", () => {
+  const S = { ...state({ "09A": { date: "2026-09-05" } }), justFlipped: "09A" };
+  const html = slotHTML(S, act);
+  assert.match(html, /class="flip turning-back"/);
+  assert.equal(S.justFlipped, null, "旗標要被消耗，否則每次重繪都會再播一次");
+});
+
+test("沒有剛翻過的格子不帶動畫 class", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  assert.ok(!html.includes("turning-"));
+});
+
+test("翻回正面時用的是另一個方向的動畫", () => {
+  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "front" }, justFlipped: "09A" };
+  assert.match(slotHTML(S, act), /class="flip turning-front"/);
+});

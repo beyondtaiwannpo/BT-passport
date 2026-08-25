@@ -347,6 +347,10 @@ export function slotHTML(S, a) {
   const anim = st && S.justStamped === a.id;
   if (anim) S.justStamped = null;
 
+  // 跟 justStamped 同一個模式：讀到就消耗掉，否則每次重繪都會再播一次動畫。
+  const turn = S.justFlipped === a.id;
+  if (turn) S.justFlipped = null;
+
   const front = `<div class="face front" aria-hidden="${face === "back"}">
       <button class="faceopen" data-act="open" data-id="${a.id}">
         <span class="cat">${esc(CATNAME[a.category] || "")}</span>
@@ -366,7 +370,7 @@ export function slotHTML(S, a) {
     </div>`;
 
   return `<div class="slot" data-id="${a.id}" data-done="${st ? 1 : 0}" data-face="${face}">
-    <div class="flip">${front}${back}</div>
+    <div class="flip${turn ? (face === "back" ? " turning-back" : " turning-front") : ""}">${front}${back}</div>
   </div>`;
 }
 
