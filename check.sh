@@ -189,7 +189,11 @@ fi
 # 護照照常運作。把 ms 加進那個清單，會讓「SQL 還沒跑」變成整站壞掉。
 # 單元測試碰不到這件事：data.js 在 module scope 建 supabase client，
 # 沒有網路 stub 就測不到錯誤分支。2026-08-25 實測過：把 ms 加進去，37 個測試全綠。
-n=$(grep -c 'firstError(\[mo, ac, pa, st, en\])' src/data.js)
+# 用 grep -o | wc -l 數出現次數，不用 grep -c —— grep -c 數的是「符合的行數」，
+# 兩處寫在同一行的話 grep -c 只算 1，會把「併成一行」誤判成「只剩一處」而 FAIL
+# （這條要求剛好是 2，所以那個誤判方向是安全的：誤報而不是放行，但跟下面
+# 「只准數一次」那條的寫法不一致會讓人以為兩條規則不同，所以一起改成同一種數法）。
+n=$(grep -o 'firstError(\[mo, ac, pa, st, en\])' src/data.js | wc -l | tr -d ' ')
 if [ "$n" = "2" ] && ! grep -q 'firstError(\[mo, ac, pa, st, en, ms\])' src/data.js; then
   ok "loadAll 的 firstError 清單不含 milestones"
 else
@@ -202,7 +206,12 @@ fi
 # 算出來永遠一樣，任何比對結果的測試都會是綠的（2026-08-25 實測，42 個測試全綠）。
 # 真正會出事的是有人只改了其中一處的定義 —— 那時候畫面上兩個數字會不一致，
 # 而沒有任何東西會報錯。
-n=$(grep -c 'Object\.keys(S\.stamps)\.length' src/ui.js)
+# 用 grep -o | wc -l 數出現次數，不用 grep -c —— grep -c 數的是「符合的行數」，
+# 把兩次出現寫在同一行（例如加一個 sneaky 變數重複算一次，塞進同一行）會讓
+# grep -c 回 1，這條檢查就會誤判成「只有一處」而放行，對它要擋的東西沒有效果
+# （2026-08-25 審查實測過）。tr -d ' ' 是因為 macOS 的 wc -l 會補前導空白，
+# 不去掉的話字串比對永遠對不上。
+n=$(grep -o 'Object\.keys(S\.stamps)\.length' src/ui.js | wc -l | tr -d ' ')
 if [ "$n" = "1" ]; then
   ok "章的數量只在 milestoneState 裡數一次"
 else
