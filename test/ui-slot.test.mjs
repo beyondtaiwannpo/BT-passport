@@ -2,7 +2,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotHTML } from "../src/ui.js";
+import { slotHTML, faceOf } from "../src/ui.js";
 
 const act = {
   id: "09A", month: 9, seq: 1, category: "gather",
@@ -35,4 +35,26 @@ test("蓋章後心得與照片仍然照舊顯示", () => {
   );
   assert.ok(html.includes("那天我遲到了十分鐘"));
   assert.ok(html.includes("class=\"thumb\""));
+});
+
+test("faceOf：未蓋章一律正面", () => {
+  assert.equal(faceOf(state(), act), "front");
+  // 就算 flipped 說背面也一樣 —— 未蓋章根本沒有背面可以翻到
+  assert.equal(faceOf({ ...state(), flipped: { "09A": "back" } }, act), "front");
+});
+
+test("faceOf：已蓋章預設背面", () => {
+  assert.equal(faceOf(state({ "09A": { date: "2026-09-05" } }), act), "back");
+});
+
+test("faceOf：已蓋章時 flipped 可以覆寫成正面", () => {
+  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "front" } };
+  assert.equal(faceOf(S, act), "front");
+});
+
+test("faceOf：S.flipped 不存在時不炸", () => {
+  // 舊形狀的 state，或還沒有人翻過任何一格
+  const S = state({ "09A": { date: "2026-09-05" } });
+  delete S.flipped;
+  assert.equal(faceOf(S, act), "back");
 });

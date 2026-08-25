@@ -84,6 +84,20 @@ export function milestoneState(S) {
   return { done, list, reached, next, remaining: next ? next.threshold - done : 0 };
 }
 
+// 這一格現在哪一面朝上。**只有這一個定義點** —— slotHTML 與任何之後要知道
+// 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
+// milestoneState 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
+//
+// 未蓋章一律回 "front"，而且**不看 S.flipped** —— 未蓋章的格子根本不產生背面的 DOM
+// （spec §3.1），所以「翻到背面」是一個不存在的狀態，不該讓它表達得出來。
+//
+// S.flipped 只活在 session 裡：不進資料庫、不進備份檔、不進 localStorage。
+// 它是介面狀態不是護照內容（spec §4）。
+export function faceOf(S, a) {
+  if (!S.stamps[a.id]) return "front";
+  return (S.flipped || {})[a.id] === "front" ? "front" : "back";
+}
+
 // 中文月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
 const MONTH_ZH = { 1:"一月",2:"二月",3:"三月",4:"四月",5:"五月",6:"六月",
                    7:"七月",8:"八月",9:"九月",10:"十月",11:"十一月",12:"十二月" };
