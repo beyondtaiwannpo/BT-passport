@@ -190,7 +190,11 @@
     transition:border-color .16s,background .16s;
     position:relative;
   }
-  .slot:hover,.slot:focus-visible{border-color:var(--bt-navy);background:rgba(255,196,108,.14)}
+  /* 只剩 :hover。.slot 在 2026-08-25 從 button 改成 div（按鈕不能巢狀，翻面按鈕
+     必須在格子裡面），div 不是原生可聚焦元素也沒有 tabindex，:focus-visible
+     永遠不會命中，留著是死 CSS。鍵盤可及性沒有退化——真正可聚焦的
+     .faceopen 與 .flipbtn 已經套用通用的 #bt-root :focus-visible 規則。 */
+  .slot:hover{border-color:var(--bt-navy);background:rgba(255,196,108,.14)}
   .slot .cat{font-size:9px;font-weight:700;letter-spacing:.2em;opacity:.5;text-transform:uppercase}
   .slot .ttl{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;margin:5px 0 3px}
   .slot .en{font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;opacity:.45}
