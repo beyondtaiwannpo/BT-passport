@@ -182,6 +182,20 @@ else
   bad "index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
 fi
 
+# loadAll 的 firstError 清單必須維持五個查詢，**不可以包含 milestones**。
+# 其他五個是「任一失敗就整批失敗」，理由是少了 stamps 的畫面看起來像「一個章都沒蓋」，
+# 學生會以為紀錄不見了然後重蓋一次。milestones 不一樣：讀不到就是沒有里程碑 UI，
+# 不會誤導任何人；而且這讓部署順序不再有先後 —— 前端先上、SQL 還沒跑時查詢會 404，
+# 護照照常運作。把 ms 加進那個清單，會讓「SQL 還沒跑」變成整站壞掉。
+# 單元測試碰不到這件事：data.js 在 module scope 建 supabase client，
+# 沒有網路 stub 就測不到錯誤分支。2026-08-25 實測過：把 ms 加進去，37 個測試全綠。
+n=$(grep -c 'firstError(\[mo, ac, pa, st, en\])' src/data.js)
+if [ "$n" = "2" ] && ! grep -q 'firstError(\[mo, ac, pa, st, en, ms\])' src/data.js; then
+  ok "loadAll 的 firstError 清單不含 milestones"
+else
+  bad "src/data.js 的 firstError 清單被動過，milestones 失敗會拖垮整本護照"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #
