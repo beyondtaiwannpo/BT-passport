@@ -105,3 +105,21 @@ test("沒有里程碑時，資料頁整塊不出現、頂欄也不多一行", ()
   assert.ok(!idPageHTML(S).includes("mstones"));
   assert.ok(!barHTML(S).includes("下一個里程碑"));
 });
+
+test("FULL 疊印：蓋滿才出現，而且沒有活動時不算蓋滿", () => {
+  // idPageHTML 的 done 改成吃 milestoneState 之後，這條線沒有任何測試涵蓋（審查指出的）。
+  // 0/0 那個 case 是既存的 bug：activities 空的時候 0 === 0 會成立，
+  // 一個章都沒蓋的人會被蓋一個「0 / 0 · FULL」。
+  // 跟 dotOn 的 acts.length && 是同一條理由：沒有東西可以完成的時候，不算完成。
+  const mk = (n, total) => ({
+    profile: PROFILE, milestones: [], entries: {},
+    activities: Array.from({ length: total }, (_, i) => ({ id: "a" + i })),
+    stamps: Object.fromEntries(Array.from({ length: n }, (_, i) => ["a" + i, { date: "2026-09-01" }]))
+  });
+  const hasFull = s => idPageHTML(s).includes("FULL");
+  assert.equal(hasFull(mk(0, 33)), false, "0/33 不該是 FULL");
+  assert.equal(hasFull(mk(32, 33)), false, "32/33 不該是 FULL");
+  assert.equal(hasFull(mk(33, 33)), true, "33/33 要是 FULL");
+  assert.equal(hasFull(mk(3, 3)), true, "3/3 要是 FULL（總數可以不是 33）");
+  assert.equal(hasFull(mk(0, 0)), false, "沒有活動時不算蓋滿");
+});

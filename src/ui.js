@@ -176,6 +176,9 @@ function pageBodyHTML(S, page) {
   return monthPageHTML(S, page.month);
 }
 
+// total > 0 不可省（見下面 FULL 疊印那一行）：activities 空的時候 done === total
+// 會是 0 === 0，一個章都沒蓋的人會被蓋一個「0 / 0 · FULL」。跟 dotOn 的
+// acts.length && 是同一條理由 —— 沒有東西可以完成的時候，不算完成。
 export function idPageHTML(S) {
   const p = S.profile;
   const [l1, l2] = mrz(p);
@@ -201,7 +204,7 @@ export function idPageHTML(S) {
         ${p.motto ? `<div class="motto">「${esc(p.motto)}」</div>` : ""}
       </div>
     </div>
-    ${done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
+    ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
     ${milestonesHTML(S)}
     <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
     <div class="row" style="margin-top:18px">
