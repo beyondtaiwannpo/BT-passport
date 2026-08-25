@@ -58,3 +58,45 @@ test("faceOf：S.flipped 不存在時不炸", () => {
   delete S.flipped;
   assert.equal(faceOf(S, act), "back");
 });
+
+test("未蓋章：只有正面，沒有背面也沒有翻面按鈕", () => {
+  const html = slotHTML(state(), act);
+  assert.ok(html.includes('class="face front"'));
+  assert.ok(!html.includes('class="face back"'), "未蓋章不該產生背面的 DOM");
+  assert.ok(!html.includes('data-act="flip"'), "沒有東西可以翻到就不該有翻面按鈕");
+  assert.match(html, /data-face="front"/);
+});
+
+test("已蓋章：兩面都在，預設背面朝上，兩面各有翻面按鈕", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  assert.ok(html.includes('class="face front"'));
+  assert.ok(html.includes('class="face back"'));
+  assert.match(html, /data-face="back"/);
+  assert.equal((html.match(/data-act="flip"/g) || []).length, 2, "兩面各一顆");
+});
+
+test("朝外的那一面標 aria-hidden，讀螢幕的人不該聽到兩份內容", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  assert.match(html, /class="face front" aria-hidden="true"/);
+  assert.match(html, /class="face back" aria-hidden="false"/);
+});
+
+test("翻面按鈕的 aria-label 說得出它要去哪一面", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  assert.ok(html.includes('aria-label="翻到正面"'));
+  assert.ok(html.includes('aria-label="翻到背面"'));
+});
+
+test("翻面按鈕不是 faceopen 的子孫 —— 按鈕不能巢狀", () => {
+  // 巢狀按鈕是無效的 HTML，而且會讓 closest("[data-act]") 的委派失效。
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  const open = html.indexOf('data-act="open"');
+  const closeOpen = html.indexOf("</button>", open);
+  const firstFlip = html.indexOf('data-act="flip"');
+  assert.ok(firstFlip > closeOpen, "翻面按鈕要在 faceopen 關閉之後");
+});
+
+test("一格仍然只有一個 .slot —— 既有的 slotCount 不能被拆成兩個", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  assert.equal(html.split('class="slot"').length - 1, 1);
+});

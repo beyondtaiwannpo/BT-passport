@@ -204,6 +204,33 @@
   /* 蓋章之後說明留著但淡化，讓標題與章之間的內容連續、不留一片空白（2026-08-23 Task 10）。 */
   .slot[data-done="1"] .hint{opacity:.42}
 
+  /* ── 翻面卡（spec 2026-08-25）──
+     這是新的視覺元件，是原規格 §3.4 的**明確例外**，使用者 2026-08-25 授權。
+     理由：一格要塞五樣東西，蓋完章之後說明變成死重量，而護照本來就是一頁一頁翻的。
+     這個例外只涵蓋翻面卡本身，不是「以後可以自由新增元件」的先例。
+
+     .flip 用 grid 把兩面疊在同一格，**容器高度自動是兩面的最大值** ——
+     不用 JS 量、不用寫死數字，內容改了也不用回來調。
+     2026-08-25 實測：只放正面 88px、只放背面 145px、兩面疊放 145px、翻面前後不跳。
+
+     backface-visibility:hidden 同時擋掉指標事件（實測），所以背面朝外時
+     點中央命中的是背面的內容，不需要額外的 pointer-events 補丁。 */
+  .slot{perspective:900px}
+  .slot .flip{display:grid;flex:1;transform-style:preserve-3d}
+  .slot .face{grid-area:1/1;backface-visibility:hidden;display:flex;flex-direction:column}
+  .slot .face.back{transform:rotateY(180deg)}
+  .slot[data-face="back"] .flip{transform:rotateY(180deg)}
+  .slot .faceopen{display:flex;flex-direction:column;text-align:left;width:100%;flex:1}
+  /* 翻面按鈕走一般流排在最後、靠右，不用絕對定位 ——
+     絕對定位會蓋到照片或心得，而且不計入高度；這樣排它永遠不會重疊。
+     44px 是 spec §3.3 的最小點擊區要求（手機誤觸）。 */
+  .slot .flipbtn{
+    align-self:flex-end;margin-top:auto;min-width:44px;min-height:44px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;opacity:.4;border-radius:2px;
+  }
+  .slot .flipbtn:hover,.slot .flipbtn:focus-visible{opacity:.9}
+
   /* 說明頁的三張卡不要固定高度，讓它跟著文案長。
      .slot 的 min-height:270px 是給月份頁的活動格子用的 —— 蓋章前要先留出章的位置，
      所以那邊必須維持。說明頁沒有章，固定高度只會在文案短的時候留一大片空白，

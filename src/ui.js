@@ -318,28 +318,56 @@ export function callbackHTML(S, act) {
   </div>`;
 }
 
+// 翻面按鈕。**必須是 .faceopen 的兄弟不是子孫** —— 按鈕不能巢狀（無效的 HTML），
+// 而且既有的事件委派是 e.target.closest("[data-act]")：放在外面的話，
+// 點按鈕會先找到 flip、點面上其他地方會找到 open，天生就對，
+// 不需要 stopPropagation。放進去的話兩者都會變成 open。
+//
+// 44px 的最小點擊區是 spec §3.3 的要求：手機一格佔滿寬度，滑動時很容易誤觸，
+// 所以翻面只能由這顆觸發，不能「點整格就翻」。
+function flipBtnHTML(id, to) {
+  return `<button class="flipbtn" data-act="flip" data-id="${id}" data-to="${to}" aria-label="${to === "back" ? "翻到背面" : "翻到正面"}">↻</button>`;
+}
+
+// CATNAME 取不到就印空字串。取不到代表有人改了 category 名稱，
+// 那時候該壞的是順序（排到最後），不是在畫面上出現「undefined」四個字。
+//
+// 這段刻意是 JS 註解而不是 template literal 裡的 HTML 註解：
+// 放進 template 的話它會變成輸出的一部分，而 test/ui-order.test.mjs 的
+// mutation 測試斷言的正是「輸出裡不准出現 undefined 這個字」——
+// 註解自己會把那個測試弄紅。另外 slotHTML 每次整頁渲染會被呼叫 33 次，
+// HTML 註解等於同一段文字送 33 份到瀏覽器。
+//
+// 未蓋章**不產生背面的 DOM**（spec §3.1）：沒有東西可以翻到時不該有翻面按鈕，
+// 而一個空的背面只會被讀螢幕的人聽到、被下一個人誤以為是 bug。
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
+  const face = faceOf(S, a);
   const anim = st && S.justStamped === a.id;
   if (anim) S.justStamped = null;
-  // CATNAME 取不到就印空字串。取不到代表有人改了 category 名稱，
-  // 那時候該壞的是順序（排到最後），不是在畫面上出現「undefined」四個字。
-  //
-  // 這段刻意是 JS 註解而不是 template literal 裡的 HTML 註解：
-  // 放進 template 的話它會變成輸出的一部分，而 test/ui-order.test.mjs 的
-  // mutation 測試斷言的正是「輸出裡不准出現 undefined 這個字」——
-  // 註解自己會把那個測試弄紅。另外 slotHTML 每次整頁渲染會被呼叫 33 次，
-  // HTML 註解等於同一段文字送 33 份到瀏覽器。
-  return `<button class="slot" data-act="open" data-id="${a.id}" data-done="${st ? 1 : 0}">
-    <span class="cat">${esc(CATNAME[a.category] || "")}</span>
-    <span class="ttl">${esc(a.title_zh)}</span>
-    <span class="en">${esc(a.title_en)}</span>
-    ${st ? `<span class="hint">${esc(a.description)}</span>${stampHTML(a, st, anim)}
-        ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
-        ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}`
-      : `<span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
-  </button>`;
+
+  const front = `<div class="face front" aria-hidden="${face === "back"}">
+      <button class="faceopen" data-act="open" data-id="${a.id}">
+        <span class="cat">${esc(CATNAME[a.category] || "")}</span>
+        <span class="ttl">${esc(a.title_zh)}</span>
+        <span class="en">${esc(a.title_en)}</span>
+        <span class="hint">${esc(a.description)}</span>
+        ${st ? "" : `<span class="cta">蓋章 →</span>`}
+      </button>
+      ${st ? flipBtnHTML(a.id, "back") : ""}
+    </div>`;
+
+  const back = !st ? "" : `<div class="face back" aria-hidden="${face === "front"}">
+      ${stampHTML(a, st, anim)}
+      ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
+      ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}
+      ${flipBtnHTML(a.id, "front")}
+    </div>`;
+
+  return `<div class="slot" data-id="${a.id}" data-done="${st ? 1 : 0}" data-face="${face}">
+    <div class="flip">${front}${back}</div>
+  </div>`;
 }
 
 // ┌──────────────────────────────────────────────────────────────────────────┐

@@ -13,7 +13,7 @@ let S = {
   profile: null, stamps: {}, entries: {},
   activities: [], months: [],
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-  down: false, justStamped: null
+  down: false, justStamped: null, flipped: {}, justFlipped: null
 };
 
 function compress(file, maxDim, quality) {
@@ -231,6 +231,15 @@ document.addEventListener("click", async e => {
   // 邊界問 pagesOf，不要自己算 months.length —— 書裡不是只有月份頁。
   if (act === "next") { S.page = Math.min(UI.pagesOf(S).length - 1, S.page + 1); render(); return; }
   if (act === "go") { S.page = Number(b.dataset.p); render(); return; }
+  // 翻面。只改介面狀態，不碰資料庫 —— 哪一面朝上不是護照內容（spec §4）。
+  if (act === "flip") {
+    const id = b.dataset.id;
+    S.flipped[id] = b.dataset.to;
+    S.justFlipped = id;
+    render();
+    return;
+  }
+
   if (act === "open") { openModal(b.dataset.id); return; }
   if (act === "close") { const d = document.getElementById("scrim"); if (d) d.remove(); return; }
   if (act === "stamp") { doStamp(b.dataset.id); return; }
@@ -395,7 +404,7 @@ document.addEventListener("click", async e => {
       authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-      down: false, justStamped: null
+      down: false, justStamped: null, flipped: {}, justFlipped: null
     });
     render();
     return;
