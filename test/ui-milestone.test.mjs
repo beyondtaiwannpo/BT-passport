@@ -1,7 +1,7 @@
 // 里程碑的狀態計算。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { milestoneState } from "../src/ui.js";
+import { milestoneState, barHTML, idPageHTML } from "../src/ui.js";
 
 const MS = [
   { id: "m22", threshold: 22, title_zh: "二十二", title_en: "TBD", description: "d" },
@@ -9,6 +9,10 @@ const MS = [
   { id: "m33", threshold: 33, title_zh: "三十三", title_en: "TBD", description: "d" },
   { id: "m11", threshold: 11, title_zh: "十一",   title_en: "TBD", description: "d" }
 ];
+
+const PROFILE = { id: "00000000-0000-0000-0000-000000000000", name_zh: "王小明",
+                   name_en: "Ming Wang", team: "Sponsorship Team", issued: "2026-08-22" };
+
 const stateWith = n => ({
   milestones: MS,
   stamps: Object.fromEntries(Array.from({ length: n }, (_, i) => [`a${i}`, { date: "2026-09-01" }]))
@@ -58,4 +62,42 @@ test("milestones 是 undefined 時也不炸", () => {
   const s = milestoneState({ stamps: {} });
   assert.deepEqual(s.list, []);
   assert.equal(s.next, null);
+});
+
+test("頂欄的數字與里程碑用的數字永遠同源", () => {
+  // 使用者指定要釘住這件事：之後有人改其中一個，另一個要跟著紅。
+  // 做法是從 barHTML 的輸出把那個數字抓出來，跟 milestoneState 的 done 比。
+  // 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
+  for (const n of [0, 1, 5, 17, 33]) {
+    const S = { ...stateWith(n), activities: [], view: "passport" };
+    const shown = barHTML(S).match(/<\/small>(\d+) <span/);
+    assert.ok(shown, `barHTML 的數字抓不到（n=${n}），格式可能被改了`);
+    assert.equal(Number(shown[1]), milestoneState(S).done, `n=${n} 兩邊不一致`);
+  }
+});
+
+test("全部達成之後，頂欄不再顯示「還差幾個」", () => {
+  const S = { ...stateWith(33), activities: [], view: "passport" };
+  assert.ok(!barHTML(S).includes("下一個里程碑"));
+});
+
+test("還沒全部達成時，頂欄顯示正確的差額", () => {
+  const S = { ...stateWith(3), activities: [], view: "passport" };
+  assert.ok(barHTML(S).includes("下一個里程碑還差 2 個章"));
+});
+
+test("資料頁列出全部里程碑，未達成的標成鎖定", () => {
+  const S = { ...stateWith(11), activities: [], profile: PROFILE };
+  const html = idPageHTML(S);
+  assert.equal((html.match(/class="slot" data-locked="0"/g) || []).length, 2, "5 與 11 已達成");
+  assert.equal((html.match(/class="slot" data-locked="1"/g) || []).length, 2, "22 與 33 鎖定");
+  assert.ok(html.includes("22 個章 · 鎖定"));
+  assert.ok(html.includes("5 個章 · 已達成"));
+});
+
+test("沒有里程碑時，資料頁整塊不出現、頂欄也不多一行", () => {
+  // 這是 milestones 讀取失敗時的實際表現（data.js 回空陣列）。
+  const S = { milestones: [], stamps: {}, activities: [], profile: PROFILE, view: "passport" };
+  assert.ok(!idPageHTML(S).includes("mstones"));
+  assert.ok(!barHTML(S).includes("下一個里程碑"));
 });

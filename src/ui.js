@@ -107,7 +107,7 @@ export function mrz(p) {
 }
 
 export function barHTML(S) {
-  const done = Object.keys(S.stamps).length;
+  const ms = milestoneState(S);
   return `<div class="bar">
     <img src="./logo.png" alt="Beyond Taiwan">
     <div class="tabs" role="tablist">
@@ -116,7 +116,7 @@ export function barHTML(S) {
     </div>
     <button class="btn ghost sm" data-act="signout">登出</button>
     <div class="sp"></div>
-    <div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
+    <div class="prog"><small>Stamps collected</small>${ms.done} <span style="opacity:.4">/ ${S.activities.length}</span>${ms.next ? `<small class="next">下一個里程碑還差 ${ms.remaining} 個章</small>` : ""}</div>
   </div>`;
 }
 
@@ -201,6 +201,7 @@ export function idPageHTML(S) {
       </div>
     </div>
     ${done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
+    ${milestonesHTML(S)}
     <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
     <div class="row" style="margin-top:18px">
       <button class="btn ghost sm" data-act="edit">編輯資料</button>
@@ -208,6 +209,28 @@ export function idPageHTML(S) {
       <button class="btn ghost sm" data-act="import">匯入還原</button>
       <button class="btn sm quiet" data-act="reset">清除這本護照</button>
     </div>`;
+}
+
+// 資料頁的里程碑清單。位置在標語之後、機讀碼之前。
+// 已達成的正常顯示，未達成的降低透明度但**門檻數字與名字都看得到** ——
+// 使用者的要求是「要讓人看得到還有什麼在前面」。
+//
+// 狀態同時寫在 .cat 的文字裡（「5 個章 · 已達成」／「5 個章 · 鎖定」），
+// 不只靠透明度：只靠顏色的話，讀螢幕的人與色覺不同的人拿不到這個資訊。
+//
+// 卡片是 <div class="slot"> 不是 <button>：它不可點，沒有任何動作。
+function milestonesHTML(S) {
+  const ms = milestoneState(S);
+  if (!ms.list.length) return "";   // 沒有里程碑（含讀取失敗）就整塊不出現
+  return `<div class="mstones-h">Milestones / 里程碑</div>
+    <div class="slots mstones">${ms.list.map(m => {
+      const got = ms.done >= m.threshold;
+      return `<div class="slot" data-locked="${got ? 0 : 1}">
+        <span class="cat">${m.threshold} 個章 · ${got ? "已達成" : "鎖定"}</span>
+        <span class="ttl">${esc(m.title_zh)}</span>
+        ${m.description ? `<span class="hint">${esc(m.description)}</span>` : ""}
+      </div>`;
+    }).join("")}</div>`;
 }
 
 export function stampHTML(act, st, animate) {
