@@ -196,6 +196,20 @@ else
   bad "src/data.js 的 firstError 清單被動過，milestones 失敗會拖垮整本護照"
 fi
 
+# 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
+# barHTML 的「N / 33」、idPageHTML 的 FULL 疊印、里程碑的達成判斷，全部吃它的結果。
+# 這條守的是架構不是行為，測試碰不到：兩邊各自用同一條公式算一次的話，
+# 算出來永遠一樣，任何比對結果的測試都會是綠的（2026-08-25 實測，42 個測試全綠）。
+# 真正會出事的是有人只改了其中一處的定義 —— 那時候畫面上兩個數字會不一致，
+# 而沒有任何東西會報錯。
+n=$(grep -c 'Object\.keys(S\.stamps)\.length' src/ui.js)
+if [ "$n" = "1" ]; then
+  ok "章的數量只在 milestoneState 裡數一次"
+else
+  bad "src/ui.js 有 $n 處在數 S.stamps，應該只有 milestoneState 那一處"
+  grep -n 'Object\.keys(S\.stamps)\.length' src/ui.js
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #

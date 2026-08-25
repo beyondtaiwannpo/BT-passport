@@ -64,15 +64,19 @@ test("milestones 是 undefined 時也不炸", () => {
   assert.equal(s.next, null);
 });
 
-test("頂欄的數字與里程碑用的數字永遠同源", () => {
-  // 使用者指定要釘住這件事：之後有人改其中一個，另一個要跟著紅。
-  // 做法是從 barHTML 的輸出把那個數字抓出來，跟 milestoneState 的 done 比。
-  // 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
+test("頂欄顯示的數字等於 milestoneState 的 done", () => {
+  // 這條驗的只是顯示端有沒有把 milestoneState(S).done 印錯（例如印成 done+1、
+  // 或印成 S.activities.length）——**不是**「兩邊各自算的結果永遠同源」。
+  // milestoneState 是純函式，同一個 S 呼叫兩次結果必然相同，所以拿 barHTML 的輸出
+  // 跟「再呼叫一次 milestoneState(S).done」比較是恆真的：2026-08-25 審查實測過，
+  // 把 barHTML 改回自己用 Object.keys(S.stamps).length 算一次，這條照樣綠。
+  // 「章的數量整份 src/ui.js 只准算一次」這件事測試碰不到，是架構性質，
+  // 改由 check.sh 用 grep 守（見該檔案「章的數量」那條）。
   for (const n of [0, 1, 5, 17, 33]) {
     const S = { ...stateWith(n), activities: [], view: "passport" };
     const shown = barHTML(S).match(/<\/small>(\d+) <span/);
     assert.ok(shown, `barHTML 的數字抓不到（n=${n}），格式可能被改了`);
-    assert.equal(Number(shown[1]), milestoneState(S).done, `n=${n} 兩邊不一致`);
+    assert.equal(Number(shown[1]), milestoneState(S).done, `n=${n} 顯示的數字跟 done 不一致`);
   }
 });
 

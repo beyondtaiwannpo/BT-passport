@@ -68,8 +68,9 @@ function orderSlots(acts) {
 // 里程碑的狀態**只有這一個定義點**。頂欄那行提示與資料頁的清單都問它，
 // 不准任何一邊自己再算一次 —— 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
 //
-// done 用 Object.keys(S.stamps).length，跟 barHTML 的那個數字**同源**。
-// test/ui-milestone.test.mjs 有一條測試釘住這件事。
+// done 直接數 S.stamps 的鍵，而且整個檔案只准在這裡數一次 ——
+// check.sh 用 grep 守住這件事（見該檔案「章的數量」那條）。
+// test/ui-milestone.test.mjs 另外驗顯示端（barHTML）有沒有把這個數字印錯。
 //
 // 沒有「誰達成了什麼」的資料表，達成與否一律即時算（見 supabase/schema.sql 的註解）。
 export function milestoneState(S) {
@@ -179,7 +180,7 @@ export function idPageHTML(S) {
   const p = S.profile;
   const [l1, l2] = mrz(p);
   const av = S.profile.avatar ? `<img src="${esc(S.profile.avatar)}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
-  const done = Object.keys(S.stamps).length;
+  const done = milestoneState(S).done;
   const total = S.activities.length;
   return `<div class="mhead">
       <div class="mnum">00</div>
