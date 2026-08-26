@@ -211,13 +211,22 @@ else
 fi
 
 # 長英文字串與網址會把 grid 的 1fr 撐開，三格寬度重新分配（實測 158/633/129，
-# 正常是 282 三等分）。修法是 .slot 的 min-width:0 加上內容的 overflow-wrap:anywhere，
-# **兩個缺一不可**。單元測試碰不到這件事（是版面寬度，要真瀏覽器才量得到），
-# 而且它不會有橫向捲軸、不像跑版，只像「某一格怪怪的」，人工也不容易發現。
+# 正常是 282 三等分）。修法是 .slot 的 min-width:0 加上內容的 overflow-wrap:anywhere。
+#
+# 2026-08-25 實測推翻了「兩個缺一不可」這個原本的說法：單獨的 overflow-wrap:anywhere
+# 就足以讓三欄維持 282/282/282（它會被計入 min-content 尺寸計算，不同於舊式的
+# word-break:break-word）；只留 min-width:0 的話欄寬也不會壞，但文字不斷行、
+# 溢出格子邊界約 308px——換一種形狀的視覺 bug，不是「缺一不可」。
+# 兩個都留是防禦深度：overflow-wrap 只斷得了文字，min-width:0 擋的是斷不了的東西
+# （比格子寬的圖、<pre>、white-space:nowrap 的元素），兩者擋的是不同的東西，
+# 只是在「長英文字串」這個案例上剛好重疊，所以兩個條件都要成立才 ok。
+#
+# 單元測試碰不到這件事（是版面寬度，要真瀏覽器才量得到），而且它不會有橫向捲軸、
+# 不像跑版，只像「某一格怪怪的」，人工也不容易發現。
 if grep -qE '^\s*min-width:0;' index.html && grep -q 'overflow-wrap:anywhere' index.html; then
-  ok "長字串不會撐開格子（min-width:0 + overflow-wrap:anywhere）"
+  ok "長字串不會撐開格子（min-width:0 防斷不了的內容、overflow-wrap:anywhere 防長字串）"
 else
-  bad "index.html 少了 min-width:0 或 overflow-wrap:anywhere，長英文字串會把格子撐寬"
+  bad "index.html 少了 min-width:0 或 overflow-wrap:anywhere——少 overflow-wrap 會讓長英文字串撐寬格子，少 min-width:0 則會讓斷不了的內容溢出格子邊界"
 fi
 
 # 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
