@@ -365,16 +365,32 @@ function milestonesHTML(S) {
     }).join("")}</div>`;
 }
 
-export function stampHTML(act, st, animate) {
+function stampInner(act, st, extraClass) {
   const ink = act.category === "gather" ? "ink-fill" : "ink-navy";
   const rot = ((act.id.charCodeAt(2) * 7) % 11) - 5;   // 角度由 id 決定，固定不變（spec §7.1）
   return `<div class="stampwrap"><div class="tilt" style="transform:rotate(${rot}deg)">
-    <div class="stamp ${ink}${animate ? " land" : ""}">
+    <div class="stamp ${ink}${extraClass ? " " + extraClass : ""}">
       <div class="s1">Beyond Taiwan</div>
       <div class="s2">${esc(act.title_en)}</div>
       <div class="s3">${esc(st.date).replace(/-/g, ".")}</div>
     </div>
   </div></div>`;
+}
+
+// tearing 為真時（S.tearing === 這一格的 id，撕掉這格的動畫正在播）：
+// 章裂成左右兩半各自往下掉，不是直接消失（Task 7，spec §9.7）。
+// 兩半是**同一份章渲染兩次**，各自套一個 clip-path（鋸齒裂口，兩個互補）
+// 與一個方向相反的動畫，.tearwrap 用 grid 把兩半疊在同一格 ——
+// 跟上面 .slot .flip 疊放正反面同一個手法（見 index.html 對應的註解）。
+// reduce 開啟時 main.js 根本不會把 tearing 設起來，這個分支走不到。
+export function stampHTML(act, st, animate, tearing) {
+  if (tearing) {
+    return `<div class="tearwrap">
+      <div class="tearhalf l">${stampInner(act, st)}</div>
+      <div class="tearhalf r">${stampInner(act, st)}</div>
+    </div>`;
+  }
+  return stampInner(act, st, animate ? "land" : "");
 }
 
 // 入境章。spec §三 —— MONTH CLEARED 說的是「你完成了」，這個說的是「你到過那裡」。
@@ -507,6 +523,14 @@ export function slotHTML(S, a) {
   const turn = S.justFlipped === a.id;
   if (turn) S.justFlipped = null;
 
+  // 撕掉這格的動畫（Task 7）。**不讀了就消耗掉** —— 跟 justStamped/justFlipped
+  // 不一樣：S.tearing 要撐過好幾次 render()（動畫播完之前使用者可能翻頁、
+  // main.js 的 animationend/flush 都還沒觸發），提早消耗掉會讓下一次重繪
+  // 看到的又是還沒撕開的完整章，裂口動畫會被打斷、看起來像沒撕。
+  // 真正的一次性保護在 main.js 的 doUnstamp 裡（刪掉 S.stamps[id] 之後
+  // S.tearing 才歸零），不是這裡。
+  const tearing = !!st && S.tearing === a.id;
+
   // data-act 掛在 .face.front 上而不是只掛在 .faceopen 上：章是 <div>，
   // 而按鈕的內容模型只允許 phrasing content，所以章不能放進 .faceopen 裡
   // （跟 .slot 當初從 button 改成 div 是同一個理由）。
@@ -518,7 +542,7 @@ export function slotHTML(S, a) {
         <span class="ttl">${esc(a.title_zh)}</span>
         ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
       </button>
-      ${st ? stampHTML(a, st, anim) + flipBtnHTML(a.id, "back") : ""}
+      ${st ? stampHTML(a, st, anim, tearing) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
 
   const back = !st ? "" : `<div class="face back" aria-hidden="${face === "front"}">

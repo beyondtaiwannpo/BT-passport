@@ -13,7 +13,7 @@ let S = {
   profile: null, stamps: {}, entries: {},
   activities: [], months: [], destinations: [], visas: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-  down: false, justStamped: null, flipped: {}, justFlipped: null
+  down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
 };
 
 function compress(file, maxDim, quality) {
@@ -172,10 +172,57 @@ async function doStamp(id) {
   }
 }
 
+// 真正執行「撕掉這格」刪除的地方。三個觸發點共用：reduce 開啟時直接呼叫、
+// 動畫播完的 animationend 呼叫、以及使用者在動畫沒播完就做下一個動作時的
+// flush（見下面 click/keydown 的處理，補的是 spec §9.7 裁定裡的一個洞——
+// 只靠 animationend 的話，翻頁會把還在動畫的元素換掉，事件永遠不會觸發，
+// 章看起來沒了但資料庫那一列還在）。
+// 寫成一個函式而不是三處各寫一次 —— 三個地方各寫一次，改了其中一處
+// 另外兩處會靜靜地說謊（跟 SLOT_ORDER、faceOf、syncVisas 同一條原則）。
+//
+// 一次性保護：S.stamps[id] 已經不在就代表已經被刪過（三個觸發點裡的另一個
+// 先跑到了），直接不做事。不用額外的旗標比對——刪除本身就是那個旗標。
+//
+// **S.visas 那一列不要動**（spec §9.10）：撕掉的語意是「這一格記錯了」，
+// 不是「這個月沒發生過」。重蓋回來要拿到同一個城市。
+//
+// 失敗要還原：先留住被刪的兩個值，catch 裡放回去再 render()，
+// 不然失敗只跳一句 toast、畫面上章已經不見，重整之後章又回來
+// —— 使用者會以為自己眼花。
+async function doUnstamp(id) {
+  if (!S.stamps[id]) return;
+  const stampBackup = S.stamps[id];
+  const entryBackup = S.entries[id];
+  delete S.stamps[id];
+  delete S.entries[id];
+  // faceOf 對未蓋章一律回 "front"，但 S.flipped[id] 要一起清掉，
+  // 否則留著一個指向不存在的背面的狀態。
+  delete S.flipped[id];
+  S.tearing = null;
+  render();
+  try {
+    await DATA.removeStamp(id);
+    toast("撕掉了。");
+  } catch (e) {
+    S.stamps[id] = stampBackup;
+    S.entries[id] = entryBackup;
+    render();
+    toast("沒有存起來，再試一次。");
+  }
+}
+
 /* ---------- events ---------- */
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
+
+  // flush：撕章動畫還沒播完，使用者已經按了下一個動作（翻頁、開別的卡……）。
+  // 那個動作幾乎一定會 render()，把還在動畫的元素連根換掉，animationend
+  // 永遠不會再觸發。這裡先把上一格真的刪掉，資料才不會卡在「畫面上看起來
+  // 沒了、資料庫那一列還在」的狀態（見 doUnstamp 上面的裁定）。
+  // 不 await：doUnstamp 到第一個 await 之前是同步的（刪 state、render()），
+  // 那一段會在這裡就跑完，接下來要處理的這個新動作看到的已經是刪完的狀態。
+  if (S.tearing) doUnstamp(S.tearing);
 
   if (act === "switch-auth") { S.authMode = b.dataset.m; S.authMsg = ""; render(); return; }
 
@@ -266,16 +313,21 @@ document.addEventListener("click", async e => {
   if (act === "unstamp") {
     const id = b.dataset.id;
     if (!confirm("撕掉這格？日期、心得和照片都會不見。")) return;
-    delete S.stamps[id];
-    delete S.entries[id];
     const d = document.getElementById("scrim"); if (d) d.remove();
-    render();
-    try {
-      await DATA.removeStamp(id);
-      toast("撕掉了。");
-    } catch (e) {
-      toast("沒有存起來，再試一次。");
+    // 在呼叫的當下求值，不要存成模組層級的常數 —— 使用者可以隨時在
+    // 系統設定裡切換這個偏好，存起來的話開著這個分頁的人切了也不會生效。
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      // reduce 為真：不演，直接刪。animation:none 時 animationend 永遠
+      // 不會觸發，只靠事件的話章會卡在畫面上、資料永遠不刪（spec §9.7）。
+      doUnstamp(id);
+      return;
     }
+    // reduce 為否：先讓畫面播裂開的動畫，animationend 觸發才真的刪
+    // （見上面的 animationend 監聽器與 doUnstamp）。這裡刻意不用
+    // setTimeout 串接 —— 既有裁定：計時器會跟下一次 render() 競態。
+    S.tearing = id;
+    render();
     return;
   }
 
@@ -435,7 +487,7 @@ document.addEventListener("click", async e => {
       authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {}, visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
-      down: false, justStamped: null, flipped: {}, justFlipped: null
+      down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
     });
     render();
     return;
@@ -447,8 +499,24 @@ document.addEventListener("keydown", e => {
   if (document.getElementById("scrim") || !S.profile) return;
   if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (S.view !== "passport") return;
+  // 跟 click 那邊同一條裁定：方向鍵翻頁一樣會把還在撕的元素換掉。
+  if (S.tearing && (e.key === "ArrowLeft" || e.key === "ArrowRight")) doUnstamp(S.tearing);
   if (e.key === "ArrowLeft" && S.page > 0) { S.page--; render(); }
   if (e.key === "ArrowRight" && S.page < UI.pagesOf(S).length - 1) { S.page++; render(); }
+});
+
+// animationend 是撕章動畫的主要觸發點（另一個是上面的 flush）。
+// 三個陷阱都在這裡處理：
+//   1. 冒泡——這一頁每個動畫（.stamp.land、.page.turn、.overprint.land、
+//      .flip.turning-*）都會觸發它，一定要用 e.animationName 過濾，
+//      不能用 target 的 class（class 會變）。
+//   2. 兩半（tearL、tearR）各觸發一次——只認 tearL 這一個名字，
+//      另一半的事件會被這條 if 直接濾掉，不會跑到第二次 doUnstamp。
+//   3. 監聽器掛在 document 上：render() 只換 #bt-root 的 innerHTML，
+//      不會把掛在 document 上的監聽器一起換掉。
+document.addEventListener("animationend", e => {
+  if (!S.tearing || e.animationName !== "tearL") return;
+  doUnstamp(S.tearing);
 });
 
 /* ---------- boot ---------- */

@@ -313,6 +313,21 @@
     55%{transform:scale(.93) rotate(2deg);opacity:.95}
     100%{opacity:.86}
   }
+  /* 撕掉這格（Task 7，spec §9.7）。章不是直接消失，是裂成兩半各自往下掉。
+     .tearwrap 用 grid 把兩半疊在同一格 —— 跟下面 .slot .flip 疊放正反面
+     同一個手法，容器大小自動貼合內容，不用額外量。
+     兩半是**同一份章渲染兩次**（見 ui.js 的 stampHTML），各自套一組
+     互補的鋸齒 clip-path（逐字照用需求裡給的路徑）與一個方向相反的動畫。
+     main.js 只在 prefers-reduced-motion 為否時才會渲染出這個分支；
+     reduce 為真時直接刪，不會有 .tearwrap 出現，這裡的動畫也就不會被用到——
+     但機器守門（check-motion.mjs）認的是「宣告了 animation 的選擇器」，
+     不看使用不使用得到，所以下面 reduce 區塊那一行還是要加。 */
+  .tearwrap{display:grid}
+  .tearhalf{grid-area:1/1}
+  .tearhalf.l{clip-path:polygon(0% 0%,48% 0%,52% 10%,47% 20%,53% 30%,48% 40%,52% 50%,47% 60%,53% 70%,48% 80%,52% 90%,47% 100%,0% 100%);animation:tearL .5s ease forwards}
+  .tearhalf.r{clip-path:polygon(48% 0%,100% 0%,100% 100%,47% 100%,52% 90%,48% 80%,53% 70%,47% 60%,52% 50%,48% 40%,53% 30%,47% 20%,52% 10%);animation:tearR .5s ease forwards}
+  @keyframes tearL{to{transform:translateY(70px) rotate(-16deg);opacity:0}}
+  @keyframes tearR{to{transform:translateY(70px) rotate(16deg);opacity:0}}
   /* 翻面用 animation 不用 transition：main.js 的 render() 是 el.innerHTML = ...，
      整棵子樹每次都被拆掉重建，transition 永遠不會跑（要過渡的元素沒活到下一幀）。
      既有的 .stamp.land 與 .page.turn 會動也正是這個原因。
@@ -701,8 +716,11 @@
        .overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
        它跟 .stamp.land 共用同一組 land keyframe，卻一直漏在這條規則外面 ——
        因為它只在集滿的那一刻出現，平常根本測不到。2026-08-18 做 §11-17
-       驗收時用 CSSOM 逐條比對才抓到。新增動畫時記得回來加進這一行。 */
-    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front{animation:none}
+       驗收時用 CSSOM 逐條比對才抓到。新增動畫時記得回來加進這一行。
+       2026-08-26 加了 .tearhalf.l、.tearhalf.r（Task 7，撕掉這格裂成兩半
+       往下掉的動畫）——這個分支 reduce 為真時 main.js 根本不會渲染出來，
+       但守門認的是宣告，不是用不用得到，一樣要列進來。 */
+    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r{animation:none}
   }
 </style>
 </head>
