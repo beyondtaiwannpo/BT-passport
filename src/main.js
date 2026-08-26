@@ -400,9 +400,17 @@ document.addEventListener("click", async e => {
     // 用 Object.assign 就地覆寫而不是 S = {...}：後者會把沒列到的 key 整個丟掉。
     // 注意 user 不在清單裡——清除的是護照內容不是登入狀態，就地覆寫不列它
     // 就等於不動它，不需要像原本的寫法那樣特地寫 user: S.user 才能保住它。
+    //
+    // **判準是「參考資料還是護照內容」**，不是「初始 state 有沒有這個 key」。
+    // activities、months、milestones、destinations 是參考資料，全站共用、
+    // 跟這個人清不清除無關，所以不列。stamps、entries、visas 是護照內容，要列。
+    // visas 在這裡：城市是「我到過哪裡」，清除這本護照就是把那句話一起清掉
+    // （spec §9.11；資料庫那一側的 delete 見 DATA.clearAll）。
+    // destinations 2026-08-26 一度被列進來過 —— 那是控制端 brief 寫錯，
+    // 它直接牴觸上面那行「要保留的（user、activities、months、milestones⋯）」。
     Object.assign(S, {
       authMode: "in", authMsg: "",
-      profile: null, stamps: {}, entries: {}, destinations: [], visas: {},
+      profile: null, stamps: {}, entries: {}, visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
       down: false, justStamped: null, flipped: {}, justFlipped: null
     });
