@@ -281,6 +281,22 @@ else
   bad "找不到 node，單元測試沒有跑到（這不是通過）"
 fi
 
+# prefers-reduced-motion 的涵蓋率。**這是無障礙需求不是視覺偏好**，所以由機器守門，
+# 不只寫在 CSS 裡（使用者 2026-08-25 的裁定）。
+# 2026-08-18 那次 .overprint.land 漏在 reduce 之外，是人工逐條比對才抓到的 ——
+# 它只在集滿 33 格那一刻出現，平常測不到。這支讓那件事不可能再發生。
+if command -v node >/dev/null 2>&1; then
+  motion=$(node check-motion.mjs 2>&1)
+  if [ $? -eq 0 ]; then
+    ok "reduced-motion 涵蓋所有動畫（${motion}）"
+  else
+    bad "有動畫沒有被 prefers-reduced-motion 關掉："
+    printf '%s\n' "$motion"
+  fi
+else
+  bad "找不到 node，reduced-motion 檢查沒有跑到（這不是通過）"
+fi
+
 # CNAME 不可掉
 if [ -f CNAME ]; then
   ok "CNAME 存在"
