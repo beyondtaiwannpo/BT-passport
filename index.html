@@ -314,15 +314,10 @@
      —— 那是拿一個穩定的架構去換一個動畫（spec §5.1）。 */
   @keyframes flipToBack{from{transform:rotateY(0)}to{transform:rotateY(180deg)}}
   @keyframes flipToFront{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+  /* 這兩個動畫現在只由手動翻面觸發：章移到正面之後（2026-08-25 設計改動，見
+     spec §5.2），蓋章不再先翻面，兩段時序的串接已經拿掉。 */
   .flip.turning-back{animation:flipToBack .42s ease}
   .flip.turning-front{animation:flipToFront .42s ease}
-  /* 蓋章之後：先翻面、翻完再落章。用 animation-delay 串接**不要用 JS 計時器** ——
-     計時器會跟下一次 render() 競態（使用者在動畫沒跑完時翻頁或蓋下一個章，
-     計時器仍然會觸發，而它要操作的 DOM 已經不在了）。animation-delay 沒有這個問題：
-     元素被移除，動畫跟著消失。
-     animation-fill-mode:backwards 不可省：land 的 0% 是 opacity 0，
-     少了它的話章會在延遲的那 .42 秒裡先以最終樣子出現，然後才彈一次。 */
-  .flip.turning-back .stamp.land{animation-delay:.42s;animation-fill-mode:backwards}
   /* top:60px 是量出來的，不是目測。疊印**刻意**壓住右上角的時刻
      （.mtheme.clock）——那是使用者的裁定：真的入境章也會壓到頁碼和邊框，
      章壓過底下的東西是章該有的樣子，不要「修掉」。

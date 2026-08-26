@@ -88,14 +88,15 @@ export function milestoneState(S) {
 // 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
 // milestoneState 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
 //
-// 未蓋章一律回 "front"，而且**不看 S.flipped** —— 未蓋章的格子根本不產生背面的 DOM
+// 一律預設正面 —— 章在那裡（見 spec §1.1）。未蓋章一律回 "front"，
+// 而且**不看 S.flipped** —— 未蓋章的格子根本不產生背面的 DOM
 // （spec §3.1），所以「翻到背面」是一個不存在的狀態，不該讓它表達得出來。
 //
 // S.flipped 只活在 session 裡：不進資料庫、不進備份檔、不進 localStorage。
 // 它是介面狀態不是護照內容（spec §4）。
 export function faceOf(S, a) {
   if (!S.stamps[a.id]) return "front";
-  return (S.flipped || {})[a.id] === "front" ? "front" : "back";
+  return (S.flipped || {})[a.id] === "back" ? "back" : "front";
 }
 
 // 中文月名是語言常數，不是活動內容，可以留在程式裡（spec §5 只禁止活動內容寫死）。
@@ -340,6 +341,10 @@ function flipBtnHTML(id, to) {
 //
 // 未蓋章**不產生背面的 DOM**（spec §3.1）：沒有東西可以翻到時不該有翻面按鈕，
 // 而一個空的背面只會被讀螢幕的人聽到、被下一個人誤以為是 bug。
+//
+// 2026-08-25 設計改動（spec §1.1）：章移到正面、說明退到背面。已蓋章的正面
+// 是分類、標題、章、翻面按鈕；背面是說明、心得、照片。理由是章才是這本護照的
+// 主角，說明是「還沒蓋章時才需要」的東西。
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
@@ -351,19 +356,22 @@ export function slotHTML(S, a) {
   const turn = S.justFlipped === a.id;
   if (turn) S.justFlipped = null;
 
-  const front = `<div class="face front" aria-hidden="${face === "back"}">
+  // data-act 掛在 .face.front 上而不是只掛在 .faceopen 上：章是 <div>，
+  // 而按鈕的內容模型只允許 phrasing content，所以章不能放進 .faceopen 裡
+  // （跟 .slot 當初從 button 改成 div 是同一個理由）。
+  // 掛在外層 div 上讓「整面可點」保住（spec §10 裁定 4），
+  // 而 .faceopen 仍是真按鈕，鍵盤使用者 tab 得到、按 Enter 開得了。
+  const front = `<div class="face front" data-act="open" data-id="${a.id}" aria-hidden="${face === "back"}">
       <button class="faceopen" data-act="open" data-id="${a.id}">
         <span class="cat">${esc(CATNAME[a.category] || "")}</span>
         <span class="ttl">${esc(a.title_zh)}</span>
-        <span class="en">${esc(a.title_en)}</span>
-        <span class="hint">${esc(a.description)}</span>
-        ${st ? "" : `<span class="cta">蓋章 →</span>`}
+        ${st ? "" : `<span class="en">${esc(a.title_en)}</span><span class="hint">${esc(a.description)}</span><span class="cta">蓋章 →</span>`}
       </button>
-      ${st ? flipBtnHTML(a.id, "back") : ""}
+      ${st ? stampHTML(a, st, anim) + flipBtnHTML(a.id, "back") : ""}
     </div>`;
 
   const back = !st ? "" : `<div class="face back" aria-hidden="${face === "front"}">
-      ${stampHTML(a, st, anim)}
+      <span class="hint">${esc(a.description)}</span>
       ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
       ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}
       ${flipBtnHTML(a.id, "front")}

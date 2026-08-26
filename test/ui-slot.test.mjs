@@ -43,20 +43,20 @@ test("faceOf：未蓋章一律正面", () => {
   assert.equal(faceOf({ ...state(), flipped: { "09A": "back" } }, act), "front");
 });
 
-test("faceOf：已蓋章預設背面", () => {
-  assert.equal(faceOf(state({ "09A": { date: "2026-09-05" } }), act), "back");
+test("faceOf：已蓋章預設正面", () => {
+  assert.equal(faceOf(state({ "09A": { date: "2026-09-05" } }), act), "front");
 });
 
-test("faceOf：已蓋章時 flipped 可以覆寫成正面", () => {
-  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "front" } };
-  assert.equal(faceOf(S, act), "front");
+test("faceOf：已蓋章時 flipped 可以覆寫成背面", () => {
+  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "back" } };
+  assert.equal(faceOf(S, act), "back");
 });
 
 test("faceOf：S.flipped 不存在時不炸", () => {
   // 舊形狀的 state，或還沒有人翻過任何一格
   const S = state({ "09A": { date: "2026-09-05" } });
   delete S.flipped;
-  assert.equal(faceOf(S, act), "back");
+  assert.equal(faceOf(S, act), "front");
 });
 
 test("未蓋章：只有正面，沒有背面也沒有翻面按鈕", () => {
@@ -67,18 +67,18 @@ test("未蓋章：只有正面，沒有背面也沒有翻面按鈕", () => {
   assert.match(html, /data-face="front"/);
 });
 
-test("已蓋章：兩面都在，預設背面朝上，兩面各有翻面按鈕", () => {
+test("已蓋章：兩面都在，預設正面朝上，兩面各有翻面按鈕", () => {
   const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
   assert.ok(html.includes('class="face front"'));
   assert.ok(html.includes('class="face back"'));
-  assert.match(html, /data-face="back"/);
+  assert.match(html, /data-face="front"/);
   assert.equal((html.match(/data-act="flip"/g) || []).length, 2, "兩面各一顆");
 });
 
 test("朝外的那一面標 aria-hidden，讀螢幕的人不該聽到兩份內容", () => {
   const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
-  assert.match(html, /class="face front" aria-hidden="true"/);
-  assert.match(html, /class="face back" aria-hidden="false"/);
+  assert.match(html, /class="face front" data-act="open" data-id="09A" aria-hidden="false"/);
+  assert.match(html, /class="face back" aria-hidden="true"/);
 });
 
 test("翻面按鈕的 aria-label 說得出它要去哪一面", () => {
@@ -102,7 +102,9 @@ test("一格仍然只有一個 .slot —— 既有的 slotCount 不能被拆成�
 });
 
 test("剛翻過的那一格帶動畫 class，而且旗標被消耗掉", () => {
-  const S = { ...state({ "09A": { date: "2026-09-05" } }), justFlipped: "09A" };
+  // flipped 明確指到背面：預設已經是正面了（見 faceOf），這裡要測的是
+  // 手動翻到背面那個方向的動畫 class，不能靠預設值。
+  const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "back" }, justFlipped: "09A" };
   const html = slotHTML(S, act);
   assert.match(html, /class="flip turning-back"/);
   assert.equal(S.justFlipped, null, "旗標要被消耗，否則每次重繪都會再播一次");
@@ -116,4 +118,27 @@ test("沒有剛翻過的格子不帶動畫 class", () => {
 test("翻回正面時用的是另一個方向的動畫", () => {
   const S = { ...state({ "09A": { date: "2026-09-05" } }), flipped: { "09A": "front" }, justFlipped: "09A" };
   assert.match(slotHTML(S, act), /class="flip turning-front"/);
+});
+
+test("已蓋章的正面有章、沒有說明", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  const front = html.slice(html.indexOf('class="face front"'), html.indexOf('class="face back"'));
+  assert.ok(front.includes("stampwrap"), "章要在正面");
+  assert.ok(!front.includes(act.description), "說明不該在正面");
+  assert.ok(!front.includes('class="en"'), "英文標題不該在正面（章上已經有了）");
+});
+
+test("已蓋章的背面有說明、沒有章", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  const back = html.slice(html.indexOf('class="face back"'));
+  assert.ok(back.includes(act.description), "說明要在背面");
+  assert.ok(!back.includes("stampwrap"), "章不該在背面");
+});
+
+test("未蓋章的正面維持原樣：說明與蓋章入口都在", () => {
+  const html = slotHTML(state(), act);
+  assert.ok(html.includes(act.description));
+  assert.ok(html.includes("蓋章 →"));
+  assert.ok(html.includes('class="en"'));
+  assert.ok(!html.includes("stampwrap"));
 });
