@@ -365,15 +365,25 @@
     transform:rotate(-11deg);
     color:var(--bt-navy);background:var(--bt-orange);
     opacity:.85;
-    border:3px double currentColor;border-radius:4px;padding:4px 12px;
+    border:3px double currentColor;border-radius:4px;padding:3px 10px;
     display:flex;flex-direction:column;align-items:center;gap:1px;
     font-family:var(--display);font-weight:700;text-align:center;
     filter:url(#bt-ink);
   }
-  .estamp .e1{font-size:9px;letter-spacing:.22em;opacity:.75}
-  .estamp .e2{font-size:17px;letter-spacing:.3em}
-  .estamp .e3{font-size:13px;letter-spacing:.1em}
-  .estamp .e4{font-size:10px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+  /* ── 字級是**用最長的城市**量出來的，不是用 TAIPEI ──
+     旋轉 -11 度之後，外接框的高 = 寬·sin11 + 高·cos11 —— 城市名一長，
+     框變寬，**框就跟著變高**，往下伸進第三格。2026-08-26 實測 1280px（dpr 2）：
+       TAIPEI（6 字母）        寬 129.8  章底減第三格 .cat 頂 = -7.80  不重疊
+       SAN FRANCISCO（13）    寬 251.3  = +4.01  重疊
+       SALT LAKE CITY（14）   寬 252.3  = +4.11  重疊
+     最初的 17px/.3em 只用 TAIPEI 驗過，所以看起來是過的。
+     縮到下面這組之後，最長的城市是 -8.62（餘裕跟 TAIPEI 原本那組同一個量級）。
+     **之後改任何一行的字級或 padding，要拿 SALT LAKE CITY 重量，不要拿 TAIPEI。**
+     四行一起等比縮：.e2 若只縮自己會跟 .e3 一樣大，階層會塌掉。 */
+  .estamp .e1{font-size:8px;letter-spacing:.22em;opacity:.75}
+  .estamp .e2{font-size:14px;letter-spacing:.18em}
+  .estamp .e3{font-size:11px;letter-spacing:.1em}
+  .estamp .e4{font-size:9px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
   .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
   /* 長英文字串與網址要能在任何位置斷行。
      grid 的 1fr 預設不會小於內容的最小寬度，而一串沒有空白的字母的最小寬度
@@ -528,10 +538,11 @@
        被刻意壓住是同一種允許的重疊，因為 .mtheme 這一輪已經整個拿掉
        （spec §二），那個角落現在是空白。.estamp 沒有超出 .page 右邊界
        （right 比 .page.right 少 20.54px）。top:26px 起手就通過，不用再調。 */
-    .estamp{top:26px;padding:3px 8px;gap:0}
-    .estamp .e1{font-size:6px;letter-spacing:.18em}
-    .estamp .e2{font-size:11px;letter-spacing:.2em}
-    .estamp .e3{font-size:9px}
+    /* 手機也是拿 SALT LAKE CITY 量的，理由見桌機那段。 */
+    .estamp{top:26px;padding:2px 7px;gap:0}
+    .estamp .e1{font-size:6px;letter-spacing:.16em}
+    .estamp .e2{font-size:10px;letter-spacing:.14em}
+    .estamp .e3{font-size:8px}
     .estamp .e4{font-size:7px}
   }
   @media (prefers-reduced-motion:reduce){
