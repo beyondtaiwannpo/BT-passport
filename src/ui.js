@@ -84,6 +84,70 @@ export function milestoneState(S) {
   return { done, list, reached, next, remaining: next ? next.threshold - done : 0 };
 }
 
+// 每個月一枚入境章的城市（spec §三 分配規則、§9.9）。**唯一的定義點** ——
+// 跟 SLOT_ORDER、pagesOf、faceOf、milestoneState 同一條原則。
+//
+// 兩個來源，存下來的贏：
+//   S.visas 有紀錄  → 用它。蓋滿的月份城市從此不動，那是這張表存在的全部理由。
+//   沒有紀錄        → 用種子洗牌即時算（還沒蓋滿的月份是預覽；已蓋滿但沒紀錄的
+//                     是修復路徑，main.js 的 syncVisas 會補寫進去）
+//
+// **即時算的部分要避開已經存下來的城市。** 池子變動之後洗牌結果會變，一個已經
+// 發出去的城市可能被算給另一個月 —— 同一本護照出現兩個 TOKYO 就不像護照了。
+//
+// 九月固定 TPE：每本護照都從台灣出發（spec §三）。
+// 種子是 passports.id（就是 auth.uid()），不是 Math.random()：同一個人重整幾次
+// 都要一樣。這個系統已經有一模一樣的機制 —— 章的旋轉角度用 act.id 算（見 stampHTML）。
+const HOME_CODE = "TPE";
+
+// FNV-1a 32-bit。要的是「同一個字串永遠得到同一個數字」，不是密碼學強度。
+// 自己寫是因為零相依，而且 JS 沒有內建的穩定雜湊。
+// Math.imul 不可省：一般的 * 超過 2^53 會失去精度，結果就不再穩定。
+function hash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+export function visasOf(S) {
+  const months = S.months || [];
+  const pool = S.destinations || [];
+  // 停用的不再被抽到，但**已經發出去的章不能因為城市停用就消失**，
+  // 所以查表用完整的池子，抽籤才過濾 active。
+  const byCode = new Map(pool.map(d => [d.code, d]));
+  const stored = S.visas || {};
+  const out = {}, taken = new Set();
+  months.forEach(m => {
+    const d = byCode.get(stored[m.month]);
+    if (d) { out[m.month] = d; taken.add(d.code); }
+  });
+
+  const seed = (S.profile && S.profile.id) || "";
+  const free = pool.filter(d => d.active !== false && !taken.has(d.code));
+  // 排序而不是 Fisher-Yates：一樣是決定性的，但少一個可變狀態，也好測。
+  // 平手時用 code 收尾，讓雜湊碰撞時結果仍然唯一。
+  const rest = free.filter(d => d.code !== HOME_CODE).slice().sort((a, b) =>
+    (hash32(seed + a.code) - hash32(seed + b.code)) || (a.code < b.code ? -1 : 1));
+
+  const home = free.find(d => d.code === HOME_CODE);
+  const blanks = months.filter(m => !out[m.month]);
+  let queue = rest;
+  if (home) {
+    // TPE 還沒被用掉。九月也還空著的話就留給九月，否則 TPE 回到池子最前面。
+    if (blanks.length && blanks[0].month === months[0].month) {
+      out[blanks[0].month] = home;
+      blanks.shift();
+    } else {
+      queue = [home, ...rest];
+    }
+  }
+  blanks.forEach((m, i) => { if (queue[i]) out[m.month] = queue[i]; });
+  return out;
+}
+
 // 這一格現在哪一面朝上。**只有這一個定義點** —— slotHTML 與任何之後要知道
 // 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
 // milestoneState 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
