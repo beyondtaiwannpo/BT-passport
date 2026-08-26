@@ -200,15 +200,31 @@ fi
 # 護照照常運作。把 ms 加進那個清單，會讓「SQL 還沒跑」變成整站壞掉。
 # 單元測試碰不到這件事：data.js 在 module scope 建 supabase client，
 # 沒有網路 stub 就測不到錯誤分支。2026-08-25 實測過：把 ms 加進去，37 個測試全綠。
+# ── 2026-08-26 改寫。這條守門自己踩了 README 第 12 項 ──
+# 原本的寫法是「`firstError([mo, ac, pa, st, en])` 這個字面必須出現兩次」。
+# 它想守的是「ms 不准進清單」，斷言的卻是「清單長得跟當時一模一樣」。
+# 於是 2026-08-26 依規格 §9.4 把 destinations 與 visas 加進清單（那兩張表**應該**
+# 進去，理由見 data.js 的註解）時，這條無辜地 FAIL 了 —— 而 FAIL 的理由跟它
+# 保護的東西無關。這是 README 第 12 項的第四個實例，而且發生在守門這一側。
+#
+# 改成守它真正在意的三件事：出現兩次、兩次一模一樣、兩次都不含 ms。
+# 清單裡有幾個、叫什麼名字，都不關這條守門的事。
+#
 # 用 grep -o | wc -l 數出現次數，不用 grep -c —— grep -c 數的是「符合的行數」，
-# 兩處寫在同一行的話 grep -c 只算 1，會把「併成一行」誤判成「只剩一處」而 FAIL
-# （這條要求剛好是 2，所以那個誤判方向是安全的：誤報而不是放行，但跟下面
-# 「只准數一次」那條的寫法不一致會讓人以為兩條規則不同，所以一起改成同一種數法）。
-n=$(grep -o 'firstError(\[mo, ac, pa, st, en\])' src/data.js | wc -l | tr -d ' ')
-if [ "$n" = "2" ] && ! grep -q 'firstError(\[mo, ac, pa, st, en, ms\])' src/data.js; then
-  ok "loadAll 的 firstError 清單不含 milestones"
+# 兩處寫在同一行的話只算 1。這裡 grep -o 讓每一筆自成一行，所以後面用
+# `sort -u | wc -l` 數「有幾種不同的寫法」是安全的。
+# 先剝掉整行註解再抓。這個 repo 的註解會解釋規則本身（data.js 那段就在講
+# 「不要把 ms 加進 firstError」），註解裡遲早會出現這個字面。不剝的話，
+# 一個「讓註解說實話」的 commit 會把守門弄紅 —— 方向是安全的（誤報而不是
+# 放行，見 README 第 10 項），但讓文件弄壞建置沒有必要。
+fe=$(grep -v '^[[:space:]]*//' src/data.js | grep -o 'firstError(\[[^]]*\])')
+n=$(printf '%s\n' "$fe" | grep -c 'firstError')
+kinds=$(printf '%s\n' "$fe" | sort -u | grep -c 'firstError')
+if [ "$n" = "2" ] && [ "$kinds" = "1" ] && ! printf '%s\n' "$fe" | grep -qE '(\[|, )ms(\]|,)'; then
+  ok "loadAll 的 firstError 兩處一致且不含 milestones"
 else
-  bad "src/data.js 的 firstError 清單被動過，milestones 失敗會拖垮整本護照"
+  bad "src/data.js 的 firstError 出了問題：要嘛不是兩處、兩處不一樣，要嘛 milestones 被加進去了"
+  printf '%s\n' "$fe" | sed 's/^/      /'
 fi
 
 # boot() 必須整包裝填，不可以退回手寫逐欄指派。手寫的話 loadAll 每多回傳一個東西
