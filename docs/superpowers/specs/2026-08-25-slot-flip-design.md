@@ -33,6 +33,23 @@
 
 已蓋章的正面也不放英文標題：章上的 `s2` 就是 `title_en`，重複。
 
+### 1.2 背面補一行小字標題（2026-08-25）
+
+章帶著 `title_en` 移到正面之後，背面只剩說明、心得、照片 —— **沒有任何識別**。
+
+使用者的裁定與理由（原話）：
+
+> 理由不是「看起來有做完」，是照片需要它 —— 九月拍月亮、十二月拍聖誕樹、
+> 六月拍水溝蓋，明年七月翻回去看的時候，一張照片配一行心得，你不會記得那格
+> 題目是什麼。而那正是翻回去要找的資訊。
+> 用小字，不要跟正面的標題一樣重。背面的主角是照片和心得，標題只是標籤。
+
+所以用 `.btitle`（12px / 600 / opacity .5）不用 `.ttl`（22px）。
+
+連帶刪掉 `.slot[data-done="1"] .hint{opacity:.42}`。那條的理由是「蓋章之後說明
+留著但淡化，讓標題與章之間的內容連續」（2026-08-23）—— 說明退到背面之後那個
+情境不存在了，而規則還在會把背面的識別資訊壓到 .42，正好是使用者要它可讀的那一行。
+
 ---
 
 ## 2. §3.4 的例外 —— 這是新的視覺元件
@@ -61,20 +78,26 @@
 ```html
 <div class="slot" data-id="09A" data-done="1" data-face="front">
   <div class="flip">
-    <div class="face front" aria-hidden="false">
+    <div class="face front" data-act="open" data-id="09A" aria-hidden="false">
       <button class="faceopen" data-act="open" data-id="09A">
         未蓋章：分類標籤 / 標題 / 英文標題 / 說明 / 蓋章 →
-        已蓋章：分類標籤 / 標題 / 章
+        已蓋章：分類標籤 / 標題
       </button>
+      已蓋章：章（在 .faceopen 外面，見下）
       <button class="flipbtn" data-act="flip" data-id="09A" aria-label="翻到背面">↻</button>
     </div>
     <div class="face back" aria-hidden="true">
-      說明 / 心得 / 照片
+      小字標題（.btitle，見 §1.2）/ 說明 / 心得 / 照片
       <button class="flipbtn" data-act="flip" data-id="09A" aria-label="翻到正面">↻</button>
     </div>
   </div>
 </div>
 ```
+
+**章為什麼在 `.faceopen` 外面**：`stampHTML` 吐的是 `<div>`，而 `<button>` 的內容模型
+只允許 phrasing content —— 跟 `.slot` 從 `<button>` 改成 `<div>` 是同一類問題。
+所以 `data-act="open"` 掛在 `.face.front` 這個外層 div 上（整面可點，見 §10 裁定 4），
+章當 `.faceopen` 的兄弟。`.faceopen` 仍是真按鈕，鍵盤 tab 得到、按 Enter 開得了。
 
 ### 3.1 未蓋章不產生背面的 DOM
 
@@ -174,6 +197,12 @@ reduce 開啟時**不做 3D 翻轉，直接切換內容**（`animation:none`，�
 
 - 2026-08-18 那次 `.overprint.land` 漏在 reduce 之外，是人工用 CSSOM 逐條比對才抓到的。
   通用檢查讓那件事不可能再發生。
+- **這支腳本會檢查自己有沒有盲點**（2026-08-25 實作時追加）：它用正則走 CSS 規則，
+  `@media` 開頭的選擇器被跳過時會連同該區塊「第一條」子規則一起吞掉 ——
+  寫在那個位置的 `animation` 宣告，守門對它是瞎的。所以腳本剝掉註解、`@keyframes`
+  與 reduce 區塊之後自己再數一次 `animation:` 宣告，跟走規則時算到的條數對帳，
+  對不上就 FAIL 並說出「有 N 個宣告落在解析不到的地方」。
+  理由跟 `README.md` 第 10 項同一條：一個看不見自己盲點的守門，跟假綠燈沒有兩樣。
 - `transition` 一起掃，但判準不同：animation 一律要關；transition 只有在動到
   `transform` 或位置類屬性（`top`/`left`/`width`/`height`/`inset`/`margin`）時才要求。
   顏色與透明度的過渡不是前庭刺激來源。
