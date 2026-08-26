@@ -1,7 +1,8 @@
 // 城市分配（spec §三 分配規則、§9.9）。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { visasOf, pendingVisasOf, angleOf } from "../src/ui.js";
+import fs from "node:fs";
+import { visasOf, pendingVisasOf, angleOf, monthPageHTML } from "../src/ui.js";
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",
@@ -198,4 +199,33 @@ test("angleOf：不同人的同一個月不一樣", () => {
 
 test("angleOf：沒有 profile 也不炸", () => {
   assert.ok(Number.isFinite(angleOf("", 9)));
+});
+
+/* ---------- 入境章的季節色盤 class（spec §10.3、10.4） ---------- */
+
+// 每個月各自蓋滿三格，用來讓 monthPageHTML 判定「full」而畫出入境章。
+const ACTS = m => [
+  { id: `${m}-A`, month: m, seq: 1, category: "gather" },
+  { id: `${m}-B`, month: m, seq: 1, category: "prompt" },
+  { id: `${m}-C`, month: m, seq: 1, category: "frame" }
+];
+const STAMPS = m => ({
+  [`${m}-A`]: { date: "2026-09-05" },
+  [`${m}-B`]: { date: "2026-09-05" },
+  [`${m}-C`]: { date: "2026-09-05" }
+});
+
+test("十一個月都拿得到自己的月份 class", () => {
+  for (const m of [9,10,11,12,1,2,3,4,5,6,7]) {
+    const s = { months: [{ seq: 0, month: m }], destinations: DEST, visas: {},
+      profile: { id: A }, activities: ACTS(m), stamps: STAMPS(m), entries: {}, justStamped: null };
+    const html = monthPageHTML(s, { seq: 0, month: m });
+    assert.match(html, new RegExp(`class="estamp m${String(m).padStart(2, "0")}"`),
+      `${m} 月沒有拿到 class`);
+  }
+});
+
+test("ui.js 裡沒有任何色碼 —— 顏色只住在 index.html 的色盤區塊", () => {
+  const src = fs.readFileSync(new URL("../src/ui.js", import.meta.url), "utf8");
+  assert.equal(src.match(/#[0-9A-Fa-f]{3,8}\b/g), null, "色碼不准出現在 JS 裡");
 });

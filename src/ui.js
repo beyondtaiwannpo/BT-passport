@@ -387,8 +387,10 @@ export function stampHTML(act, st, animate) {
 //
 // 日期取三格 stamped_on 的**最大值**（spec §9.6）：使用者可以自己改日期，
 // 而「插入順序」既沒有進前端也不是使用者看得懂的東西。
-function entryStampHTML(dest, date, angle) {
-  return `<div class="estamp" style="--rot:${angle}deg;transform:rotate(${angle}deg)">
+// class="estamp mNN" 的 mNN 只用來讓 CSS 挑色（見 index.html 的
+// ESTAMP-PALETTE 區塊）——這裡不准出現任何色碼，色碼只住在那個區塊。
+function entryStampHTML(dest, date, angle, month) {
+  return `<div class="estamp m${String(month).padStart(2, "0")}" style="--rot:${angle}deg;transform:rotate(${angle}deg)">
     <span class="e1">IMMIGRATION</span>
     <span class="e2">${esc(dest.city)}</span>
     <span class="e3">${esc(dest.code)}</span>
@@ -424,7 +426,7 @@ export function monthPageHTML(S, m) {
   const dated = full ? acts.map(a => S.stamps[a.id].date).sort().slice(-1)[0] : "";
   const angle = angleOf((S.profile && S.profile.id) || "", m.month);
   const zh = MONTH_ZH[m.month] || String(m.month);
-  return `${dest ? entryStampHTML(dest, dated, angle) : ""}
+  return `${dest ? entryStampHTML(dest, dated, angle, m.month) : ""}
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
       <div class="mzh">${zh}</div>

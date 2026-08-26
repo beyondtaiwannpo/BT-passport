@@ -449,9 +449,27 @@
      **之後改任何一行的字級、padding 或角度範圍，要拿「最長城市 SALT LAKE CITY
      × 角度範圍兩端 -15°/+8°」重量，不要拿 TAIPEI，也不要只量一個角度或
      假設哪個角度比較壞——上面這段就是量錯猜測的例子。** */
+  /* ==== ESTAMP-PALETTE-BEGIN ==== 這個區塊是 check.sh 三色守門的唯一例外。
+     十一個月一色，九月與七月同色 —— 翻完一本回到原點，那正好是學年的形狀。
+     明度都在 40-55%、飽和度 35-50%，所以每枚章的份量一致，配米白底不會像貼紙
+     （使用者 2026-08-26 的設計說明）。
+     **在這裡新增或修改任何色碼，check.sh 都會 FAIL**，要同時改檢查裡那份
+     寫死的清單。那是刻意的：例外要一次只開一個洞，不是開一扇門。 */
+  .estamp.m09{--ink:#C77A2E}   /* 九月 暖橘 */
+  .estamp.m10{--ink:#A85C3A}   /* 十月 */
+  .estamp.m11{--ink:#7E4A48}   /* 十一月 */
+  .estamp.m12{--ink:#4A3F5C}   /* 十二月 */
+  .estamp.m01{--ink:#2E3D6B}   /* 一月 */
+  .estamp.m02{--ink:#2A5C6E}   /* 二月 */
+  .estamp.m03{--ink:#2F6B5E}   /* 三月 */
+  .estamp.m04{--ink:#3D7A54}   /* 四月 */
+  .estamp.m05{--ink:#5E8248}   /* 五月 */
+  .estamp.m06{--ink:#8A7A3C}   /* 六月 */
+  .estamp.m07{--ink:#C77A2E}   /* 七月 回到暖橘，跟 m09 同色 */
+  /* ==== ESTAMP-PALETTE-END ==== */
   .estamp{
     position:absolute;top:34px;right:26px;z-index:2;pointer-events:none;
-    color:var(--bt-navy);
+    color:var(--ink, var(--bt-navy));
     opacity:.85;
     border:3px double currentColor;border-radius:4px;padding:5.57px 18.57px;
     display:flex;flex-direction:column;align-items:center;gap:1px;

@@ -51,15 +51,64 @@ else
 fi
 
 # §11-14 只有三色。抓所有 #hex，扣掉三個允許值。
-stray=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' $FILES 2>/dev/null \
-        | tr 'a-f' 'A-F' | sort -u \
+# ESTAMP-PALETTE 區塊是這條規則**唯一**的例外（使用者 2026-08-26）——
+# 排除它再掃，不是把十個季節色加進允許值。加進允許值等於讓那十色在任何地方
+# 都合法，那就是使用者明確拒絕的「放寬」。$FILES 現在是
+# "index.html src activities.json"：index.html 要先剝掉色盤區塊，
+# 其餘檔案（src、activities.json）不受影響、照舊整份掃。
+strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' index.html \
+         | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' src activities.json 2>/dev/null)
+stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
+        | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -v '^#FFC46C$' | grep -v '^#EDE5D8$' | grep -v '^#102A86$')
 if [ -n "$stray" ]; then
   bad "§11-14 出現不允許的色碼："
   printf '%s\n' "$stray"
 else
-  ok "§11-14 只有三個色碼"
+  ok "§11-14 只有三個色碼（ESTAMP-PALETTE 區塊是唯一例外，另外守在下面）"
 fi
+
+# .estamp 的季節色盤是三色規則的**唯一例外**（使用者 2026-08-26）。
+# 清單寫死在這裡，不用萬用字元 —— 例外要一次只開一個洞，不是開一扇門。
+# 新增或修改任何一色都必須同時改這一行，那是刻意的摩擦。
+ESTAMP_PALETTE="#C77A2E #A85C3A #7E4A48 #4A3F5C #2E3D6B #2A5C6E #2F6B5E #3D7A54 #5E8248 #8A7A3C"
+
+# 哨兵各自只准出現一次。多一個或少一個都會讓下面兩條抽錯範圍，
+# 而抽錯範圍的守門比沒有守門更糟（README 第 10 項）。
+# 這裡的 grep -c 數的是「行數」，跟一行一個哨兵的事實一致；不是 firstError
+# 那種「兩處可能擠在同一行」的情境，不受 README 第 12 項那個 grep -c 陷阱影響——
+# 旁邊特別註明，免得下一個人以為這裡也踩到了。
+b=$(grep -c 'ESTAMP-PALETTE-BEGIN' index.html)
+e=$(grep -c 'ESTAMP-PALETTE-END' index.html)
+if [ "$b" = "1" ] && [ "$e" = "1" ]; then
+  ok "ESTAMP-PALETTE 的哨兵各一個"
+else
+  bad "ESTAMP-PALETTE 的哨兵不是各一個（${b} / ${e}）"
+fi
+
+# 方向一：區塊裡的色碼必須**剛好等於**清單。多一個少一個都 FAIL。
+# 這一條讓「偷偷加第十二色」不可能，而不只是「不鼓勵」——集合相等，不是包含。
+inside=$(sed -n '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/p' index.html \
+         | grep -ohI '#[0-9A-Fa-f]\{6\}' | tr 'a-f' 'A-F' | sort -u)
+want=$(printf '%s\n' $ESTAMP_PALETTE | tr 'a-f' 'A-F' | sort -u)
+if [ "$inside" = "$want" ]; then
+  ok "ESTAMP-PALETTE 區塊裡的色碼剛好等於寫死的清單"
+else
+  bad "色盤區塊裡的色碼跟 check.sh 寫死的清單對不上"
+fi
+
+# 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
+# 不是「解禁了十色可以到處用」。
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' index.html; cat src/*.js activities.json 2>/dev/null)
+outsidebad=0
+for c in $ESTAMP_PALETTE; do
+  if printf '%s' "$outside" | grep -qiF "$c"; then
+    bad "季節色 $c 出現在色盤區塊之外"
+    outsidebad=1
+  fi
+done
+[ "$outsidebad" = "0" ] && ok "季節色沒有出現在色盤區塊之外"
 
 # §11-14 rgba 只允許三種底色
 strayrgba=$(grep -rhIo 'rgba([0-9 ]*,[0-9 ]*,[0-9 ]*,[^)]*)' $FILES 2>/dev/null \
