@@ -452,6 +452,23 @@ GitHub repo → **Actions** → 「ping supabase」→ 最近有沒有綠勾。
 正確做法：Table Editor → `activities` → 那一列的 `active` 改成 `false`。
 它就不會再出現在護照上，但已經蓋過的人資料還在。
 
+## `destinations`（城市池子）可以怎麼動
+
+**加城市是安全的**，而且會常常發生 —— 每年都有人搬家、交換、畢業，
+不是哪天可能，是一定會遇到。為什麼安全：一個月份蓋滿的當下，抽到的城市就存進
+`visas`，之後池子再怎麼變，已經存下來的那些不受影響。
+
+**刪城市的話資料庫會擋。** `visas.code` 對 `destinations(code)` 有外鍵，
+只要有人蓋過那個城市，`delete` 就會失敗。這是約束，不是規則 ——
+不需要有人記得「不要刪」，資料庫自己會擋。
+
+**停用是可以的**：Table Editor → `destinations` → 那一列的 `active` 改成 `false`。
+新的抽籤不會再抽到它，但已經發出去的入境章照樣顯示
+（`visasOf` 查表用完整池子，只有抽籤才過濾 `active`，見它自己的註解）。
+
+**這一整段的前提是「城市在蓋滿的當下存進 `visas`，而 `visas` 沒有 update 權限」。**
+哪天有人給那張表開了 update，這一段就不再成立。
+
 ## Supabase 的 SQL Editor 有兩個要先知道的限制
 
 第一次貼 SQL 進去的人一定會踩到這兩件事，先講：
