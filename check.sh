@@ -379,6 +379,41 @@ else
   bad "找不到 node，reduced-motion 檢查沒有跑到（這不是通過）"
 fi
 
+# check.sh 自己的陷阱：**變數名後面緊接非 ASCII 字元**（這個檔案裡就是全形括號）。
+# bash 3.2（macOS 系統 bash）在 UTF-8 locale 下會把後面那個字的延續位元組併進
+# 變數名，於是 `echo "（$e）"` 變成引用一個不存在的變數，在 set -u 之下
+# 直接中止整支腳本。2026-08-26 一天內踩到兩次：`（$motion）` 與 `（$b / $e）`。
+# **兩次都只在守門真的 FAIL 的那條路徑上才會爆**，正常全綠時完全看不出來 ——
+# 所以它躲得過每一次「跑一下 check.sh 看有沒有過」。修法是加大括號：${e}。
+#
+# 用 node 不用 grep：BSD 與 GNU 的 grep 對非 ASCII 字元類的支援不一致，
+# 而 JS 的 /[^\x00-\x7F]/ 定義明確。控制端第一版用 grep 寫，pattern 還寫成
+# 「變數後面接**左**括號」—— 真正的 bug 是右括號，那條守門對合成的違規行
+# 完全抓不到。這一條是「必須不存在」型（README 第 10 項的安全方向）。
+#
+# 掃描前會剝掉 shell 的整行註解（`^\s*#`）：這一整段註解為了說明問題，
+# 免不了要寫出違規的字面，不剝的話這條守門會抓到自己然後永遠 FAIL。
+# **JS 那段裡面也不要寫違規字面** —— `//` 開頭的行不在剝除範圍內
+# （剝的是 shell 註解），控制端 2026-08-26 就這樣讓它抓到自己一次。
+if node -e '
+  // 先剝掉 shell 的整行註解，理由見上面那段（註解不會執行）。
+  const s = require("fs").readFileSync("check.sh", "utf8")
+    .split("\n").filter(l => !/^\s*#/.test(l)).join("\n");
+  const m = s.match(/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/g);
+  if (m) { console.log([...new Set(m)].join("  ")); process.exit(1); }
+' 2>/dev/null; then
+  ok "check.sh 沒有變數名緊接非 ASCII 字元"
+else
+  bad "check.sh 裡有變數名緊接非 ASCII 字元，FAIL 路徑上會 unbound variable："
+  node -e '
+    const s = require("fs").readFileSync("check.sh", "utf8");
+    s.split("\n").forEach((l, i) => {
+      if (/^\s*#/.test(l)) return;
+      if (/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/.test(l)) console.log(`  ${i+1}: ${l.trim()}`);
+    });
+  '
+fi
+
 # CNAME 不可掉
 if [ -f CNAME ]; then
   ok "CNAME 存在"
