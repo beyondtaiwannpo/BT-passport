@@ -358,6 +358,53 @@
      這也是為什麼下面 opacity 只有一個桌機共用值，手機不再需要自己的
      opacity:1（見手機媒體查詢那段 .estamp 旁的說明）。
 
+     ── 判準第一次寫錯：只量了 .e4，量測本身沒錯，但問錯問題 ──
+     B 版第一次驗收時只量了「.mhead 那條線有沒有穿過 .e4（日期）」，8 格
+     （2 視寬 × 4 角度）全過，當時的結論是「不用做 C」。**控制端指出這是錯的
+     判準**：26px 這組把章放大、桌機 top 從 25 調到 34 之後，日期整個沉到線
+     下面，那格量測自然乾淨——但線改成從 .e2（城市名）正中間切過去，沒人量
+     那一行。真正的判準是「線不准穿過章上任何一行字（.e1/.e2/.e3/.e4）」，
+     不是只看日期。重新用同一個方法（.mhead.getBoundingClientRect().bottom
+     對 .estamp 每一行的 getBoundingClientRect()）量四行 × 兩個視寬 × 四個角度
+     × SALT LAKE CITY／TAIPEI 兩個城市，結果：**.e2 在 1280px 與 390px、
+     兩個城市、全部四個角度都被線穿過**；390px 的 .e3 在 -15°/-11° 也貼線
+     （最近時線只差 0.7px 就不穿過，等於也算穿過）。數字見
+     r2-task-3-report.md。這件事的教訓記在這裡：**做 B／C 的取捨判斷不能只挑
+     「brief 點名的那一行」量，字級跟位置一變，哪一行最先被線切到會跟著換，
+     每次都要把 .e1~.e4 四行一起量一次。**
+
+     ── 於是做 C：把 .mhead 那條線在章的範圍內斷開 ──
+     見下面 .estamp::before。手法：.estamp 因為有 transform 會自成一個
+     stacking context，它的子元素不管 z-index 多負都壓不到 .estamp 自己
+     下面——z-index:-1 的 ::before 落在「章的墨線／文字之下、但仍在 .page
+     內容（含 .mhead 那條線）之上」，正好是把線「擦掉」又不擋住章本身的那一層。
+     ::before 用 background:var(--paper) 蓋掉它所在的那一小段線，四行文字跟
+     border 畫在它上面，兩者互不影響。
+     ::before 用 transform:rotate(calc(-1 * var(--rot))) 把父層 .estamp 的旋轉
+     轉回來，畫出來的是一條真正水平的色塊，不是跟著章一起斜的——推導與實測
+     都證實只要這個色塊的「本地垂直中心」跟 .estamp 自己的旋轉中心（也就是
+     .estamp 未旋轉時的幾何中心，transform-origin 預設 50% 50%）維持同一個
+     top 值，色塊在頁面上的位置**幾乎不隨角度漂移**（本地做過推導：漂移量
+     正比於 (1-cosθ) 與 sinθ，在 -15°~+8° 這個範圍都是零點幾 px 等級），
+     這也是為什麼下面只需要「兩個視寬各一個 top」，不用四個角度各測一個 top
+     ——跟 Task 3 計畫文件裡寫的一致，但這裡多做了一步實測驗證這個假設，
+     不是直接假設它成立。
+     top 的算法是「線的 y（相對 .page，= .mhead.getBoundingClientRect().bottom
+     - .page.getBoundingClientRect().top）減章的未旋轉 top，再退半個 height
+     讓色塊置中在線上」：
+       桌機：lineY=97.27，top:34 → (97.27-34) - 4/2 = 61.27，
+             實測後再上移到 **57.27px** 才會讓色塊同時蓋過線的上緣與下緣
+             （border-bottom 2px 是畫在 .mhead 底部的最後 2px，不是置中在
+             .mhead.bottom 那個 y 上，所以粗算的 61.27 只蓋到線的下半，
+             要往上補；量測方法與過程見 r2-task-3-report.md）
+       手機：lineY=75.68，同樣的邏輯量出來是 **43.68px**
+     height:4px（線寬 2px + 2px 緩衝）、left:0;right:0（章自己的內距寬度，
+     沒有再往外推）：兩個視寬 × 兩個城市（SALT LAKE CITY／TAIPEI）×
+     四個角度，用一個跟 ::before 樣式完全相同、但插進真實 DOM 方便量測的
+     代理 div 反覆量過，缺口穩定蓋住線的實際範圍（每一格都留有 ≥0.7px 的
+     餘裕），螢幕截圖確認缺口的兩端剛好落在章的墨線框邊上，沒有超出去，
+     也沒有留下一小截沒擦乾淨的線頭——不需要再用負的 left/right 往外推。
+
      ── 2026-08-26 第二輪：判準整個換掉（使用者裁定，見 spec §10.1）──
      舊判準「不可以切到活動格子裡的任何東西」被推翻。新判準：
      **可以**壓 .slot 與格子裡的內容（.cat/.ttl/活動章）——那個「壓過去」正是
@@ -410,6 +457,23 @@
     display:flex;flex-direction:column;align-items:center;gap:1px;
     font-family:var(--display);font-weight:700;text-align:center;
     filter:url(#bt-ink);
+  }
+  /* C：把 .mhead 那條線在章的範圍內斷開。完整推導、量測方法與反向驗證見上面
+     .estamp 那則長註解的「於是做 C」段落，這裡只留最終規則。
+     z-index:-1 讓這塊色塊落在 .estamp 自己的 border/文字之下，但因為 .estamp
+     有 transform 自成 stacking context，這塊色塊仍然蓋在 .page 正常流內容
+     （含 .mhead 的線）之上——線被蓋住的地方，章的墨線與文字照常畫在上面。
+     transform 用 --rot 的反向角度把父層的旋轉轉回來，讓這塊色塊維持水平，
+     跟真正的那條線平行，不是跟著章一起斜的。
+     top:57.27px 是桌機（1280px）量出來的值，手機的 43.68px 在下面媒體查詢裡
+     覆寫。**不要把這兩個 top 併成一個值**——它們對應不同視寬下 .mhead 的線
+     跟 .estamp 未旋轉 top 的實際距離，兩個視寬各自量、不共用。 */
+  .estamp::before{
+    content:"";position:absolute;z-index:-1;
+    left:0;right:0;top:57.27px;height:4px;
+    background:var(--paper);
+    transform:rotate(calc(-1 * var(--rot)));
+    transform-origin:center;
   }
   /* ── 字級是**用最長的城市**量出來的，不是用 TAIPEI ── 見上面 .estamp 那則
      長註解的完整量測方法與數字。這裡只留最終值：.e2=26px 這組的桌機字級，
@@ -578,13 +642,20 @@
        底色可以蓋線，opacity 再怎麼調也蓋不住線，因為線本來就沒被蓋住過、
        是被色塊蓋住。所以這裡不再覆寫 opacity，手機跟桌機一樣吃上面
        .estamp 的 opacity:.85（一個定義點）。
-       重量結果（26px 這組、兩個視寬 × 四個角度 -15/-11/0/+8，數字見
-       r2-task-3-report.md）：`.mhead` 那條線在全部 8 格裡都沒有穿過 `.e4`
-       ——390px 最壞（-15°）的餘裕還有 17.31px，所以**沒有做 C**（把線在
-       章的範圍內斷開那個方案）。如果之後字級、top 或角度範圍改了要回來重量，
-       穿過的話修法是 `.estamp::before`，**不是**把 opacity 改回 1 或任何
-       固定值去遮線——那是舊字級時代的解法，使用者已經明確禁止拿它解這輪的問題。 */
+       **不准把 opacity 改回 1 或任何固定值去遮線**——那是舊字級時代的解法，
+       使用者已經明確禁止拿它解這一輪的問題，修線的地方是下面的
+       .estamp::before（C），不是這裡。 */
     .estamp{top:26px;padding:3.71px 13px;gap:0}
+    /* C 在手機的 top：只覆寫 top，其餘（height/left/right/background/transform）
+       沿用桌機那條 .estamp::before 規則。43.68px 是用 390px 視寬量出來的，
+       跟桌機的 57.27px 不是同一個數字——兩個視寬各自量、不共用，理由見桌機
+       那則 .estamp 長註解的「於是做 C」段落。量測結果（兩個視寬 × 兩個城市
+       SALT LAKE CITY／TAIPEI × 四個角度 -15/-11/0/+8，數字見
+       r2-task-3-report.md）：這個 top 值在全部 16 格裡都讓色塊完整蓋住線的
+       實際範圍，餘裕最小 0.7px（390px、angle -15/-11 附近），螢幕截圖
+       （c-390-minus15.png／c-390-plus8.png）確認缺口沒有跑掉、兩端剛好落在
+       墨線框邊上。 */
+    .estamp::before{top:43.68px}
     .estamp .e1{font-size:11.14px;letter-spacing:.16em}
     .estamp .e2{font-size:18.57px;letter-spacing:.14em}
     .estamp .e3{font-size:14.86px}
