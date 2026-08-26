@@ -355,10 +355,14 @@ export function visasOf(S) {
 reset 分支的清除清單也要加同樣兩個。
 **這是 2026-08-25 那個「手寫物件字面漏過兩次」的位置，逐字比對兩份清單。**
 
-- [ ] **Step 5: 留 destinations 的遷移檔**
+- [x] **Step 5: 留 destinations 的遷移檔 —— 控制端已完成，實作者跳過**
 
-Create `supabase/migrations/2026-08-26-destinations.sql`，內容是 spec §六 那段 SQL
-的第 1、2、3 節。檔頭註明**已由使用者於 2026-08-26 執行**，這個檔案只是留底。
+`supabase/migrations/2026-08-26-destinations.sql` 已由控制端建立。
+
+**這一步原本是計畫缺陷**：它寫「內容是 spec §六 那段 SQL 的第 1、2、3 節」，
+但規格 §六 只有狀態、沒有 SQL 原文。實作者停下來問而不是猜一份 DDL 出來 ——
+這個檔案的用途是留底，一份猜出來的留底比沒有留底更糟。
+原文在使用者的規格訊息裡，控制端手上有，所以由控制端補。
 
 - [ ] **Step 6: 驗證**
 

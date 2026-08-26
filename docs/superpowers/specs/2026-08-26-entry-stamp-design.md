@@ -165,7 +165,15 @@ AMS AMSTERDAM／LHR LONDON／NRT TOKYO／ICN SEOUL／SYD SYDNEY
 
 **狀態：使用者已於 2026-08-26 執行完畢。** 控制端實測確認：
 `destinations` 24 筆（全部 active）／還有主題的月份 0／還有中文的鏡頭格 0。
-遷移檔留在 `supabase/migrations/2026-08-26-destinations.sql`。
+
+**SQL 原文在 `supabase/migrations/2026-08-26-destinations.sql`**，不在這裡。
+規格最初只寫了狀態沒有帶原文，於是計畫 Task 3 Step 5 那句「內容是 spec §六 那段
+SQL 的第 1、2、3 節」指向一段不存在的東西 —— 實作者停下來問，沒有捏造一份
+看起來合理的 DDL 冒充歷史紀錄。那是對的判斷：這個檔案的用途是「留底」，
+一份猜出來的留底比沒有留底更糟。
+
+確認用的 `description ~ '[\u4e00-\u9fff]'` 控制端在 Postgres 上實測過：
+命中中文、**不會**誤中說明裡的破折號 `—`（U+2014 在範圍外），也不會誤中純英文。
 
 ---
 
