@@ -270,18 +270,21 @@ export function stampHTML(act, st, animate) {
 // <span>\n</span> 與完全不渲染的 .mtheme 高度都是 42.50，一模一樣 ——
 // 空的 inline 元素不產生行框。理由是不要在 DOM 裡留一個永遠是空的元素，
 // 下一個人看到會以為渲染壞了然後去「修」它。見 spec 2026-08-22 §5.2。
-// full 判斷「這個月是不是蓋滿了」。**acts.length > 0 不可省**：空集合讓
-// .every() 無條件成立，這個 repo 已經被同一個 bug class 咬過三次——dotOn 的圓點
-// （2026-08-22 修）、idPageHTML 的 FULL 疊印（2026-08-25 修）、以及這裡。
-// 這一處還跟 dotOn 互相矛盾過：dotOn 先加了守衛，這裡沒加，於是同一個沒有
-// 活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
-// 判斷「全部完成」的時候，先問「有沒有東西可以完成」。
+//
 // 2026-08-26：months 的 theme_zh 也全部清空了（spec §二），所以整個 .mtheme
 // 跟著不渲染。**這不是版面修正** —— 實測 1280px（dpr 2）三種情況下 .mhead
 // 都是 71.27：有主題 42.50、空字串 0、完全不渲染。.mhead 是 flex row，
 // 高度由 .mzh 決定，.mtheme 從來沒有參與過，而空的 <b> 是空的 inline 元素、
 // 不產生行框。理由跟上面那段一樣：不要在 DOM 裡留一個永遠是空的元素，
 // 下一個人看到會以為渲染壞了然後去「修」它。
+//
+// ── 以下這段講的是 full，跟上面的 .mtheme 無關 ──
+// full 判斷「這個月是不是蓋滿了」。**acts.length > 0 不可省**：空集合讓
+// .every() 無條件成立，這個 repo 已經被同一個 bug class 咬過三次——dotOn 的圓點
+// （2026-08-22 修）、idPageHTML 的 FULL 疊印（2026-08-25 修）、以及這裡。
+// 這一處還跟 dotOn 互相矛盾過：dotOn 先加了守衛，這裡沒加，於是同一個沒有
+// 活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
+// 判斷「全部完成」的時候，先問「有沒有東西可以完成」。
 export function monthPageHTML(S, m) {
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
