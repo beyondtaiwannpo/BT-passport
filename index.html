@@ -468,9 +468,24 @@
      top:57.27px 是桌機（1280px）量出來的值，手機的 43.68px 在下面媒體查詢裡
      覆寫。**不要把這兩個 top 併成一個值**——它們對應不同視寬下 .mhead 的線
      跟 .estamp 未旋轉 top 的實際距離，兩個視寬各自量、不共用。 */
+  /* ── left/right 的 -10px 是量出來的，不是留白 ──
+     色塊反轉回水平之後，它的長度等於 .estamp 的**元素寬**（left:0;right:0），
+     但章旋轉之後，線穿過章的那一段比元素寬**更長** —— 線是在章的上半部橫過去，
+     斜邊把交點推到元素寬之外。2026-08-26 實測 1280px（dpr 2），
+     兩個城市 × 四個角度，left:0;right:0 之下線的漏出量：
+       SALT LAKE CITY  -15°  左 7.56  右 3.69   ← 最壞
+                       -11°  左 4.39  右 1.58
+                         0°  左 0     右 0
+                        +8°  左 0.55  右 2.58
+       TAIPEI          -15°  左 5.11  右 1.24
+     漏出的那一小截會在章的框裡面重新冒出來，看起來像線把城市名戳穿。
+     -10px 覆蓋最壞的 7.56 還留 2.44px 餘裕。
+     代價是 0° 時色塊比章寬 10px，線會在章的兩側提早一點斷掉 —— 截圖確認過
+     （c-gap8-1280.png 是 8px 版），那讀起來像章旁邊留了一點呼吸，不像線斷了。
+     **改角度範圍、字級或 padding 之後要回來重量這個數字。** */
   .estamp::before{
     content:"";position:absolute;z-index:-1;
-    left:0;right:0;top:57.27px;height:4px;
+    left:-10px;right:-10px;top:57.27px;height:4px;
     background:var(--paper);
     transform:rotate(calc(-1 * var(--rot)));
     transform-origin:center;
@@ -652,9 +667,10 @@
        那則 .estamp 長註解的「於是做 C」段落。量測結果（兩個視寬 × 兩個城市
        SALT LAKE CITY／TAIPEI × 四個角度 -15/-11/0/+8，數字見
        r2-task-3-report.md）：這個 top 值在全部 16 格裡都讓色塊完整蓋住線的
-       實際範圍，餘裕最小 0.7px（390px、angle -15/-11 附近），螢幕截圖
-       （c-390-minus15.png／c-390-plus8.png）確認缺口沒有跑掉、兩端剛好落在
-       墨線框邊上。 */
+       實際範圍，餘裕最小 0.7px（390px、angle -15/-11 附近）。
+       **那個 0.7px 是垂直方向的餘裕**（色塊有沒有蓋住線的厚度）——
+       水平兩端是另一回事，2026-08-26 覆核時發現線會從色塊兩端漏出來最多
+       7.56px，修法見桌機那條 .estamp::before 的 left/right:-10px。 */
     .estamp::before{top:43.68px}
     .estamp .e1{font-size:11.14px;letter-spacing:.16em}
     .estamp .e2{font-size:18.57px;letter-spacing:.14em}
