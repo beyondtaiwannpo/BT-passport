@@ -276,6 +276,12 @@ export function stampHTML(act, st, animate) {
 // 這一處還跟 dotOn 互相矛盾過：dotOn 先加了守衛，這裡沒加，於是同一個沒有
 // 活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
 // 判斷「全部完成」的時候，先問「有沒有東西可以完成」。
+// 2026-08-26：months 的 theme_zh 也全部清空了（spec §二），所以整個 .mtheme
+// 跟著不渲染。**這不是版面修正** —— 實測 1280px（dpr 2）三種情況下 .mhead
+// 都是 71.27：有主題 42.50、空字串 0、完全不渲染。.mhead 是 flex row，
+// 高度由 .mzh 決定，.mtheme 從來沒有參與過，而空的 <b> 是空的 inline 元素、
+// 不產生行框。理由跟上面那段一樣：不要在 DOM 裡留一個永遠是空的元素，
+// 下一個人看到會以為渲染壞了然後去「修」它。
 export function monthPageHTML(S, m) {
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
@@ -284,7 +290,7 @@ export function monthPageHTML(S, m) {
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
       <div class="mzh">${zh}</div>
-      <div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>
+      ${m.theme_zh ? `<div class="mtheme clock"><b>${esc(m.theme_zh)}</b>${m.theme_en ? `<span>${esc(m.theme_en)}</span>` : ""}</div>` : ""}
     </div>
     <div class="slots">${acts.map(a => slotHTML(S, a)).join("")}</div>`;
 }
