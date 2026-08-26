@@ -448,6 +448,19 @@ export async function removeStamp(actId) {
   if (s.error) throw s.error;
 }
 
+// 發出入境章：把「已經蓋滿但還沒存下來」的月份寫進 visas。
+// on conflict do nothing —— 這張表只准新增不准修改（RLS 也沒有給 update 權限，
+// 見 2026-08-26-visas.sql 的檔頭）。「蓋滿的月份城市從此固定」如果只靠前端自律，
+// 下一個人寫一行 upsert 就破功而且不會有東西報錯。
+export async function issueVisas(rows) {
+  if (!rows.length) return;
+  const user = await currentUser();
+  const r = await supabase.from("visas")
+    .upsert(rows.map(x => ({ user_id: user.id, month: x.month, code: x.code })),
+            { onConflict: "user_id,month", ignoreDuplicates: true });
+  if (r.error) throw r.error;
+}
+
 // 清除這個人自己的整本護照（spec §11-10 的「匯出 → 清除 → 匯入還原」）。
 // 這個函式當初被加進介面清單，就是為了預防它現在最容易出的錯：計畫的 Task 6
 // 只列了六個函式、沒有這一個，照著做的話「清除護照」會留在 localStorage 版本 ——
@@ -464,6 +477,10 @@ export async function clearAll() {
   if (e.error) throw e.error;
   const s = await supabase.from("stamps").delete().eq("user_id", user.id);
   if (s.error) throw s.error;
+  // visas 是護照內容（spec §9.11），跟 stamps／entries 同一批清掉。不是參考資料，
+  // 不比照 destinations／activities／months／milestones 那種「全站共用、清人不清它」。
+  const v = await supabase.from("visas").delete().eq("user_id", user.id);
+  if (v.error) throw v.error;
   const p = await supabase.from("passports").update({
     name_zh: null, name_en: null, team: null, motto: null, avatar: null,
     updated_at: new Date().toISOString()
@@ -497,6 +514,12 @@ export async function exportPassport() {
       stamped_on: all.stamps[id].date,
       note: (all.entries[id] && all.entries[id].note) || "",
       photo: (all.entries[id] && all.entries[id].photo) || null
+    })),
+    // visas 是護照內容（spec §9.11），備份要跟著走，否則還原之後城市可能全換一批 ——
+    // 正是這張表存在要防的事。跟 stamps 同一個模式：物件攤平成陣列。
+    visas: Object.keys(all.visas).map(month => ({
+      month: Number(month),
+      code: all.visas[month]
     }))
   };
 }
@@ -531,6 +554,9 @@ export async function importPassport(backup, mode) {
   const user = await requireUser();
 
   const rows = backup.stamps.filter(s => s.act_id && s.stamped_on);
+  // visas 跟 stamps 同一個模式（spec §9.11）：舊備份檔沒有這個欄位，
+  // backup.visas || [] 讓還原舊檔照樣能動，只是不帶城市回來。
+  const visaRows = (backup.visas || []).filter(v => v.month != null && v.code);
 
   if (rows.length) {
     const s = await supabase.from("stamps").upsert(
@@ -542,6 +568,15 @@ export async function importPassport(backup, mode) {
       rows.map(r => ({ user_id: user.id, act_id: r.act_id, note: r.note || "", photo: r.photo || null })),
       { onConflict: "user_id,act_id" });
     if (e.error) throw e.error;
+  }
+
+  if (visaRows.length) {
+    // ignoreDuplicates: true 不可省，理由跟 issueVisas 一樣：visas 沒有 UPDATE 權限，
+    // 少了這個旗標，還原到已經有紀錄的月份會變成 UPDATE，被資料庫拒絕。
+    const v = await supabase.from("visas").upsert(
+      visaRows.map(r => ({ user_id: user.id, month: r.month, code: r.code })),
+      { onConflict: "user_id,month", ignoreDuplicates: true });
+    if (v.error) throw v.error;
   }
 
   if (mode === "overwrite") {
@@ -557,6 +592,15 @@ export async function importPassport(backup, mode) {
     }
     const re = await de; if (re.error) throw re.error;
     const rs = await ds; if (rs.error) throw rs.error;
+
+    // 同一套邏輯套在 visas 上：覆蓋之後留著的月份要跟備份檔一致。
+    const keepMonths = visaRows.map(r => r.month);
+    let dv = supabase.from("visas").delete().eq("user_id", user.id);
+    if (keepMonths.length) {
+      const list = "(" + keepMonths.join(",") + ")";
+      dv = dv.not("month", "in", list);
+    }
+    const rv = await dv; if (rv.error) throw rv.error;
   }
 
   // issued 不還原 —— 核發日屬於這個帳號，不屬於備份檔。跨帳號還原時尤其明顯：

@@ -1,7 +1,7 @@
 // 城市分配（spec §三 分配規則、§9.9）。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { visasOf } from "../src/ui.js";
+import { visasOf, pendingVisasOf } from "../src/ui.js";
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",
@@ -103,4 +103,74 @@ test("兩百個種子要產生接近兩百種組合 —— 種子必須真的參
   });
   const sigs = new Set(seeds.map(id => codes(visasOf(S(id))).join()));
   assert.ok(sigs.size >= 195, `只有 ${sigs.size} / 200 種組合，種子沒有真的參與洗牌`);
+});
+
+/* ---------- pendingVisasOf（spec §9.9） ---------- */
+
+// 九月三格都蓋了，其餘月份沒有任何活動（畫「還沒建好」的常見狀態）。
+function full9() {
+  const activities = [
+    { id: "09A", month: 9, category: "gather" },
+    { id: "09B", month: 9, category: "prompt" },
+    { id: "09C", month: 9, category: "frame" }
+  ];
+  const stamps = {
+    "09A": { date: "2026-09-05" },
+    "09B": { date: "2026-09-12" },
+    "09C": { date: "2026-09-20" }
+  };
+  return { months: MONTHS, activities, stamps, destinations: DEST, visas: {}, profile: { id: A } };
+}
+
+// 九月、十月都蓋滿了。
+function full9and10() {
+  const s = full9();
+  const acts10 = [
+    { id: "10A", month: 10, category: "gather" },
+    { id: "10B", month: 10, category: "prompt" },
+    { id: "10C", month: 10, category: "frame" }
+  ];
+  const stamps10 = {
+    "10A": { date: "2026-10-03" },
+    "10B": { date: "2026-10-11" },
+    "10C": { date: "2026-10-19" }
+  };
+  return {
+    ...s,
+    activities: [...s.activities, ...acts10],
+    stamps: { ...s.stamps, ...stamps10 }
+  };
+}
+
+test("pendingVisasOf：蓋滿又還沒發章的月份才要補", () => {
+  const S = full9();                       // 九月三格都蓋了，visas 是空的
+  assert.deepEqual(pendingVisasOf(S), [{ month: 9, code: "TPE" }]);
+});
+
+test("pendingVisasOf：已經發過章的月份不再補", () => {
+  const S = { ...full9(), visas: { 9: "TPE" } };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：沒蓋滿的月份不補", () => {
+  const S = full9(); delete S.stamps["09C"];
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：沒有活動的月份不補 —— 空集合的守衛", () => {
+  // .every() 對空集合無條件成立。這個 repo 被同一個 bug class 咬過三次：
+  // dotOn 的圓點、idPageHTML 的 FULL 疊印、monthPageHTML 的 MONTH CLEARED。
+  // 沒有這條守衛的話，一個活動還沒建好的月份會憑空發出一枚入境章。
+  const S = { ...full9(), activities: [] };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：分配不到城市的月份不補，也不產生 undefined", () => {
+  const S = { ...full9(), destinations: [] };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：一次蓋滿兩個月就回兩筆", () => {
+  const S = full9and10();
+  assert.equal(pendingVisasOf(S).length, 2);
 });

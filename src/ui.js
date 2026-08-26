@@ -163,6 +163,25 @@ export function visasOf(S) {
   return out;
 }
 
+// 哪些月份已經蓋滿、但還沒發出入境章。回 [{month, code}]，餵給 data.js 的 issueVisas。
+//
+// **為什麼在 ui.js 而不是 main.js**：這裡面有空集合的守衛，而 main.js 沒有測試。
+// 守衛放在測不到的地方等於沒有守衛（2026-08-26 對計畫的修訂）。
+//
+// acts.length > 0 不可省：.every() 對空集合無條件成立，這個 repo 被同一個
+// bug class 咬過三次 —— dotOn 的圓點、idPageHTML 的 FULL 疊印、
+// monthPageHTML 的 MONTH CLEARED。少了它，一個活動還沒建好的月份會憑空
+// 發出一枚入境章，而那一枚是寫進資料庫、之後改不掉的（visas 沒有 update 權限）。
+export function pendingVisasOf(S) {
+  const want = visasOf(S);
+  return (S.months || []).filter(m => {
+    if ((S.visas || {})[m.month]) return false;
+    const acts = (S.activities || []).filter(a => a.month === m.month);
+    return acts.length > 0 && acts.every(a => S.stamps[a.id]);
+  }).map(m => want[m.month] && { month: m.month, code: want[m.month].code })
+    .filter(Boolean);
+}
+
 // 這一格現在哪一面朝上。**只有這一個定義點** —— slotHTML 與任何之後要知道
 // 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
 // milestoneState 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。

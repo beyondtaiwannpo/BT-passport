@@ -131,6 +131,24 @@ function openModal(id) {
   setTimeout(() => { const n = d.querySelector("#mn"); if (n) n.focus(); }, 30);
 }
 
+// 補發入境章。呼叫點只有兩個：boot() 載入之後，以及蓋章成功之後。
+// 寫成一個函式而不是在兩處各判斷一次 —— 兩個地方各判斷一次，改了其中一邊
+// 另一邊會靜靜地說謊（跟 SLOT_ORDER、faceOf、visasOf 同一條原則）。
+//
+// boot() 也要呼叫的三個理由：匯入還原進來的月份、上一次寫入失敗的月份、
+// 以及這個功能上線之前就已經蓋滿的月份。
+//
+// **寫入失敗不擋使用者。** 章是使用者的資料，visa 是衍生的；失敗就留下線索，
+// 下次載入的修復路徑會再試一次。畫面上仍然顯示即時算的城市（visasOf 的
+// fallback），所以不會因此少一枚章。
+async function syncVisas() {
+  const rows = UI.pendingVisasOf(S);
+  if (!rows.length) return;
+  rows.forEach(r => { S.visas[r.month] = r.code; });
+  try { await DATA.issueVisas(rows); }
+  catch (e) { console.error("入境章沒有寫進去，下次載入會再試一次：", e); }
+}
+
 async function doStamp(id) {
   const d = document.getElementById("scrim"); if (!d) return;
   const date = d.querySelector("#md").value || UI.today();
@@ -148,6 +166,7 @@ async function doStamp(id) {
   try {
     await DATA.saveStamp(id, { date, note, photo });
     toast(fresh ? "蓋好了。" : "已更新。");
+    syncVisas();
   } catch (e) {
     toast("沒有存起來，再試一次。");
   }
@@ -471,6 +490,10 @@ export async function boot() {
     // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。
     S.activities = all.activities.filter(a => a.active !== false);
     S.down = false;
+    // 補發入境章（spec §9.9）：syncVisas 的樂觀更新是同步的，所以 render() 之前
+    // 呼叫就能讓這一次畫面立刻反映修復後的 S.visas；實際寫入資料庫的網路請求
+    // 在背景繼續跑，不擋這一次的 render（見 syncVisas 自己的註解）。
+    syncVisas();
     render();
   } catch (e) {
     // 畫面上永遠是 spec §8.1 那一句，但**維護者要看得到真正的原因**：休眠、網路斷、
