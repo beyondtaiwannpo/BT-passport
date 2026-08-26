@@ -398,36 +398,95 @@ export async function issueVisas(rows) {
 }
 ```
 
-- [ ] **Step 2: `main.js` 的 `syncVisas`，**一個定義點、兩個呼叫點****
+- [ ] **Step 2: 「哪些月份還欠一枚章」抽成純函式，放 `ui.js`**
+
+**這一步是 2026-08-26 對計畫的修訂。** 原本整個 `syncVisas` 都在 `main.js`，
+但 `main.js` 一條測試都沒有（ledger 的已知缺口），而這段邏輯裡藏著**空集合守衛**
+—— 那個 bug class 在這個 repo 已經咬過三次。放在測不到的地方等於沒有守衛。
+
+所以拆兩半：**選哪些月份**是純函式、進 `ui.js`、有測試；**送出請求**留在 `main.js`。
+
+先寫測試 `test/ui-visa.test.mjs`（接在既有的後面）：
 
 ```js
-// 補寫入境章。找出「已經蓋滿但 S.visas 沒有紀錄」的月份，算出城市寫進去。
+test("pendingVisasOf：蓋滿又還沒發章的月份才要補", () => {
+  const S = full9();                       // 九月三格都蓋了，visas 是空的
+  assert.deepEqual(pendingVisasOf(S), [{ month: 9, code: "TPE" }]);
+});
+
+test("pendingVisasOf：已經發過章的月份不再補", () => {
+  const S = { ...full9(), visas: { 9: "TPE" } };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：沒蓋滿的月份不補", () => {
+  const S = full9(); delete S.stamps["09C"];
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：沒有活動的月份不補 —— 空集合的守衛", () => {
+  // .every() 對空集合無條件成立。這個 repo 被同一個 bug class 咬過三次：
+  // dotOn 的圓點、idPageHTML 的 FULL 疊印、monthPageHTML 的 MONTH CLEARED。
+  // 沒有這條守衛的話，一個活動還沒建好的月份會憑空發出一枚入境章。
+  const S = { ...full9(), activities: [] };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：分配不到城市的月份不補，也不產生 undefined", () => {
+  const S = { ...full9(), destinations: [] };
+  assert.deepEqual(pendingVisasOf(S), []);
+});
+
+test("pendingVisasOf：一次蓋滿兩個月就回兩筆", () => {
+  const S = full9and10();
+  assert.equal(pendingVisasOf(S).length, 2);
+});
+```
+
+實作放 `src/ui.js`，緊接在 `visasOf` 後面：
+
+```js
+// 哪些月份已經蓋滿、但還沒發出入境章。回 [{month, code}]，餵給 data.js 的 issueVisas。
 //
-// 呼叫點只有兩個：boot() 載入之後，以及蓋章成功之後。寫成一個函式而不是在兩處
-// 各判斷一次 —— 兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊
-// （跟 SLOT_ORDER、faceOf、visasOf 同一條原則）。
+// **為什麼在 ui.js 而不是 main.js**：這裡面有空集合的守衛，而 main.js 沒有測試。
+// 守衛放在測不到的地方等於沒有守衛（2026-08-26 對計畫的修訂）。
+//
+// acts.length > 0 不可省：.every() 對空集合無條件成立，這個 repo 被同一個
+// bug class 咬過三次 —— dotOn 的圓點、idPageHTML 的 FULL 疊印、
+// monthPageHTML 的 MONTH CLEARED。少了它，一個活動還沒建好的月份會憑空
+// 發出一枚入境章，而那一枚是寫進資料庫、之後改不掉的（visas 沒有 update 權限）。
+export function pendingVisasOf(S) {
+  const want = visasOf(S);
+  return (S.months || []).filter(m => {
+    if ((S.visas || {})[m.month]) return false;
+    const acts = (S.activities || []).filter(a => a.month === m.month);
+    return acts.length > 0 && acts.every(a => S.stamps[a.id]);
+  }).map(m => want[m.month] && { month: m.month, code: want[m.month].code })
+    .filter(Boolean);
+}
+```
+
+`main.js` 的 `syncVisas` 就只剩接線：
+
+```js
+// 補發入境章。呼叫點只有兩個：boot() 載入之後，以及蓋章成功之後。
+// 寫成一個函式而不是在兩處各判斷一次 —— 兩個地方各判斷一次，改了其中一邊
+// 另一邊會靜靜地說謊（跟 SLOT_ORDER、faceOf、visasOf 同一條原則）。
 //
 // boot() 也要呼叫的三個理由：匯入還原進來的月份、上一次寫入失敗的月份、
 // 以及這個功能上線之前就已經蓋滿的月份。
 //
 // **寫入失敗不擋使用者。** 章是使用者的資料，visa 是衍生的；失敗就留下線索，
-// 下次載入再試一次。畫面上仍然顯示即時算的城市，所以不會因此少一枚章。
+// 下次載入的修復路徑會再試一次。畫面上仍然顯示即時算的城市（visasOf 的
+// fallback），所以不會因此少一枚章。
 async function syncVisas() {
-  const want = UI.visasOf(S);
-  const rows = S.months.filter(m => {
-    if (S.visas[m.month]) return false;
-    const acts = S.activities.filter(a => a.month === m.month);
-    return acts.length > 0 && acts.every(a => S.stamps[a.id]);   // 空集合的守衛
-  }).map(m => want[m.month] && { month: m.month, code: want[m.month].code }).filter(Boolean);
+  const rows = UI.pendingVisasOf(S);
   if (!rows.length) return;
   rows.forEach(r => { S.visas[r.month] = r.code; });
   try { await DATA.issueVisas(rows); }
   catch (e) { console.error("入境章沒有寫進去，下次載入會再試一次：", e); }
 }
 ```
-
-**`acts.length > 0 &&` 不可省** —— 空集合讓 `.every()` 無條件成立，這個 repo 已經被
-同一個 bug class 咬過三次。沒有活動的月份不該發出入境章。
 
 - [ ] **Step 3: 備份、還原、清除三條路（spec §9.11）**
 
