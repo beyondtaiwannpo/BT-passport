@@ -100,16 +100,31 @@ export function milestoneState(S) {
 // 都要一樣。這個系統已經有一模一樣的機制 —— 章的旋轉角度用 act.id 算（見 stampHTML）。
 const HOME_CODE = "TPE";
 
-// FNV-1a 32-bit。要的是「同一個字串永遠得到同一個數字」，不是密碼學強度。
-// 自己寫是因為零相依，而且 JS 沒有內建的穩定雜湊。
+// FNV-1a 32-bit + 一段 avalanche。要的是「同一個字串永遠得到同一個數字」，
+// 不是密碼學強度。自己寫是因為零相依，而且 JS 沒有內建的穩定雜湊。
+//
 // Math.imul 不可省：一般的 * 超過 2^53 會失去精度，結果就不再穩定。
+//
+// **結尾那段 avalanche 也不可省，而且它不是「保險」。** 2026-08-26 實測：
+// 只有 FNV-1a 的話，3000 個 uuid 只產生 1149 種城市組合（1826 個重複），
+// 而 23 選 10 有 4.1×10¹² 種排列；第二格的分布卡方 91.5（df=22，
+// p<0.001 的臨界值是 48.3）。
+//
+// 原因在 FNV-1a 的結構：h = (h ^ c) * p，而字元只有 7 bit，XOR 只動低位。
+// 三個字元的 code 跑完之後，各城市雜湊值的差異主要由 code 決定，種子的影響
+// 被壓住 —— 於是**每個人的順序幾乎一樣**。加上 avalanche 之後同一組測試是
+// 3000/3000 種組合、卡方 26.5。
+// test/ui-visa.test.mjs 的「兩百個種子要產生接近兩百種組合」釘住這件事。
 function hash32(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
     h = Math.imul(h, 0x01000193) >>> 0;
   }
-  return h;
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return h >>> 0;
 }
 
 export function visasOf(S) {

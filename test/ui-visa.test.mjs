@@ -85,3 +85,22 @@ test("池子不夠十一個的時候，只分配得出來的那幾個月", () =>
   assert.equal(Object.keys(d).length, 4);
   assert.equal(d[9].code, "TPE");
 });
+
+// 「不同人拿到不同的組合」上面已經有一條，但它只比兩個人 —— 那條在雜湊嚴重偏斜
+// 的時候照樣會過。2026-08-26 實測：原本的 FNV-1a 讓 3000 個 uuid 只產生 1149 種
+// 組合（1826 個重複），而 23 選 10 有 4.1×10¹² 種排列。
+//
+// 原因是 FNV-1a 的結構：h = (h ^ c) * p，而字元只有 7 bit，XOR 只動低位。
+// 三個字元的 code 跑完之後，各城市雜湊值的差異主要由 code 決定，種子的影響被壓住，
+// 於是大家的順序幾乎一樣。修法是在 hash32 結尾加一段 avalanche。
+//
+// 這條測試釘的是**種子真的有參與洗牌**，不是「湊巧兩個人不一樣」。
+test("兩百個種子要產生接近兩百種組合 —— 種子必須真的參與洗牌", () => {
+  const seeds = Array.from({ length: 200 }, (_, i) => {
+    const a = String(i).padStart(8, "0");
+    const z = String(i * 7919 % 100000000).padStart(12, "0");
+    return `${a}-0b7e-4d55-9a11-${z}`;
+  });
+  const sigs = new Set(seeds.map(id => codes(visasOf(S(id))).join()));
+  assert.ok(sigs.size >= 195, `只有 ${sigs.size} / 200 種組合，種子沒有真的參與洗牌`);
+});
