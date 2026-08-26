@@ -11,7 +11,7 @@ import * as UI from "./ui.js";
 let S = {
   user: null, authMode: "in", authMsg: "",
   profile: null, stamps: {}, entries: {},
-  activities: [], months: [],
+  activities: [], months: [], destinations: [], visas: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
   down: false, justStamped: null, flipped: {}, justFlipped: null
 };
@@ -402,7 +402,7 @@ document.addEventListener("click", async e => {
     // 就等於不動它，不需要像原本的寫法那樣特地寫 user: S.user 才能保住它。
     Object.assign(S, {
       authMode: "in", authMsg: "",
-      profile: null, stamps: {}, entries: {},
+      profile: null, stamps: {}, entries: {}, destinations: [], visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
       down: false, justStamped: null, flipped: {}, justFlipped: null
     });

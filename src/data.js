@@ -279,7 +279,9 @@ function fetchAll(user) {
     supabase.from("passports").select("*").eq("id", user.id).maybeSingle(),
     supabase.from("stamps").select("act_id, stamped_on").eq("user_id", user.id),
     supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id),
-    supabase.from("milestones").select("*").eq("active", true).order("threshold")
+    supabase.from("milestones").select("*").eq("active", true).order("threshold"),
+    supabase.from("destinations").select("*").eq("active", true).order("code"),
+    supabase.from("visas").select("month, code")
   ]);
 }
 
@@ -295,6 +297,13 @@ function fetchAll(user) {
 // 這個例外只准套用在 milestones 一個查詢上，不要把它當成「以後新增查詢
 // 都不用加進 firstError」的先例 —— stamps／entries／activities／months／
 // passports 這五個失敗了就是要整批擋下來，理由見上面那句。
+//
+// 2026-08-26：destinations 與 visas 都進這張清單，**不比照 milestones**。
+// milestones 讀不到的表現是「沒有里程碑 UI」，不會誤導。
+// destinations 讀不到的話，一個已經蓋滿三格的月份會什麼章都沒有 —— 那跟
+// 「你還沒蓋滿」長得一模一樣。visas 讀不到更糟：畫面會退回即時算，
+// 於是使用者看到的城市可能跟他上禮拜看到的不一樣，而且沒有任何提示。
+// 兩個都正是這段註解要防的那種誤導。README 第 9 項的直接應用（spec §9.4）。
 const firstError = rs => (rs.find(r => r.error) || {}).error || null;
 
 // milestones 的錯誤不往上拋（見 firstError 那段的註解）。失敗就當沒有里程碑，
@@ -311,10 +320,10 @@ export async function loadAll() {
   const user = await currentUser();
   // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
   // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
-  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [], milestones: [] };
+  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [], milestones: [], destinations: [], visas: {} };
 
-  let [mo, ac, pa, st, en, ms] = await fetchAll(user);
-  let firstErr = firstError([mo, ac, pa, st, en]);
+  let [mo, ac, pa, st, en, ms, de, vi] = await fetchAll(user);
+  let firstErr = firstError([mo, ac, pa, st, en, de, vi]);
 
   // ── PGRST303「JWT issued at future」只重試這一種，而且只重試一次 ──
   //
@@ -344,8 +353,8 @@ export async function loadAll() {
   // 換句話說：調小它能省下的是不存在的成本，賠上的是真實的失敗率。
   if (firstErr && firstErr.code === "PGRST303") {
     await new Promise(r => setTimeout(r, 2000));
-    [mo, ac, pa, st, en, ms] = await fetchAll(user);
-    firstErr = firstError([mo, ac, pa, st, en]);
+    [mo, ac, pa, st, en, ms, de, vi] = await fetchAll(user);
+    firstErr = firstError([mo, ac, pa, st, en, de, vi]);
   }
 
   // 重試之後仍然失敗就往上丟。main.js 的 boot() 會接住並顯示
@@ -357,6 +366,8 @@ export async function loadAll() {
   (st.data || []).forEach(r => { stamps[r.act_id] = { date: r.stamped_on }; });
   const entries = {};
   (en.data || []).forEach(r => { entries[r.act_id] = { note: r.note, photo: r.photo }; });
+  const visas = {};
+  (vi.data || []).forEach(r => { visas[r.month] = r.code; });
 
   return {
     // maybeSingle() 沒找到時 data 是 null 而不是報錯。正常情況一定找得到 ——
@@ -367,7 +378,9 @@ export async function loadAll() {
     stamps, entries,
     activities: ac.data || [],
     months: mo.data || [],
-    milestones: milestonesOf(ms)
+    milestones: milestonesOf(ms),
+    destinations: de.data || [],
+    visas
   };
 }
 
