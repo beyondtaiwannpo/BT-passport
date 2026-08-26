@@ -347,8 +347,16 @@
   /* 入境章。spec §三、§9.2、§10.1 —— 新的視覺元件，是 §3.4 的第二個明確例外
      （第一個是 2026-08-25 的翻面卡）。不沿用 .overprint 是因為 .overprint 還在
      資料頁被 FULL 用（idPageHTML），而它是一行文字、入境章是四行的框，改 .overprint
-     會連帶改到 FULL。位置、斜角、filter:url(#bt-ink)、pointer-events、顏色全部沿用
+     會連帶改到 FULL。位置、斜角、filter:url(#bt-ink)、pointer-events 沿用
      .overprint 的值，視覺語彙不新增，不得新增顏色。
+
+     ── 2026-08-26 第三輪：拿掉底色，只留墨線（使用者裁定，B 版）──
+     .overprint 的 background:var(--bt-orange) **沒有**沿用進來。章放大到會壓過
+     活動格子的內容之後，實心底色會把壓到的標題整個蓋掉；使用者要的是「壓過去」——
+     像真的入境章蓋在已經印好的頁面上，底下的文字從筆畫（border/文字）之間透出來，
+     不是「蓋掉」。所以 .estamp 只剩 border（墨線）與四行文字，沒有 background。
+     這也是為什麼下面 opacity 只有一個桌機共用值，手機不再需要自己的
+     opacity:1（見手機媒體查詢那段 .estamp 旁的說明）。
 
      ── 2026-08-26 第二輪：判準整個換掉（使用者裁定，見 spec §10.1）──
      舊判準「不可以切到活動格子裡的任何東西」被推翻。新判準：
@@ -396,7 +404,7 @@
      假設哪個角度比較壞——上面這段就是量錯猜測的例子。** */
   .estamp{
     position:absolute;top:34px;right:26px;z-index:2;pointer-events:none;
-    color:var(--bt-navy);background:var(--bt-orange);
+    color:var(--bt-navy);
     opacity:.85;
     border:3px double currentColor;border-radius:4px;padding:5.57px 18.57px;
     display:flex;flex-direction:column;align-items:center;gap:1px;
@@ -564,14 +572,19 @@
        .superpowers/sdd/2026-08-26-entry-stamp/r2-task-2-report.md。
        手機字級跟桌機一樣，是拿最長的城市 SALT LAKE CITY 量的，不是 TAIPEI，
        理由見桌機那段。 */
-    /* ── opacity:1 是為了可讀性，不是為了視覺 ── 這一段是第一輪（21px 疊印時代）
-       量出來的：.mhead 底下那條 2px 的線在當時的字級與位置下正好穿過章最底下
-       的日期，桌機維持 .85（章壓過底下東西是章該有的樣子），手機改 opacity:1
-       避免蓋掉唯讀資訊。opacity 這個決定本身不在這次任務範圍內（Task 2 明確
-       不動底色與 opacity），這裡沒有重新量線與新字級/新 top 是否還相交——
-       如果之後有人要動 opacity，要重新量這條線，不要沿用這裡舊字級時代的數字。
-       opacity 不動任何幾何，跟 .estamp 的位置/尺寸量測互相獨立。 */
-    .estamp{top:26px;padding:3.71px 13px;gap:0;opacity:1}
+    /* ── 2026-08-26 第三輪：手機不再需要自己的 opacity ── 舊的 opacity:1
+       是為了讓實色底色蓋住 .mhead 底下那條線，避免線穿過日期。B 版拿掉了
+       background（見桌機 .estamp 那則長註解），這個理由整個不存在了：沒有
+       底色可以蓋線，opacity 再怎麼調也蓋不住線，因為線本來就沒被蓋住過、
+       是被色塊蓋住。所以這裡不再覆寫 opacity，手機跟桌機一樣吃上面
+       .estamp 的 opacity:.85（一個定義點）。
+       重量結果（26px 這組、兩個視寬 × 四個角度 -15/-11/0/+8，數字見
+       r2-task-3-report.md）：`.mhead` 那條線在全部 8 格裡都沒有穿過 `.e4`
+       ——390px 最壞（-15°）的餘裕還有 17.31px，所以**沒有做 C**（把線在
+       章的範圍內斷開那個方案）。如果之後字級、top 或角度範圍改了要回來重量，
+       穿過的話修法是 `.estamp::before`，**不是**把 opacity 改回 1 或任何
+       固定值去遮線——那是舊字級時代的解法，使用者已經明確禁止拿它解這輪的問題。 */
+    .estamp{top:26px;padding:3.71px 13px;gap:0}
     .estamp .e1{font-size:11.14px;letter-spacing:.16em}
     .estamp .e2{font-size:18.57px;letter-spacing:.14em}
     .estamp .e3{font-size:14.86px}
