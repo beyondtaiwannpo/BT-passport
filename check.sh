@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # BT Passport 靜態檢查。對應 spec §11 的視覺項與金鑰項。
 # 用法：./check.sh
+#
+# 寫新檢查前讀這段（2026-08-25，同一個坑咬過四次）：
+# 「必須存在」型的 grep 守門一律要錨定到程式碼的完整形式（行首空白 + 完整的
+# 選擇器/呼叫），不要只 grep 一個裸字串。理由：這個 repo 的註解習慣解釋規則
+# 本身（例如「修法是 min-width:0 加上 overflow-wrap:anywhere」），註解裡的
+# 敘述句會含有跟真正宣告一樣的字面，於是「grep -q 那個字串」會被註解餵飽，
+# 就算把宣告本身刪掉，守門依然回報 ok —— 而且是安靜地壞，不會像下面「必須不
+# 存在」型的守門那樣因為誤報 FAIL 而當場被發現。2026-08-25 實測過：
+# overflow-wrap:anywhere 那條就這樣壞掉，直到專門的破壞測試才抓到。
+# 「必須不存在」型的守門（grep 到就 bad）不受這個坑影響：註解污染只會讓它
+# 誤報 FAIL，那個方向是安全的，不用特別錨定。
 set -u
 fail=0
 say() { printf '%s\n' "$1"; }
@@ -125,7 +136,7 @@ fi
 # 用 class 描述外觀的規則，全站按鈕的邊框與底色會靜靜地全部消失 ——
 # 不會報錯，只是東西不見了，而 .dots 只剩 aria-current 的 outline 撐著一顆圓點。
 # 這個站從原型到 2026-08-22 都是這個狀態。見 spec 2026-08-22 §1。
-if grep -q ':where(#bt-root button)' index.html; then
+if grep -qE '^\s*:where\(#bt-root button\)\{' index.html; then
   ok "按鈕 reset 是零特異性（:where）"
 else
   bad "index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
@@ -136,7 +147,7 @@ fi
 # 而那是一個沒有任何東西會報錯的視覺回歸。2026-08-22 實測過：把選擇器改回
 # .mtheme b 之後，check.sh 與全部單元測試都還是綠的，所以需要這兩條。
 # 單元測試碰不到這件事：它是 CSS 級聯，要真的瀏覽器才量得出 computed style。
-if grep -q '\.mtheme\.clock b{' index.html; then
+if grep -qE '^\s*\.mtheme\.clock b\{' index.html; then
   ok "時刻放大掛在 .mtheme.clock b 上"
 else
   bad "index.html 找不到 .mtheme.clock b，時刻放大可能被改到 .mtheme b（spec 2026-08-22 §5.2）"
@@ -151,7 +162,7 @@ fi
 
 # 說明頁三張卡的標題要固定兩行高，否則使用者刻意寫成同樣開頭的第一句會錯開。
 # 這件事單元測試碰不到（是版面高度，要真瀏覽器才量得到），只能在這裡守著寫法。
-if grep -q '\.slots\.guide \.slot \.ttl{' index.html; then
+if grep -qE '^\s*\.slots\.guide \.slot \.ttl\{' index.html; then
   ok "說明頁標題固定兩行高（.slots.guide .slot .ttl）"
 else
   bad "index.html 找不到 .slots.guide .slot .ttl，說明頁三張卡的第一句會錯開（spec 2026-08-22 §4.2）"
@@ -170,13 +181,13 @@ fi
 # 「清除這本護照」必須維持降級的外觀。它會刪掉一整年的章、心得與照片且不可復原，
 # 跟旁邊三顆可逆的操作長得一樣重的話，遲早有人手滑按到。
 # 這不是視覺偏好是安全設計 —— 視覺偏好可以被下一個人推翻，安全設計不行，所以釘住它。
-if grep -q 'class="btn sm quiet" data-act="reset"' src/ui.js; then
+if grep -qE '^\s*<button class="btn sm quiet" data-act="reset">' src/ui.js; then
   ok "清除護照的按鈕維持降級外觀（.btn.quiet）"
 else
   bad "src/ui.js 的「清除這本護照」不是 class=\"btn sm quiet\"，它會跟可逆操作等重"
 fi
 
-if grep -q '\.btn\.quiet{' index.html; then
+if grep -qE '^\s*\.btn\.quiet\{' index.html; then
   ok ".btn.quiet 的樣式定義還在"
 else
   bad "index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
@@ -204,7 +215,7 @@ fi
 # 就要記得加一行，而那件事已經漏過 —— milestones 從上線起就沒被裝進 S，
 # 里程碑 UI 在正式站上是死的，而 (S.milestones || []) 的防呆讓它安靜地不渲染，
 # 所以沒有人發現（2026-08-25）。單元測試碰不到：main.js 一條測試都沒有。
-if grep -q 'Object\.assign(S, all)' src/main.js; then
+if grep -qE '^\s*Object\.assign\(S, all\);' src/main.js; then
   ok "boot() 整包裝填 loadAll 的結果"
 else
   bad "src/main.js 的 boot() 不是 Object.assign(S, all)，新欄位會靜靜地不進 S"
@@ -221,12 +232,18 @@ fi
 # （比格子寬的圖、<pre>、white-space:nowrap 的元素），兩者擋的是不同的東西，
 # 只是在「長英文字串」這個案例上剛好重疊，所以兩個條件都要成立才 ok。
 #
+# 這條本身在 2026-08-25 審查中被抓到一個 Critical：overflow-wrap:anywhere 這個
+# 字面在上面的註解裡出現了三次，而原本的 grep 沒有錨定行首——註解把守門餵飽，
+# 就算把 369 行 .slot .note,.slot .hint{overflow-wrap:anywhere} 那條宣告整行
+# 刪掉，check.sh 依然印 ok。現在錨定到宣告的完整形式（行首空白 + 選擇器 +
+# {overflow-wrap:anywhere}），敘述句裡的字面無論怎麼寫都不會命中。
+#
 # 單元測試碰不到這件事（是版面寬度，要真瀏覽器才量得到），而且它不會有橫向捲軸、
 # 不像跑版，只像「某一格怪怪的」，人工也不容易發現。
-if grep -qE '^\s*min-width:0;' index.html && grep -q 'overflow-wrap:anywhere' index.html; then
+if grep -qE '^\s*min-width:0;' index.html && grep -qE '^\s*\.slot \.note,\.slot \.hint\{overflow-wrap:anywhere\}' index.html; then
   ok "長字串不會撐開格子（min-width:0 防斷不了的內容、overflow-wrap:anywhere 防長字串）"
 else
-  bad "index.html 少了 min-width:0 或 overflow-wrap:anywhere——少 overflow-wrap 會讓長英文字串撐寬格子，少 min-width:0 則會讓斷不了的內容溢出格子邊界"
+  bad "index.html 少了 min-width:0 或 .slot .note,.slot .hint{overflow-wrap:anywhere} 這條宣告本身——兩個都沒有時長英文字串會撐寬格子；只少 overflow-wrap（min-width:0 還在）不會撐寬，是文字溢出格子邊界"
 fi
 
 # 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
