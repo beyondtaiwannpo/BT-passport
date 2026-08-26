@@ -538,8 +538,19 @@
        被刻意壓住是同一種允許的重疊，因為 .mtheme 這一輪已經整個拿掉
        （spec §二），那個角落現在是空白。.estamp 沒有超出 .page 右邊界
        （right 比 .page.right 少 20.54px）。top:26px 起手就通過，不用再調。 */
-    /* 手機也是拿 SALT LAKE CITY 量的，理由見桌機那段。 */
-    .estamp{top:26px;padding:2px 7px;gap:0}
+    /* 手機也是拿 SALT LAKE CITY 量的，理由見桌機那段。
+       ── opacity:1 是為了可讀性，不是為了視覺 ──
+       .mhead 底下那條 2px 的線正好穿過章最底下那一行日期（實測 390px dpr 3：
+       線在 y=75.68，.e4 的範圍是 64.41–82.14，三個城市都被穿過）。
+       桌機維持 .85 —— 使用者 2026-08-25 的裁定「章壓過底下的東西是章該有的
+       樣子，不要修掉」在那裡仍然成立。但那個判斷是在**一行文字**的章上做的；
+       現在是四行，最底下的日期在手機上只有 7px，線穿過去就不可讀了。
+       使用者 2026-08-26 修正：**壓過去是質感，蓋掉資訊不是。**
+       另外兩個做法都量過並否決：往下移會撞到第一格（只剩 2.58px 餘裕）；
+       往上移到 top:17 才閃得開線，但章會貼到頁面上緣只剩 5.94px，
+       而且那是一個「以後改 .mhead 或 padding 就要回來重量」的新耦合。
+       opacity 不動任何幾何。 */
+    .estamp{top:26px;padding:2px 7px;gap:0;opacity:1}
     .estamp .e1{font-size:6px;letter-spacing:.16em}
     .estamp .e2{font-size:10px;letter-spacing:.14em}
     .estamp .e3{font-size:8px}
