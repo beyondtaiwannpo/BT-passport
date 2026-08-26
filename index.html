@@ -344,45 +344,73 @@
   }
   .overprint.land{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
 
-  /* 入境章。spec §三、§9.2 —— 新的視覺元件，是 §3.4 的第二個明確例外（第一個是
-     2026-08-25 的翻面卡）。不沿用 .overprint 是因為 .overprint 還在資料頁被 FULL 用
-     （idPageHTML），而它是一行文字、入境章是四行的框，改 .overprint 會連帶改到 FULL。
-     位置、斜角、filter:url(#bt-ink)、pointer-events、顏色全部沿用 .overprint 的值，
-     視覺語彙不新增，不得新增顏色。
+  /* 入境章。spec §三、§9.2、§10.1 —— 新的視覺元件，是 §3.4 的第二個明確例外
+     （第一個是 2026-08-25 的翻面卡）。不沿用 .overprint 是因為 .overprint 還在
+     資料頁被 FULL 用（idPageHTML），而它是一行文字、入境章是四行的框，改 .overprint
+     會連帶改到 FULL。位置、斜角、filter:url(#bt-ink)、pointer-events、顏色全部沿用
+     .overprint 的值，視覺語彙不新增，不得新增顏色。
 
-     top:60px 是照抄 .overprint 的起點，但入境章是四行的框，旋轉 -11 度之後
-     左下角比一行的 MONTH CLEARED 伸得更遠——實測 1280px（dpr 2）九月三格全蓋滿時，
-     top:60px 讓 .estamp 切到第三格（鏡頭 FRAME）.cat 的上緣，重疊 85.45×12.5＝1068.12px²
-     （比當年 .overprint 在 top:70px 時切 .cat 的 251.0×5.2 更嚴重），所以改成 top:25px：
-     .estamp.bottom(135.53) 減第三格 .cat.top(144.77) = -9.25px（不重疊，留 9.25px 餘裕）。
-     跟 .mzh（月名）沒有水平重疊，不受影響。.estamp 沒有超出 .page 右邊界
-     （right 比 .page.right 少 18.04px）。
-     之後如果調整 .mhead 的高度、.slot 的 padding 或 .cat 的字級，
-     **要回來重量這個距離**——它是兩個獨立絕對定位/旋轉元素的幾何關係，
-     沒有任何測試守得住。 */
+     ── 2026-08-26 第二輪：判準整個換掉（使用者裁定，見 spec §10.1）──
+     舊判準「不可以切到活動格子裡的任何東西」被推翻。新判準：
+     **可以**壓 .slot 與格子裡的內容（.cat/.ttl/活動章）——那個「壓過去」正是
+     「這個月結束了」的感覺，真的入境章本來就蓋在已經有東西的頁面上。
+     **不可以**壓到 .mnum（月份數字）與 .mzh（月名），那是導航不是內容；
+     也不准超出 .page 的左/右/上邊界，不准出現橫向捲軸。
+     這條裁定也讓 pointer-events:none 從裝飾變成載重的：章蓋在可點的格子上，
+     少了它蓋滿的月份會有兩格點不開（check.sh 有一條錨定的守門在守這個宣告）。
+
+     ── 放大到多少：三個尺寸都量過，用 26px 這組當暫定值，由使用者選 ──
+     .e2 分別試過 20 / 26 / 32px，其餘三行與 padding 按 .e2 的成長比例整組等比放大
+     （例如 26px 是 14px 的 26/14 倍，於是 .e1/.e3/.e4/padding 全部乘上同一個倍數，
+     桌機、手機各自的既有數字各自乘，維持原本桌機:手機的比例不變）。
+     量測矩陣是 3 尺寸 × 3 城市（TAIPEI／SAN FRANCISCO／SALT LAKE CITY）×
+     4 角度（-15/-11/0/+8，angleOf 的全範圍）× 2 視寬（1280/390）＝ 72 格，
+     每格量 .estamp 相對 .page 的矩形、跟 .mnum／.mzh 的重疊面積（矩形相交公式）、
+     有沒有超出 .page 邊界、有沒有橫向捲軸。完整 72 格數字見
+     .superpowers/sdd/2026-08-26-entry-stamp/r2-task-2-report.md。
+
+     結果：**20px 與 26px 兩組全部 72 格裡屬於它們的 48 格都過**（.mnum／.mzh
+     重疊永遠是 0，不超界，無橫向捲軸）；**32px 出局**——390px 視寬下 SAN
+     FRANCISCO／SALT LAKE CITY 四個角度全部壓到 .mzh（最壞 SLC -15° 重疊
+     765.82px²，即使 0° 不轉也還有 388.83px²，不是角度的問題，是框本身在
+     390px 寬度下已經比 .mzh 到 .page 右邊界的距離更寬）。
+
+     **量測結果推翻了原本對「哪個角度最壞」的猜測**：預期正角度（+8°）會把
+     章往左下推、更靠近 .mzh，實測卻是 **-15°** 在所有量到的案例裡最壞
+     （例如 32px/390px/SLC：-15° 重疊 765.82px²，+8° 只有 618.79px²）——
+     這裡的章是用 top+right 錨定（框往左、往下長），旋轉角度的絕對值愈大，
+     框愈往左上頂，-15 的絕對值（15）比 +8（8）大，所以是 -15 贏。
+     **這不是規律，是這組錨定方式量出來的結果**——下一次量的時候還是要四個
+     角度都跑，不要因為這次的結論就只跑 -15。
+
+     top:25px 是第一輪量出來的值，扛不住新判準下更大的框：舊判準時「不壓到
+     格子」是硬限制，這次「不壓到 .page 上邊界」變成唯一還在的硬限制，於是
+     top 要往下調（讓框整體下移，跟旋轉角度無關——top 的位移是純平移，
+     旋轉中心跟著框一起移動，量出來的重疊/超界結果只會整體平移，不會變形）。
+     26px 這組實測 1280px 下最壞是 SLC -15°，原本 top:25px 會超出 .page 上邊界
+     5.59px，調到 **top:34px** 之後餘裕變成 3.41px（safety margin，不是壓線過）。
+     手機 top:26px 沒有這個問題（1280px 才會頂到，390px 單欄版面本來就寬裕），
+     不用跟著調。
+     **之後改任何一行的字級、padding 或角度範圍，要拿「最長城市 SALT LAKE CITY
+     × 角度範圍兩端 -15°/+8°」重量，不要拿 TAIPEI，也不要只量一個角度或
+     假設哪個角度比較壞——上面這段就是量錯猜測的例子。** */
   .estamp{
-    position:absolute;top:25px;right:26px;z-index:2;pointer-events:none;
+    position:absolute;top:34px;right:26px;z-index:2;pointer-events:none;
     color:var(--bt-navy);background:var(--bt-orange);
     opacity:.85;
-    border:3px double currentColor;border-radius:4px;padding:3px 10px;
+    border:3px double currentColor;border-radius:4px;padding:5.57px 18.57px;
     display:flex;flex-direction:column;align-items:center;gap:1px;
     font-family:var(--display);font-weight:700;text-align:center;
     filter:url(#bt-ink);
   }
-  /* ── 字級是**用最長的城市**量出來的，不是用 TAIPEI ──
-     旋轉 -11 度之後，外接框的高 = 寬·sin11 + 高·cos11 —— 城市名一長，
-     框變寬，**框就跟著變高**，往下伸進第三格。2026-08-26 實測 1280px（dpr 2）：
-       TAIPEI（6 字母）        寬 129.8  章底減第三格 .cat 頂 = -7.80  不重疊
-       SAN FRANCISCO（13）    寬 251.3  = +4.01  重疊
-       SALT LAKE CITY（14）   寬 252.3  = +4.11  重疊
-     最初的 17px/.3em 只用 TAIPEI 驗過，所以看起來是過的。
-     縮到下面這組之後，最長的城市是 -8.62（餘裕跟 TAIPEI 原本那組同一個量級）。
-     **之後改任何一行的字級或 padding，要拿 SALT LAKE CITY 重量，不要拿 TAIPEI。**
+  /* ── 字級是**用最長的城市**量出來的，不是用 TAIPEI ── 見上面 .estamp 那則
+     長註解的完整量測方法與數字。這裡只留最終值：.e2=26px 這組的桌機字級，
+     .e1/.e3/.e4 是 8/11/9px（第一輪的值）各自乘上 26/14。
      四行一起等比縮：.e2 若只縮自己會跟 .e3 一樣大，階層會塌掉。 */
-  .estamp .e1{font-size:8px;letter-spacing:.22em;opacity:.75}
-  .estamp .e2{font-size:14px;letter-spacing:.18em}
-  .estamp .e3{font-size:11px;letter-spacing:.1em}
-  .estamp .e4{font-size:9px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+  .estamp .e1{font-size:14.86px;letter-spacing:.22em;opacity:.75}
+  .estamp .e2{font-size:26px;letter-spacing:.18em}
+  .estamp .e3{font-size:20.43px;letter-spacing:.1em}
+  .estamp .e4{font-size:16.71px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
   .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
   /* 長英文字串與網址要能在任何位置斷行。
      grid 的 1fr 預設不會小於內容的最小寬度，而一串沒有空白的字母的最小寬度
@@ -524,36 +552,30 @@
        時刻是裝飾，月名是資訊，而手機是三十個幹部主要的使用裝置。
        改動這裡或 .mhead 的任何尺寸之後，要回來重量一次：這是幾何關係，沒有測試守得住。 */
     .overprint{font-size:13px;top:26px}
-    /* 入境章的手機尺寸。position 沿用 .overprint 的 top:26px；字級不能整套沿用
-       13px（.overprint 是一行，入境章是四行），改成依桌機 9/17/13/10 的比例
-       （約 65%）縮成 6/11/9/7。
-
-       實測 390px（dpr 2）九月三格全蓋滿：.estamp 矩形 top:29.71 bottom:103.42
-       left:288.02 right:360.46。手機是單欄堆疊，第三格 .cat 落在遠低的
-       top:575.26（.estamp.bottom 減它 = -471.84px，完全不重疊）；跟月名 .mzh
-       （top:40.68~70.68，left:96.49~156.49）沒有水平交集，用矩形相交公式算出
-       實際重疊面積是 0（跟 .cat0／.ttl0／.slot0／.cat1／.cat2 全部一樣是 0）。
-       唯一有重疊的是 .mhead 本身（3981.95px²）——跟桌機當年 .mtheme.clock
-       被刻意壓住是同一種允許的重疊，因為 .mtheme 這一輪已經整個拿掉
-       （spec §二），那個角落現在是空白。.estamp 沒有超出 .page 右邊界
-       （right 比 .page.right 少 20.54px）。top:26px 起手就通過，不用再調。 */
-    /* 手機也是拿 SALT LAKE CITY 量的，理由見桌機那段。
-       ── opacity:1 是為了可讀性，不是為了視覺 ──
-       .mhead 底下那條 2px 的線正好穿過章最底下那一行日期（實測 390px dpr 3：
-       線在 y=75.68，.e4 的範圍是 64.41–82.14，三個城市都被穿過）。
-       桌機維持 .85 —— 使用者 2026-08-25 的裁定「章壓過底下的東西是章該有的
-       樣子，不要修掉」在那裡仍然成立。但那個判斷是在**一行文字**的章上做的；
-       現在是四行，最底下的日期在手機上只有 7px，線穿過去就不可讀了。
-       使用者 2026-08-26 修正：**壓過去是質感，蓋掉資訊不是。**
-       另外兩個做法都量過並否決：往下移會撞到第一格（只剩 2.58px 餘裕）；
-       往上移到 top:17 才閃得開線，但章會貼到頁面上緣只剩 5.94px，
-       而且那是一個「以後改 .mhead 或 padding 就要回來重量」的新耦合。
-       opacity 不動任何幾何。 */
-    .estamp{top:26px;padding:2px 7px;gap:0;opacity:1}
-    .estamp .e1{font-size:6px;letter-spacing:.16em}
-    .estamp .e2{font-size:10px;letter-spacing:.14em}
-    .estamp .e3{font-size:8px}
-    .estamp .e4{font-size:7px}
+    /* 入境章的手機尺寸。position 沿用 .overprint 的 top:26px。
+       2026-08-26 第二輪放大：判準換了（見桌機那則 .estamp 長註解），量測矩陣
+       裡手機（390px）的部分是**唯一會摸到 .mzh 的地方**——桌機因為 .mzh 在
+       畫面左半、.estamp 貼右邊界，水平永遠不相交，390px 單欄版面兩者才會
+       靠近。26px 這組（.e2 26/14 倍）在 390px 下三個城市、四個角度（-15/-11/0/+8）
+       跟 .mzh 的重疊全部是 0，**沒有超出 .page 邊界，也沒有橫向捲軸**，
+       top:26px 起手就通過、不用調（跟桌機不一樣，桌機 top 要往下調到 34px
+       才夠，見桌機那則的說明）。32px 那組在這裡出局——SAN FRANCISCO／
+       SALT LAKE CITY 四個角度全部壓到 .mzh，完整數字見
+       .superpowers/sdd/2026-08-26-entry-stamp/r2-task-2-report.md。
+       手機字級跟桌機一樣，是拿最長的城市 SALT LAKE CITY 量的，不是 TAIPEI，
+       理由見桌機那段。 */
+    /* ── opacity:1 是為了可讀性，不是為了視覺 ── 這一段是第一輪（21px 疊印時代）
+       量出來的：.mhead 底下那條 2px 的線在當時的字級與位置下正好穿過章最底下
+       的日期，桌機維持 .85（章壓過底下東西是章該有的樣子），手機改 opacity:1
+       避免蓋掉唯讀資訊。opacity 這個決定本身不在這次任務範圍內（Task 2 明確
+       不動底色與 opacity），這裡沒有重新量線與新字級/新 top 是否還相交——
+       如果之後有人要動 opacity，要重新量這條線，不要沿用這裡舊字級時代的數字。
+       opacity 不動任何幾何，跟 .estamp 的位置/尺寸量測互相獨立。 */
+    .estamp{top:26px;padding:3.71px 13px;gap:0;opacity:1}
+    .estamp .e1{font-size:11.14px;letter-spacing:.16em}
+    .estamp .e2{font-size:18.57px;letter-spacing:.14em}
+    .estamp .e3{font-size:14.86px}
+    .estamp .e4{font-size:13px}
   }
   @media (prefers-reduced-motion:reduce){
     /* 五個動畫全部關掉：.stamp.land、.page.turn、.overprint.land、

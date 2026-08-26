@@ -281,6 +281,23 @@ else
   grep -n 'Object\.keys(S\.stamps)\.length' src/ui.js
 fi
 
+# spec §10.1（2026-08-26 第二輪）：入境章的判準整個換掉，現在**可以**壓到
+# .slot 裡的內容——章蓋在可點的格子上面，pointer-events:none 從裝飾性的保險
+# 變成**載重的**：少了它，蓋滿的月份會有兩格點不開，而且不會有任何東西報錯
+# （按下去的是章不是底下的按鈕，畫面看起來完全正常）。
+# 這是「必須存在」型，錨定到 .estamp 選擇器本身再看它底下那一行完整宣告
+# （見 README 第 10 項）——不能只 grep 裸字串 pointer-events:none，
+# .overprint 那條規則字面上也長得幾乎一樣（同樣 top/right/z-index/pointer-events），
+# 沒錨定的話拿掉 .estamp 的 pointer-events:none 之後這條照樣會看到 .overprint
+# 那一行然後誤判成 ok。用 `.estamp{` 單獨成行去對，媒體查詢裡那個
+# `.estamp{top:26px;...}`（同一行寫完，選擇器後面不是換行）不會被這個 pattern 選中，
+# 所以只會抓到桌機那個主要宣告——加守門時已經刪掉這行宣告本身跑過一次，確認真的 FAIL。
+if grep -A1 '^\s*\.estamp{$' index.html | tail -1 | grep -qE '^\s*position:absolute;top:[0-9]+px;right:[0-9]+px;z-index:2;pointer-events:none;'; then
+  ok ".estamp 的 pointer-events:none 還在"
+else
+  bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #
