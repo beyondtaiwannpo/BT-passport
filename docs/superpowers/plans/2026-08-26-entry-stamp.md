@@ -6,9 +6,11 @@
 **Goal:** 把 `MONTH CLEARED` 換成一枚城市代碼的入境章，月份主題留空不渲染，
 說明頁第三卡改文案，撕掉章的時候演一次紙被撕開。
 
-**Architecture:** 城市分配是**純函式**（`ui.js` 的 `destinationsOf`），
-用 `passports.id` 當種子洗牌，跟 `faceOf` / `pagesOf` / `milestoneState` 同一條原則：
-只有一個定義點。資料只多讀一張 `destinations`，不新增任何寫入路徑。
+**Architecture:** 城市有兩個來源，**存下來的贏**。`ui.js` 的純函式 `visasOf`
+是唯一的定義點：`S.visas` 有紀錄就用它，沒有就用 `passports.id` 當種子洗牌即時算，
+而即時算的部分要避開已經存下來的城市。寫入只有一條路 —— `main.js` 的 `syncVisas`，
+在 `boot()` 之後與蓋章成功之後各呼叫一次。`visas` 這張表**沒有 update 權限**，
+「蓋滿的月份城市從此固定」由資料庫擋，不靠前端自律。
 
 **Tech Stack:** 零建置原生 JS、Supabase、`node --test`、`check.sh`
 
@@ -34,14 +36,15 @@
 
 | 檔案 | 這一輪的責任 |
 |---|---|
-| `src/ui.js` | `destinationsOf` 純函式、`.estamp` 的 HTML、`monthPageHTML` 換章、`.mtheme` 不渲染、CATEGORY.frame.body |
-| `src/data.js` | 多讀一張 `destinations`，進 `firstError` |
-| `src/main.js` | unstamp 改成先演再刪，失敗還原 |
+| `src/ui.js` | `visasOf` 純函式、`.estamp` 的 HTML、`monthPageHTML` 換章、`.mtheme` 不渲染、CATEGORY.frame.body |
+| `src/data.js` | 多讀 `destinations` 與 `visas`（兩張都進 `firstError`）、`issueVisas`、備份/還原/清除跟上 |
+| `src/main.js` | `syncVisas` 的兩個呼叫點；unstamp 改成先演再刪，失敗還原 |
 | `index.html` | `.estamp` 樣式與撕開的 keyframes、reduce 區塊 |
-| `test/ui-destination.test.mjs` | 新檔，洗牌的三個要求 |
+| `test/ui-visa.test.mjs` | 新檔，洗牌的三個要求＋存下來的優先 |
 | `test/ui-month-head.test.mjs` | `.mtheme` 不渲染 |
 | `supabase/migrations/2026-08-26-destinations.sql` | 留檔（已執行） |
-| `README.md` | `destinations` 上線後不准增刪 |
+| `supabase/migrations/2026-08-26-visas.sql` | **使用者要跑**，已寫好 |
+| `README.md` | 加城市是安全的、為什麼安全、它依賴什麼前提 |
 
 ---
 
@@ -114,26 +117,29 @@ git commit -m "fix(ui): 月份主題空的時候整個 .mtheme 不渲染"
 
 ---
 
-## Task 2：`destinationsOf` 純函式
+## Task 2：`visasOf` 純函式
 
-**Files:** Modify `src/ui.js`；Create `test/ui-destination.test.mjs`
+**Files:** Modify `src/ui.js`；Create `test/ui-visa.test.mjs`
 
 **Interfaces:**
-- Produces: `export function destinationsOf(S)` → `{ [month:number]: {code, city} }`
-- Consumes: `S.months`（已依 `seq` 排序，09 在最前）、`S.destinations`、`S.profile.id`
+- Produces: `export function visasOf(S)` → `{ [month:number]: {code, city} }`
+- Consumes: `S.months`（依 `seq` 排序，09 最前）、`S.destinations`、`S.visas`（`{month: code}`）、`S.profile.id`
 
-**先讀 spec §3 分配規則與 §9.5。**
+**先讀 spec §三 分配規則、§9.5、§9.9。**
+
+這個函式回答的是「**這個月是哪個城市**」，不管有沒有蓋滿。存下來的優先，
+沒存的即時算，而且即時算的要**避開已經存下來的城市** —— 池子變動之後，一個已經
+發出的城市可能被算給另一個月，同一本護照出現兩次。
 
 - [ ] **Step 1: 先寫測試**
 
-Create `test/ui-destination.test.mjs`：
+Create `test/ui-visa.test.mjs`：
 
 ```js
-// 城市分配的三個要求（spec §3 分配規則）。
-// 跑法：node --test test/*.test.mjs
+// 城市分配（spec §三 分配規則、§9.9）。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { destinationsOf } from "../src/ui.js";
+import { visasOf } from "../src/ui.js";
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",
@@ -143,88 +149,109 @@ const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN
   "LHR LONDON","NRT TOKYO","ICN SEOUL","SYD SYDNEY"]
   .map(s => ({ code: s.slice(0,3), city: s.slice(4), active: true }));
 
-const S = id => ({ months: MONTHS, destinations: DEST, profile: { id } });
 const A = "3f1c9a20-0b7e-4d55-9a11-8c2e6f4b7d01";
 const B = "a7e4b108-52dc-41f9-8f30-1d6c9b2e5a44";
+const S = (id, visas = {}, dest = DEST) =>
+  ({ months: MONTHS, destinations: dest, visas, profile: { id } });
+const codes = d => MONTHS.map(m => d[m.month] && d[m.month].code);
 
 test("九月一律是 TPE —— 每本護照都從台灣出發", () => {
-  assert.equal(destinationsOf(S(A))[9].code, "TPE");
-  assert.equal(destinationsOf(S(B))[9].code, "TPE");
+  assert.equal(visasOf(S(A))[9].code, "TPE");
+  assert.equal(visasOf(S(B))[9].code, "TPE");
 });
 
 test("十一個月全部分到，而且不重複", () => {
-  const d = destinationsOf(S(A));
-  const codes = MONTHS.map(m => d[m.month].code);
-  assert.equal(codes.length, 11);
-  assert.equal(new Set(codes).size, 11, "同一本護照不准出現兩次同一個城市");
-});
-
-test("TPE 不會在九月以外再出現一次", () => {
-  const d = destinationsOf(S(A));
-  const extra = MONTHS.slice(1).filter(m => d[m.month].code === "TPE");
-  assert.deepEqual(extra, [], "TPE 抽掉之後不該回到池子裡");
+  const c = codes(visasOf(S(A)));
+  assert.equal(c.filter(Boolean).length, 11);
+  assert.equal(new Set(c).size, 11, "同一本護照不准出現兩次同一個城市");
 });
 
 test("同一個人算幾次都一樣", () => {
-  const a = MONTHS.map(m => destinationsOf(S(A))[m.month].code);
-  const b = MONTHS.map(m => destinationsOf(S(A))[m.month].code);
-  assert.deepEqual(a, b, "不准用 Math.random()");
+  assert.deepEqual(codes(visasOf(S(A))), codes(visasOf(S(A))), "不准用 Math.random()");
 });
 
 test("不同人拿到不同的組合", () => {
-  const a = MONTHS.map(m => destinationsOf(S(A))[m.month].code).join();
-  const b = MONTHS.map(m => destinationsOf(S(B))[m.month].code).join();
-  assert.notEqual(a, b, "三十個人不該有兩本一樣的護照");
+  assert.notEqual(codes(visasOf(S(A))).join(), codes(visasOf(S(B))).join());
 });
 
-test("active=false 的目的地不進池子", () => {
+test("存下來的城市贏過即時算 —— 這是整張表存在的理由", () => {
+  const d = visasOf(S(A, { 3: "SYD" }));
+  assert.equal(d[3].code, "SYD");
+  assert.equal(d[3].city, "SYDNEY", "code 要換回完整的城市名");
+});
+
+test("池子加了新城市之後，存下來的月份不受影響", () => {
+  const before = visasOf(S(A));
+  const stored = { 9: before[9].code, 10: before[10].code, 11: before[11].code };
+  const bigger = [...DEST, { code: "CDG", city: "PARIS", active: true },
+                           { code: "SIN", city: "SINGAPORE", active: true }];
+  const after = visasOf(S(A, stored, bigger));
+  assert.equal(after[9].code,  stored[9]);
+  assert.equal(after[10].code, stored[10]);
+  assert.equal(after[11].code, stored[11]);
+});
+
+test("即時算的月份要避開已經存下來的城市", () => {
+  // 把一個「本來會被算給別的月份」的城市，硬存給三月
+  const live = visasOf(S(A));
+  const victim = live[7].code;          // 七月本來會拿到的
+  const d = visasOf(S(A, { 3: victim }));
+  const c = codes(d);
+  assert.equal(new Set(c).size, 11, "存下來的城市不准又被算給另一個月");
+  assert.equal(d[3].code, victim);
+});
+
+test("九月已經存了別的城市時，TPE 不會再被硬塞給九月", () => {
+  const d = visasOf(S(A, { 9: "LHR" }));
+  assert.equal(d[9].code, "LHR");
+  assert.equal(new Set(codes(d)).size, 11);
+});
+
+test("active=false 的目的地不進池子，但已經存下來的仍然顯示得出來", () => {
   const dest = DEST.map(d => d.code === "LHR" ? { ...d, active: false } : d);
-  const d = destinationsOf({ months: MONTHS, destinations: dest, profile: { id: A } });
-  assert.ok(!MONTHS.some(m => d[m.month].code === "LHR"));
+  assert.ok(!codes(visasOf(S(A, {}, dest))).includes("LHR"), "停用的不再被抽到");
+  assert.equal(visasOf(S(A, { 5: "LHR" }, dest))[5].code, "LHR",
+    "已經發出去的章不能因為城市停用就消失");
 });
 
 test("池子是空的時候回空物件，不炸也不假裝有章", () => {
-  assert.deepEqual(destinationsOf({ months: MONTHS, destinations: [], profile: { id: A } }), {});
+  assert.deepEqual(visasOf({ months: MONTHS, destinations: [], visas: {}, profile: { id: A } }), {});
 });
 
 test("池子不夠十一個的時候，只分配得出來的那幾個月", () => {
-  const d = destinationsOf({ months: MONTHS, destinations: DEST.slice(0, 4), profile: { id: A } });
+  const d = visasOf(S(A, {}, DEST.slice(0, 4)));
   assert.equal(Object.keys(d).length, 4);
   assert.equal(d[9].code, "TPE");
 });
 ```
 
-- [ ] **Step 2: 跑測試確認紅的**
-
-Run: `node --test test/*.test.mjs`
-Expected: FAIL，`destinationsOf is not a function`
+- [ ] **Step 2: 跑測試確認紅的**（`visasOf is not a function`）
 
 - [ ] **Step 3: 寫實作**
 
-加進 `src/ui.js`（放在 `milestoneState` 之後，跟其他純函式一起）：
+加進 `src/ui.js`（放在 `milestoneState` 之後，跟其他純函式一起）。
+註解要講清楚三件事：為什麼存下來的優先、為什麼即時算要避開已存的、種子是什麼。
 
 ```js
-// 每個月一枚入境章的城市（spec §3 分配規則）。**唯一的定義點** ——
-// 跟 SLOT_ORDER、pagesOf、faceOf、milestoneState 同一條原則：
-// 「這個月是哪個城市」只有這裡回答得了，任何要用的地方都問它。
+// 每個月一枚入境章的城市（spec §三 分配規則、§9.9）。**唯一的定義點** ——
+// 跟 SLOT_ORDER、pagesOf、faceOf、milestoneState 同一條原則。
 //
-// 九月固定 TPE：每本護照都從台灣出發（spec §3）。其餘十格從剩下的二十三個
-// 洗牌取前十 —— 洗牌而不是每格獨立抽，是因為獨立抽會撞號，同一本護照出現
-// 兩個 TOKYO 就不像護照了。
+// 兩個來源，存下來的贏：
+//   S.visas 有紀錄  → 用它。蓋滿的月份城市從此不動，那是這張表存在的全部理由。
+//   沒有紀錄        → 用種子洗牌即時算（還沒蓋滿的月份是預覽；已蓋滿但沒紀錄的
+//                     是修復路徑，main.js 的 syncVisas 會補寫進去）
 //
-// 種子是 passports.id（就是 auth.uid()），不是 Math.random()：
-// 同一個人重整幾次都要一樣。這個系統已經有一模一樣的機制 —— 章的旋轉角度
-// 用 act.id 算（見 stampHTML）。
+// **即時算的部分要避開已經存下來的城市。** 池子變動之後洗牌結果會變，一個已經
+// 發出去的城市可能被算給另一個月 —— 同一本護照出現兩個 TOKYO 就不像護照了。
 //
-// ⚠️ **這個結果依賴 destinations 的內容。** 新增、刪除或停用任何一個目的地，
-// 每個人剩下十格的城市都會重排 —— 包含已經蓋過章的月份。使用者九月看到
-// TOKYO、明年三月回去看變成 LONDON。所以 destinations 上線後不准增刪，
-// 這條也寫在 README（spec §9.5）。
+// 九月固定 TPE：每本護照都從台灣出發（spec §三）。
+// 種子是 passports.id（就是 auth.uid()），不是 Math.random()：同一個人重整幾次
+// 都要一樣。這個系統已經有一模一樣的機制 —— 章的旋轉角度用 act.id 算（見 stampHTML）。
 const HOME_CODE = "TPE";
 
 // FNV-1a 32-bit。要的是「同一個字串永遠得到同一個數字」，不是密碼學強度。
 // 自己寫是因為零相依，而且 JS 沒有內建的穩定雜湊。
-// Math.imul 不可省：一般的 * 會在超過 2^53 時失去精度，結果就不再穩定。
+// Math.imul 不可省：一般的 * 超過 2^53 會失去精度，結果就不再穩定。
 function hash32(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -234,93 +261,194 @@ function hash32(str) {
   return h;
 }
 
-export function destinationsOf(S) {
+export function visasOf(S) {
   const months = S.months || [];
-  const pool = (S.destinations || []).filter(d => d.active !== false);
+  const pool = S.destinations || [];
+  // 停用的不再被抽到，但**已經發出去的章不能因為城市停用就消失**，
+  // 所以查表用完整的池子，抽籤才過濾 active。
+  const byCode = new Map(pool.map(d => [d.code, d]));
+  const stored = S.visas || {};
+  const out = {}, taken = new Set();
+  months.forEach(m => {
+    const d = byCode.get(stored[m.month]);
+    if (d) { out[m.month] = d; taken.add(d.code); }
+  });
+
   const seed = (S.profile && S.profile.id) || "";
-  const home = pool.find(d => d.code === HOME_CODE);
-  // 排序而不是 Fisher-Yates：同樣是決定性的，但少一個可變狀態，也好測。
-  // 平手時用 code 收尾，讓結果在雜湊碰撞時仍然唯一。
-  const rest = pool.filter(d => d.code !== HOME_CODE).slice().sort((a, b) =>
+  const free = pool.filter(d => d.active !== false && !taken.has(d.code));
+  // 排序而不是 Fisher-Yates：一樣是決定性的，但少一個可變狀態，也好測。
+  // 平手時用 code 收尾，讓雜湊碰撞時結果仍然唯一。
+  const rest = free.filter(d => d.code !== HOME_CODE).slice().sort((a, b) =>
     (hash32(seed + a.code) - hash32(seed + b.code)) || (a.code < b.code ? -1 : 1));
-  const order = home ? [home, ...rest] : rest;
-  const out = {};
-  months.forEach((m, i) => { if (order[i]) out[m.month] = order[i]; });
+
+  const home = free.find(d => d.code === HOME_CODE);
+  const blanks = months.filter(m => !out[m.month]);
+  let queue = rest;
+  if (home) {
+    // TPE 還沒被用掉。九月也還空著的話就留給九月，否則 TPE 回到池子最前面。
+    if (blanks.length && blanks[0].month === months[0].month) {
+      out[blanks[0].month] = home;
+      blanks.shift();
+    } else {
+      queue = [home, ...rest];
+    }
+  }
+  blanks.forEach((m, i) => { if (queue[i]) out[m.month] = queue[i]; });
   return out;
 }
 ```
 
-- [ ] **Step 4: 跑測試確認全過**
+- [ ] **Step 4: 跑測試確認全過**，`./check.sh`
 
 - [ ] **Step 5: Commit**
 
-```bash
-git add src/ui.js test/ui-destination.test.mjs
-git commit -m "feat(ui): 入境章的城市分配純函式"
-```
-
 ---
 
-## Task 3：讀 `destinations`
+## Task 3：讀 `destinations` 與 `visas`
 
-**Files:** Modify `src/data.js`；Create `supabase/migrations/2026-08-26-destinations.sql`
+**Files:** Modify `src/data.js`、`src/main.js`；Create `supabase/migrations/2026-08-26-destinations.sql`
 
-**先讀 spec §9.4。**
+**先讀 spec §9.4、§9.9。`supabase/migrations/2026-08-26-visas.sql` 已經寫好了，不要改它。**
 
-- [ ] **Step 1: `fetchAll` 多一個查詢**
-
-在 `fetchAll` 的 `Promise.all` 陣列尾端加：
+- [ ] **Step 1: `fetchAll` 多兩個查詢**
 
 ```js
-    supabase.from("destinations").select("*").eq("active", true).order("code")
+    supabase.from("destinations").select("*").eq("active", true).order("code"),
+    supabase.from("visas").select("month, code")
 ```
 
-- [ ] **Step 2: 兩個解構與兩個 `firstError` 都要跟上**
+- [ ] **Step 2: 兩處解構、兩處 `firstError` 都要跟上**
 
 `loadAll` 裡有**兩處** `[mo, ac, pa, st, en, ms] = await fetchAll(user)`
-（第二處在 PGRST303 重試裡），兩處都要加 `de`。
-`firstError([mo, ac, pa, st, en])` 也是**兩處**，兩處都要變成
-`firstError([mo, ac, pa, st, en, de])`。
+（第二處在 PGRST303 重試裡），兩處都要加 `de, vi`。
+`firstError([mo, ac, pa, st, en])` 也是**兩處**，都要變成
+`firstError([mo, ac, pa, st, en, de, vi])`。
 
-**`destinations` 要進 `firstError`，不套用 milestones 的例外。** 在 `firstError`
-上方那段註解的結尾補：
+**兩張都進 `firstError`，不套用 milestones 的例外。** 在 `firstError` 上方那段
+註解的結尾補：
 
 ```js
-// 2026-08-26：destinations 進這張清單，**不比照 milestones**。
-// milestones 讀不到的表現是「沒有里程碑 UI」，不會誤導；destinations 讀不到的話，
-// 一個已經蓋滿三格的月份會什麼章都沒有 —— 那跟「你還沒蓋滿」長得一模一樣，
-// 正是這段註解要防的那種誤導。README 第 9 項的直接應用（spec §9.4）。
+// 2026-08-26：destinations 與 visas 都進這張清單，**不比照 milestones**。
+// milestones 讀不到的表現是「沒有里程碑 UI」，不會誤導。
+// destinations 讀不到的話，一個已經蓋滿三格的月份會什麼章都沒有 —— 那跟
+// 「你還沒蓋滿」長得一模一樣。visas 讀不到更糟：畫面會退回即時算，
+// 於是使用者看到的城市可能跟他上禮拜看到的不一樣，而且沒有任何提示。
+// 兩個都正是這段註解要防的那種誤導。README 第 9 項的直接應用（spec §9.4）。
 ```
 
-- [ ] **Step 3: 回傳值與未登入的空形狀**
+- [ ] **Step 3: 攤平與空形狀**
 
-`loadAll` 的 return 加 `destinations: de.data || []`；
-未登入的早退回傳也要加 `destinations: []`（跟 `milestones: []` 同一行附近）。
+`visas` 攤平成 `{month: code}`（跟 `stamps` 攤平成 `{act_id: {...}}` 同一個模式）：
+
+```js
+  const visas = {};
+  (vi.data || []).forEach(r => { visas[r.month] = r.code; });
+```
+
+`loadAll` 的 return 加 `destinations: de.data || []` 與 `visas`；
+未登入的早退回傳也要加 `destinations: []` 與 `visas: {}`。
 
 - [ ] **Step 4: `main.js` 的兩處 state**
 
 `boot()` 已經是 `Object.assign(S, all)`，不用改。
-但 `let S = {...}` 的初始值要加 `destinations: []`，
-reset 分支的清除清單也要加 `destinations: []`。
+但 `let S = {...}` 的初始值要加 `destinations: []` 與 `visas: {}`，
+reset 分支的清除清單也要加同樣兩個。
 **這是 2026-08-25 那個「手寫物件字面漏過兩次」的位置，逐字比對兩份清單。**
 
-- [ ] **Step 5: 留遷移檔**
+- [ ] **Step 5: 留 destinations 的遷移檔**
 
 Create `supabase/migrations/2026-08-26-destinations.sql`，內容是 spec §六 那段 SQL
-的第 1、2、3 節（`update activities` / `update months` / `create table destinations`），
-檔頭加一行註解說明**已由使用者於 2026-08-26 執行**、這個檔案只是留底。
+的第 1、2、3 節。檔頭註明**已由使用者於 2026-08-26 執行**，這個檔案只是留底。
 
 - [ ] **Step 6: 驗證**
 
 `node --test test/*.test.mjs` 全過、`./check.sh` 全綠。
-`grep -c 'de\]' src/data.js` 應為 2（兩處 `firstError`）——
-**用 `grep -o … | wc -l` 不要用 `grep -c`**，`grep -c` 數的是行不是次數。
+確認 `firstError` 的兩處都改到了：
+`grep -o 'firstError(\[[^]]*\])' src/data.js | sort | uniq -c`
+——兩行要一模一樣。**用 `grep -o … | wc -l` 不要用 `grep -c`**，`grep -c` 數的是行不是次數。
 
 - [ ] **Step 7: Commit**
 
 ---
 
-## Task 4：入境章
+## Task 4：`syncVisas` 寫入路徑，以及備份／還原／清除
+
+**Files:** Modify `src/data.js`、`src/main.js`
+
+**先讀 spec §9.9、§9.10、§9.11。這個 Task 的重點是「只有一個定義點」。**
+
+- [ ] **Step 1: `data.js` 的寫入函式**
+
+```js
+// 發出入境章：把「已經蓋滿但還沒存下來」的月份寫進 visas。
+// on conflict do nothing —— 這張表只准新增不准修改（RLS 也沒有給 update 權限，
+// 見 2026-08-26-visas.sql 的檔頭）。「蓋滿的月份城市從此固定」如果只靠前端自律，
+// 下一個人寫一行 upsert 就破功而且不會有東西報錯。
+export async function issueVisas(rows) {
+  if (!rows.length) return;
+  const user = await currentUser();
+  const r = await supabase.from("visas")
+    .upsert(rows.map(x => ({ user_id: user.id, month: x.month, code: x.code })),
+            { onConflict: "user_id,month", ignoreDuplicates: true });
+  if (r.error) throw r.error;
+}
+```
+
+- [ ] **Step 2: `main.js` 的 `syncVisas`，**一個定義點、兩個呼叫點****
+
+```js
+// 補寫入境章。找出「已經蓋滿但 S.visas 沒有紀錄」的月份，算出城市寫進去。
+//
+// 呼叫點只有兩個：boot() 載入之後，以及蓋章成功之後。寫成一個函式而不是在兩處
+// 各判斷一次 —— 兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊
+// （跟 SLOT_ORDER、faceOf、visasOf 同一條原則）。
+//
+// boot() 也要呼叫的三個理由：匯入還原進來的月份、上一次寫入失敗的月份、
+// 以及這個功能上線之前就已經蓋滿的月份。
+//
+// **寫入失敗不擋使用者。** 章是使用者的資料，visa 是衍生的；失敗就留下線索，
+// 下次載入再試一次。畫面上仍然顯示即時算的城市，所以不會因此少一枚章。
+async function syncVisas() {
+  const want = UI.visasOf(S);
+  const rows = S.months.filter(m => {
+    if (S.visas[m.month]) return false;
+    const acts = S.activities.filter(a => a.month === m.month);
+    return acts.length > 0 && acts.every(a => S.stamps[a.id]);   // 空集合的守衛
+  }).map(m => want[m.month] && { month: m.month, code: want[m.month].code }).filter(Boolean);
+  if (!rows.length) return;
+  rows.forEach(r => { S.visas[r.month] = r.code; });
+  try { await DATA.issueVisas(rows); }
+  catch (e) { console.error("入境章沒有寫進去，下次載入會再試一次：", e); }
+}
+```
+
+**`acts.length > 0 &&` 不可省** —— 空集合讓 `.every()` 無條件成立，這個 repo 已經被
+同一個 bug class 咬過三次。沒有活動的月份不該發出入境章。
+
+- [ ] **Step 3: 備份、還原、清除三條路（spec §9.11）**
+
+- **匯出備份**：payload 加 `visas`
+- **匯入還原**：跟 `stamps` 走同一個取代／合併模式
+- **清除這本護照**：`delete from visas`，跟 `stamps`／`entries` 同一批。
+  確認框的文案**一個字都不要改**
+
+三處都要跟著 `stamps` 現有的寫法，不要自己另開一套。
+
+- [ ] **Step 4: 驗證（四種情況，各附實際觀察到的結果）**
+
+1. 蓋滿一個月 → `visas` 出現一列；重整之後城市不變
+2. 手動在 `destinations` **本地測試資料**裡加兩個城市，重整 → 已蓋滿的月份城市不變，
+   沒蓋滿的月份重排。**不要連資料庫改任何東西**，用本地 fixture
+3. 撕掉一格讓月份不再蓋滿 → `visas` 那一列**留著**（spec §9.10）；重蓋回來同一個城市
+4. 清除這本護照 → `visas` 也空了
+
+- [ ] **Step 5: `node --test test/*.test.mjs`＋`./check.sh`**
+
+- [ ] **Step 6: Commit**
+
+---
+
+## Task 5：入境章
 
 **Files:** Modify `src/ui.js`、`index.html`；Test `test/ui-month-head.test.mjs`
 
@@ -342,9 +470,15 @@ test("入境章的日期是三格裡最晚的那一天（spec §9.6）", () => {
   assert.ok(monthPageHTML(S, M9).includes("2026.09.30"));
 });
 
+test("章上的城市是存下來的那一個，不是即時算的", () => {
+  const S = { ...full(), visas: { 9: "SYD" } };
+  const html = monthPageHTML(S, M9);
+  assert.ok(html.includes("SYDNEY"));
+  assert.ok(!html.includes("TAIPEI"));
+});
+
 test("沒有活動的月份不會拿到入境章 —— 空集合的守衛", () => {
-  const S = { ...full(), activities: [] };
-  assert.ok(!monthPageHTML(S, M9).includes("IMMIGRATION"));
+  assert.ok(!monthPageHTML({ ...full(), activities: [] }, M9).includes("IMMIGRATION"));
 });
 
 test("沒蓋滿就沒有章", () => {
@@ -353,8 +487,7 @@ test("沒蓋滿就沒有章", () => {
 });
 
 test("那個月分配不到城市的時候不渲染章，也不產生空的框", () => {
-  const S = { ...full(), destinations: [] };
-  assert.ok(!monthPageHTML(S, M9).includes("estamp"));
+  assert.ok(!monthPageHTML({ ...full(), destinations: [], visas: {} }, M9).includes("estamp"));
 });
 ```
 
@@ -383,11 +516,11 @@ function entryStampHTML(dest, date) {
 }
 ```
 
-`monthPageHTML` 裡把 `full` 那一行換成：
+`monthPageHTML` 裡：
 
 ```js
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
-  const dest = full ? destinationsOf(S)[m.month] : null;
+  const dest = full ? visasOf(S)[m.month] : null;
   const dated = full ? acts.map(a => S.stamps[a.id].date).sort().slice(-1)[0] : "";
 ```
 
@@ -412,7 +545,7 @@ function entryStampHTML(dest, date) {
 - **章的最低點** 與 **第三格 `.cat` 的最高點** 相差幾 px
 - 手機另外回報：章有沒有壓到 `.mzh`（月名）
 
-判準（沿用既有裁定）：**壓到右上角的時刻可以，壓到月名或格子裡的東西不可以。**
+判準（沿用既有裁定）：**壓到右上角可以，壓到月名或格子裡的東西不可以。**
 不符就調 `top`，調完重量，把最終數字與差距寫進 CSS 註解，
 連同「改動 `.mhead`／`.slot` padding／`.cat` 字級要回來重量」那句一起。
 
@@ -421,20 +554,17 @@ function entryStampHTML(dest, date) {
 - [ ] **Step 6: 落下動畫（可選）**
 
 如果加了 `.estamp.land`，**必須進 `@media (prefers-reduced-motion:reduce)` 那一行**。
-不加就不用動。無論哪一種，Step 7 的 `check.sh` 會驗。
 
-- [ ] **Step 7: `node --test test/*.test.mjs`＋`./check.sh`（第 25 項會抓漏掉的動畫）**
+- [ ] **Step 7: 測試＋`./check.sh`（第 25 項會抓漏掉的動畫）**
 
-- [ ] **Step 8: 截圖**
-
-1280px 與 390px 各一張蓋滿的九月頁，存到
-`.superpowers/sdd/2026-08-26-entry-stamp/shots/`。
+- [ ] **Step 8: 截圖** 1280px 與 390px 各一張蓋滿的九月頁，存到
+`.superpowers/sdd/2026-08-26-entry-stamp/shots/`
 
 - [ ] **Step 9: Commit**
 
 ---
 
-## Task 5：說明頁第三張卡
+## Task 6：說明頁第三張卡
 
 **Files:** Modify `src/ui.js`
 
@@ -457,17 +587,20 @@ function entryStampHTML(dest, date) {
 
 ---
 
-## Task 6：撕掉章的動畫
+## Task 7：撕掉章的動畫
 
 **Files:** Modify `src/main.js`、`index.html`
 
-**先讀 spec §五、§9.7、§9.8。這是這一輪最容易做錯的一個。**
+**先讀 spec §五、§9.7、§9.8、§9.10。這是這一輪最容易做錯的一個。**
 
 - [ ] **Step 1: 先修 §9.8 的既有缺陷**
 
 現在的 unstamp 先 `delete S.stamps[id]` 再打 API，失敗只 toast、**state 沒有補回來**。
 先把「失敗要還原」做出來（留住被刪的兩個值，catch 裡放回去再 `render()`），
 跑一次確認行為正確，**再**加動畫。兩件事分開做，壞掉的時候才知道是哪一件。
+
+**`S.visas` 那一列不要動**（spec §9.10）：撕掉的語意是「這一格記錯了」，
+不是「這個月沒發生過」。
 
 - [ ] **Step 2: 動畫與時序**
 
@@ -476,8 +609,7 @@ function entryStampHTML(dest, date) {
   只靠事件會讓章卡在畫面上、資料永遠不刪（spec §9.7）
 - reduce 為否：`S.tearing = id` → `render()`（章帶上 `.tear`）→ 監聽 `animationend`
   → 事件觸發才真的刪
-- **不要用 `setTimeout` 串接**（`index.html` 既有的裁定：計時器會跟下一次
-  `render()` 競態）
+- **不要用 `setTimeout` 串接**（既有裁定：計時器會跟下一次 `render()` 競態）
 - 兩條路徑共用同一個「真的執行刪除」的函式，**只有一個定義點**
 - 確認刪除的 `confirm()` 文案**一個字都不要改**
 
@@ -493,27 +625,31 @@ function entryStampHTML(dest, date) {
 3. 刪除失敗（把 `DATA.removeStamp` 暫時改成 throw）：章要**回來**，toast 出現
 4. 演到一半翻頁：不可以出現 console 錯誤，不可以刪錯格子
 
-- [ ] **Step 5: `node --test test/*.test.mjs`＋`./check.sh`**
+- [ ] **Step 5: 測試＋`./check.sh`**
 
 - [ ] **Step 6: Commit**
 
 ---
 
-## Task 7：README 記下 `destinations` 不准增刪
+## Task 8：README
 
 **Files:** Modify `README.md`
 
-**先讀 spec §9.5。**
+**先讀 spec §9.5、§9.9、§9.10。**
 
 - [ ] **Step 1: 在「不要刪活動」那一節後面加一段**
 
-要講清楚三件事：改動池子會讓**每個人**剩下十格的城市重排；重排包含**已經蓋過章的月份**；
-使用者九月看到 TOKYO、明年三月回去看變成 LONDON。
-這是種子洗牌的必然結果，不是 bug。
+要講的**不是**「不准動 destinations」（那是被推翻的舊設計）。要講的是：
 
-**同時寫下它依賴什麼前提**（README 第 11 項的直接應用）：這條規則的前提是
-「城市由前端即時算出來、沒有存進資料庫」。哪一天改成把分配存進 `passports`，
-這條就該跟著走。
+- **加城市是安全的**，而且會常常發生（每年都有人搬家、交換、畢業）
+- 為什麼安全：已經蓋滿的月份，城市存在 `visas` 裡，池子變動不影響它
+- **刪城市的話資料庫會擋** —— `visas.code` 對 `destinations(code)` 有外鍵，
+  有人用到就刪不掉。這是約束不是規則，不需要人記得
+- 停用（`active=false`）是可以的：新的抽籤不會抽到它，已經發出去的章照樣顯示
+
+**同時寫下它依賴什麼前提**（README 第 11 項的直接應用）：這一整段的前提是
+「城市在蓋滿的當下存進 `visas`，而 `visas` 沒有 update 權限」。
+哪天有人給那張表開了 update，這段就不再成立。
 
 - [ ] **Step 2: `./check.sh`**（README 不在 `FILES` 掃描範圍，但跑一次確認）
 
@@ -523,11 +659,14 @@ function entryStampHTML(dest, date) {
 
 ## Self-Review
 
-- **spec 覆蓋**：§零（不改介面文字，寫進 Global Constraints）／§一（SQL 已完成）／
-  §二 Task 1／§三 Task 2+3+4／§四 Task 5／§五 Task 6／§六 已完成，Task 3 留檔／
+- **spec 覆蓋**：§零（Global Constraints）／§一（SQL 已完成）／§二 Task 1／
+  §三 Task 2+3+4+5／§四 Task 6／§五 Task 7／§六 已完成，Task 3 留檔／
   §七 順序即 Task 順序／§八 不做／§九 各 Task 開頭指名要讀的節。
-- **型別一致**：`destinationsOf` 回 `{month: {code, city}}`，Task 4 用
-  `destinationsOf(S)[m.month]`，一致。
-- **三件不能掉的既有行為**（spec §三）：空集合守衛在 Task 4 Step 3 明寫保留；
-  reduced-motion 在 Task 4 Step 6 與 Task 6 Step 3，由 `check.sh` 第 25 項守；
-  手機尺寸在 Task 4 Step 5 要重量。
+- **型別一致**：`visasOf` 回 `{month: {code, city}}`；`S.visas` 是 `{month: code}`
+  （攤平自資料庫，Task 3 Step 3）；`issueVisas` 吃 `[{month, code}]`（Task 4 Step 1）。
+  三者在 Task 5 與 Task 4 的用法一致。
+- **三件不能掉的既有行為**（spec §三）：空集合守衛在 Task 4 Step 2 與 Task 5 Step 3
+  兩處明寫保留；reduced-motion 在 Task 5 Step 6 與 Task 7 Step 3，由 `check.sh`
+  第 25 項守；手機尺寸在 Task 5 Step 5 要重量。
+- **只有一個定義點**：城市 → `visasOf`；寫入 → `syncVisas`；刪除 → Task 7 Step 2
+  共用的那個函式。三個都在計畫裡明寫。
