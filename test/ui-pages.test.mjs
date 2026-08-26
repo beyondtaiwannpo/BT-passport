@@ -70,14 +70,21 @@ test("沒有活動的月份，圓點不算蓋滿", () => {
   assert.ok(!/data-on="1"/.test(html), "沒有活動就不該有橘色圓點");
 });
 
-test("MONTH CLEARED：蓋滿才出現，而且沒有活動的月份不算蓋滿", () => {
+test("入境章：蓋滿才出現，而且沒有活動的月份不算蓋滿", () => {
   // 空集合讓 .every() 無條件成立 —— 這個 repo 被同一個 bug class 咬過三次。
   // 這一處還跟圓點互相矛盾過：dotOn 在 2026-08-22 就加了守衛，
-  // 所以同一個沒有活動的月份，圓點說未蓋滿、頁面卻蓋著 MONTH CLEARED。
-  const m = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
-  const mk = acts => ({ activities: acts, stamps: {}, entries: {}, justStamped: null, months: [m], milestones: [] });
+  // 所以同一個沒有活動的月份，圓點說未蓋滿、頁面卻蓋著完成的標記。
+  //
+  // 2026-08-26：完成的標記從 MONTH CLEARED 換成入境章（spec §三）。
+  // 這條測試守的一直是「標記只在真的完成時出現」，不是那五個字，
+  // 所以斷言跟著換成 .estamp，三個案例原封不動。
+  const m = { seq: 1, month: 9, theme_zh: "", theme_en: "" };
+  const DEST = [{ code: "TPE", city: "TAIPEI", active: true }];
+  const mk = acts => ({ activities: acts, stamps: {}, entries: {}, justStamped: null,
+    months: [m], milestones: [], destinations: DEST, visas: {},
+    profile: { id: "00000000-0000-0000-0000-000000000000" } });
   const A = { id: "09A", month: 9, seq: 1, category: "gather", title_zh: "開學電影夜", title_en: "OPENING NIGHT", description: "d" };
-  const has = s => monthPageHTML(s, m).includes("MONTH CLEARED");
+  const has = s => monthPageHTML(s, m).includes("estamp");
 
   assert.equal(has(mk([])), false, "沒有活動的月份不算蓋滿");
   assert.equal(has(mk([A])), false, "有一格未蓋章不算蓋滿");
@@ -87,12 +94,18 @@ test("MONTH CLEARED：蓋滿才出現，而且沒有活動的月份不算蓋滿"
 
 test("沒有活動的月份，圓點與頁面說的是同一件事", () => {
   // 兩處各自判斷「蓋滿」，曾經一個修了一個沒修，於是同一個月份
-  // 圓點說未蓋滿、頁面說 MONTH CLEARED。
-  const m = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
-  const S2 = { page: 2, months: [m], activities: [], stamps: {}, entries: {}, justStamped: null, milestones: [] };
+  // 圓點說未蓋滿、頁面說蓋滿了。
+  //
+  // 2026-08-26：原本斷言的是 !includes("MONTH CLEARED")。那個字串在這一輪
+  // 被移除之後，那條斷言會**永遠為真** —— 通過的理由跟它保護的東西無關
+  // （README 第 10、12 項）。改成斷言入境章。
+  const m = { seq: 1, month: 9, theme_zh: "", theme_en: "" };
+  const S2 = { page: 2, months: [m], activities: [], stamps: {}, entries: {}, justStamped: null,
+    milestones: [], destinations: [{ code: "TPE", city: "TAIPEI", active: true }], visas: {},
+    profile: { id: "00000000-0000-0000-0000-000000000000" } };
   const book = bookHTML(S2);
   assert.ok(!book.includes('data-on="1"'), "圓點不該是蓋滿");
-  assert.ok(!book.includes("MONTH CLEARED"), "頁面也不該蓋 MONTH CLEARED");
+  assert.ok(!book.includes("estamp"), "頁面也不該蓋入境章");
 });
 
 test("說明頁的三張卡也是 聚會 → 題目 → 鏡頭", () => {

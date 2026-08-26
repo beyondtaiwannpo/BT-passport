@@ -362,6 +362,25 @@ export function stampHTML(act, st, animate) {
   </div></div>`;
 }
 
+// 入境章。spec §三 —— MONTH CLEARED 說的是「你完成了」，這個說的是「你到過那裡」。
+//
+// 這是新的視覺元件，是原規格 §3.4 的**第二個明確例外**（第一個是 2026-08-25 的
+// 翻面卡），使用者 2026-08-26 授權。不沿用 .overprint 是因為 .overprint 還在
+// 資料頁被 FULL 用，而它是一行文字、這個是四行的框 —— 改它會連帶改到 FULL。
+// 但位置、斜角、filter:url(#bt-ink)、pointer-events 全部沿用 .overprint 的值，
+// 視覺語彙不新增。
+//
+// 日期取三格 stamped_on 的**最大值**（spec §9.6）：使用者可以自己改日期，
+// 而「插入順序」既沒有進前端也不是使用者看得懂的東西。
+function entryStampHTML(dest, date) {
+  return `<div class="estamp">
+    <span class="e1">IMMIGRATION</span>
+    <span class="e2">${esc(dest.city)}</span>
+    <span class="e3">${esc(dest.code)}</span>
+    <span class="e4">${esc(date).replace(/-/g, ".")}</span>
+  </div>`;
+}
+
 // theme_zh 現在放的是時間數字（07:00），theme_en 是空字串。
 // 空的時候**不產生**那個 span。
 // 這條規則跟版面無關：2026-08-22 實測 <span></span>、<span> </span>、
@@ -386,8 +405,10 @@ export function stampHTML(act, st, animate) {
 export function monthPageHTML(S, m) {
   const acts = orderSlots(S.activities.filter(a => a.month === m.month));
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
+  const dest = full ? visasOf(S)[m.month] : null;
+  const dated = full ? acts.map(a => S.stamps[a.id].date).sort().slice(-1)[0] : "";
   const zh = MONTH_ZH[m.month] || String(m.month);
-  return `${full ? `<div class="overprint">MONTH CLEARED</div>` : ""}
+  return `${dest ? entryStampHTML(dest, dated) : ""}
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
       <div class="mzh">${zh}</div>

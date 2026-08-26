@@ -343,6 +343,37 @@
     filter:url(#bt-ink);
   }
   .overprint.land{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
+
+  /* 入境章。spec §三、§9.2 —— 新的視覺元件，是 §3.4 的第二個明確例外（第一個是
+     2026-08-25 的翻面卡）。不沿用 .overprint 是因為 .overprint 還在資料頁被 FULL 用
+     （idPageHTML），而它是一行文字、入境章是四行的框，改 .overprint 會連帶改到 FULL。
+     位置、斜角、filter:url(#bt-ink)、pointer-events、顏色全部沿用 .overprint 的值，
+     視覺語彙不新增，不得新增顏色。
+
+     top:60px 是照抄 .overprint 的起點，但入境章是四行的框，旋轉 -11 度之後
+     左下角比一行的 MONTH CLEARED 伸得更遠——實測 1280px（dpr 2）九月三格全蓋滿時，
+     top:60px 讓 .estamp 切到第三格（鏡頭 FRAME）.cat 的上緣，重疊 85.45×12.5＝1068.12px²
+     （比當年 .overprint 在 top:70px 時切 .cat 的 251.0×5.2 更嚴重），所以改成 top:25px：
+     .estamp.bottom(135.53) 減第三格 .cat.top(144.77) = -9.25px（不重疊，留 9.25px 餘裕）。
+     跟 .mzh（月名）沒有水平重疊，不受影響。.estamp 沒有超出 .page 右邊界
+     （right 比 .page.right 少 18.04px）。
+     之後如果調整 .mhead 的高度、.slot 的 padding 或 .cat 的字級，
+     **要回來重量這個距離**——它是兩個獨立絕對定位/旋轉元素的幾何關係，
+     沒有任何測試守得住。 */
+  .estamp{
+    position:absolute;top:25px;right:26px;z-index:2;pointer-events:none;
+    transform:rotate(-11deg);
+    color:var(--bt-navy);background:var(--bt-orange);
+    opacity:.85;
+    border:3px double currentColor;border-radius:4px;padding:4px 12px;
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+    font-family:var(--display);font-weight:700;text-align:center;
+    filter:url(#bt-ink);
+  }
+  .estamp .e1{font-size:9px;letter-spacing:.22em;opacity:.75}
+  .estamp .e2{font-size:17px;letter-spacing:.3em}
+  .estamp .e3{font-size:13px;letter-spacing:.1em}
+  .estamp .e4{font-size:10px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
   .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
   /* 長英文字串與網址要能在任何位置斷行。
      grid 的 1fr 預設不會小於內容的最小寬度，而一串沒有空白的字母的最小寬度
@@ -484,6 +515,24 @@
        時刻是裝飾，月名是資訊，而手機是三十個幹部主要的使用裝置。
        改動這裡或 .mhead 的任何尺寸之後，要回來重量一次：這是幾何關係，沒有測試守得住。 */
     .overprint{font-size:13px;top:26px}
+    /* 入境章的手機尺寸。position 沿用 .overprint 的 top:26px；字級不能整套沿用
+       13px（.overprint 是一行，入境章是四行），改成依桌機 9/17/13/10 的比例
+       （約 65%）縮成 6/11/9/7。
+
+       實測 390px（dpr 2）九月三格全蓋滿：.estamp 矩形 top:29.71 bottom:103.42
+       left:288.02 right:360.46。手機是單欄堆疊，第三格 .cat 落在遠低的
+       top:575.26（.estamp.bottom 減它 = -471.84px，完全不重疊）；跟月名 .mzh
+       （top:40.68~70.68，left:96.49~156.49）沒有水平交集，用矩形相交公式算出
+       實際重疊面積是 0（跟 .cat0／.ttl0／.slot0／.cat1／.cat2 全部一樣是 0）。
+       唯一有重疊的是 .mhead 本身（3981.95px²）——跟桌機當年 .mtheme.clock
+       被刻意壓住是同一種允許的重疊，因為 .mtheme 這一輪已經整個拿掉
+       （spec §二），那個角落現在是空白。.estamp 沒有超出 .page 右邊界
+       （right 比 .page.right 少 20.54px）。top:26px 起手就通過，不用再調。 */
+    .estamp{top:26px;padding:3px 8px;gap:0}
+    .estamp .e1{font-size:6px;letter-spacing:.18em}
+    .estamp .e2{font-size:11px;letter-spacing:.2em}
+    .estamp .e3{font-size:9px}
+    .estamp .e4{font-size:7px}
   }
   @media (prefers-reduced-motion:reduce){
     /* 五個動畫全部關掉：.stamp.land、.page.turn、.overprint.land、
