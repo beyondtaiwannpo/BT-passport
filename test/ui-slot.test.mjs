@@ -142,3 +142,10 @@ test("未蓋章的正面維持原樣：說明與蓋章入口都在", () => {
   assert.ok(html.includes('class="en"'));
   assert.ok(!html.includes("stampwrap"));
 });
+
+test("背面有小字標題 —— 一年後只看照片與心得認不出是哪一格", () => {
+  const html = slotHTML(state({ "09A": { date: "2026-09-05" } }), act);
+  const back = html.slice(html.indexOf('class="face back"'));
+  assert.ok(back.includes(`<span class="btitle">${act.title_zh}</span>`), "背面要有標題");
+  assert.ok(!back.includes('class="ttl"'), "是標籤不是標題，不准沿用正面的 .ttl");
+});

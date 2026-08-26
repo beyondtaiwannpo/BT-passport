@@ -343,8 +343,13 @@ function flipBtnHTML(id, to) {
 // 而一個空的背面只會被讀螢幕的人聽到、被下一個人誤以為是 bug。
 //
 // 2026-08-25 設計改動（spec §1.1）：章移到正面、說明退到背面。已蓋章的正面
-// 是分類、標題、章、翻面按鈕；背面是說明、心得、照片。理由是章才是這本護照的
-// 主角，說明是「還沒蓋章時才需要」的東西。
+// 是分類、標題、章、翻面按鈕；背面是小字標題、說明、心得、照片。理由是章才是
+// 這本護照的主角，說明是「還沒蓋章時才需要」的東西。
+//
+// 背面那行標題**不是為了讓版面看起來完整**，是為了照片：九月拍月亮、十二月拍
+// 聖誕樹，明年翻回去看的時候一張照片配一行心得，人不會記得那格題目是什麼 ——
+// 而那正是翻回去要找的資訊（使用者 2026-08-25）。用 .btitle 不用 .ttl：
+// 它是標籤，背面的主角是照片與心得。
 export function slotHTML(S, a) {
   const st = S.stamps[a.id];
   const entry = S.entries[a.id] || {};
@@ -371,6 +376,7 @@ export function slotHTML(S, a) {
     </div>`;
 
   const back = !st ? "" : `<div class="face back" aria-hidden="${face === "front"}">
+      <span class="btitle">${esc(a.title_zh)}</span>
       <span class="hint">${esc(a.description)}</span>
       ${entry.note ? `<span class="note">${esc(entry.note)}</span>` : ""}
       ${entry.photo ? `<img class="thumb" src="${esc(entry.photo)}" alt="">` : ""}
