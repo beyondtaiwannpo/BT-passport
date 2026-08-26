@@ -1,7 +1,7 @@
 // 城市分配（spec §三 分配規則、§9.9）。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { visasOf, pendingVisasOf } from "../src/ui.js";
+import { visasOf, pendingVisasOf, angleOf } from "../src/ui.js";
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",
@@ -173,4 +173,29 @@ test("pendingVisasOf：分配不到城市的月份不補，也不產生 undefine
 test("pendingVisasOf：一次蓋滿兩個月就回兩筆", () => {
   const S = full9and10();
   assert.equal(pendingVisasOf(S).length, 2);
+});
+
+test("angleOf：落在 -15 到 +8 之間", () => {
+  for (const m of [9,10,11,12,1,2,3,4,5,6,7]) {
+    const a = angleOf(A, m);
+    assert.ok(a >= -15 && a <= 8, `${m} 月拿到 ${a}`);
+  }
+});
+
+test("angleOf：同一個人同一個月，算幾次都一樣", () => {
+  assert.equal(angleOf(A, 9), angleOf(A, 9), "不准用 Math.random()");
+});
+
+test("angleOf：同一個人不同月份不會全部一樣", () => {
+  const s = new Set([9,10,11,12,1,2,3,4,5,6,7].map(m => angleOf(A, m)));
+  assert.ok(s.size >= 6, `十一個月只有 ${s.size} 種角度，看起來像整本都同一個角度`);
+});
+
+test("angleOf：不同人的同一個月不一樣", () => {
+  const diff = [9,10,11,12,1,2,3,4,5,6,7].filter(m => angleOf(A, m) !== angleOf(B, m));
+  assert.ok(diff.length >= 8, `十一個月只有 ${diff.length} 個月不同`);
+});
+
+test("angleOf：沒有 profile 也不炸", () => {
+  assert.ok(Number.isFinite(angleOf("", 9)));
 });

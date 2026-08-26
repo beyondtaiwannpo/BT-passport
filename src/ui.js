@@ -127,6 +127,21 @@ function hash32(str) {
   return h >>> 0;
 }
 
+// 入境章的角度。**跟活動章同一套機制**：由 id 算出來、不是隨機，所以重整不會跳
+// （活動章見 stampHTML 的 rot）。種子多帶一個月份，讓同一本護照的十一枚章
+// 各有各的角度 —— 整本同一個角度看起來像印刷，不像一枚一枚蓋上去的。
+//
+// 範圍 -15° 到 +8°（使用者 2026-08-26 指定）。不對稱是刻意的：
+// 逆時針多一點、順時針少一點，跟大多數人右手蓋章的手腕角度一致。
+//
+// 用 hash32 而不是活動章那個 charCodeAt 公式：那個公式的輸入是 act.id 的
+// 第三個字元，這裡的輸入是 uuid + 月份，字元數差太多。**不要順手把 stampHTML
+// 也改成 hash32** —— 那會讓每一枚已經蓋出去的活動章換角度。
+const ANGLE_MIN = -15, ANGLE_SPAN = 24;   // -15..+8，含兩端共 24 個整數
+export function angleOf(seed, month) {
+  return ANGLE_MIN + (hash32(String(seed) + ":" + month) % ANGLE_SPAN);
+}
+
 export function visasOf(S) {
   const months = S.months || [];
   const pool = S.destinations || [];
@@ -372,8 +387,8 @@ export function stampHTML(act, st, animate) {
 //
 // 日期取三格 stamped_on 的**最大值**（spec §9.6）：使用者可以自己改日期，
 // 而「插入順序」既沒有進前端也不是使用者看得懂的東西。
-function entryStampHTML(dest, date) {
-  return `<div class="estamp">
+function entryStampHTML(dest, date, angle) {
+  return `<div class="estamp" style="--rot:${angle}deg;transform:rotate(${angle}deg)">
     <span class="e1">IMMIGRATION</span>
     <span class="e2">${esc(dest.city)}</span>
     <span class="e3">${esc(dest.code)}</span>
@@ -407,8 +422,9 @@ export function monthPageHTML(S, m) {
   const full = acts.length > 0 && acts.every(a => S.stamps[a.id]);
   const dest = full ? visasOf(S)[m.month] : null;
   const dated = full ? acts.map(a => S.stamps[a.id].date).sort().slice(-1)[0] : "";
+  const angle = angleOf((S.profile && S.profile.id) || "", m.month);
   const zh = MONTH_ZH[m.month] || String(m.month);
-  return `${dest ? entryStampHTML(dest, dated) : ""}
+  return `${dest ? entryStampHTML(dest, dated, angle) : ""}
     <div class="mhead">
       <div class="mnum">${String(m.month).padStart(2, "0")}</div>
       <div class="mzh">${zh}</div>
