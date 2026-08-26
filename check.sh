@@ -210,6 +210,16 @@ else
   bad "src/main.js 的 boot() 不是 Object.assign(S, all)，新欄位會靜靜地不進 S"
 fi
 
+# 長英文字串與網址會把 grid 的 1fr 撐開，三格寬度重新分配（實測 158/633/129，
+# 正常是 282 三等分）。修法是 .slot 的 min-width:0 加上內容的 overflow-wrap:anywhere，
+# **兩個缺一不可**。單元測試碰不到這件事（是版面寬度，要真瀏覽器才量得到），
+# 而且它不會有橫向捲軸、不像跑版，只像「某一格怪怪的」，人工也不容易發現。
+if grep -qE '^\s*min-width:0;' index.html && grep -q 'overflow-wrap:anywhere' index.html; then
+  ok "長字串不會撐開格子（min-width:0 + overflow-wrap:anywhere）"
+else
+  bad "index.html 少了 min-width:0 或 overflow-wrap:anywhere，長英文字串會把格子撐寬"
+fi
+
 # 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
 # barHTML 的「N / 33」、idPageHTML 的 FULL 疊印、里程碑的達成判斷，全部吃它的結果。
 # 這條守的是架構不是行為，測試碰不到：兩邊各自用同一條公式算一次的話，

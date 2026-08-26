@@ -189,6 +189,7 @@
     display:flex;flex-direction:column;text-align:left;width:100%;
     transition:border-color .16s,background .16s;
     position:relative;
+    min-width:0;
   }
   /* 只剩 :hover。.slot 在 2026-08-25 從 button 改成 div（按鈕不能巢狀，翻面按鈕
      必須在格子裡面），div 不是原生可聚焦元素也沒有 tabindex，:focus-visible
@@ -342,6 +343,16 @@
   }
   .overprint.land{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
   .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
+  /* 長英文字串與網址要能在任何位置斷行。
+     grid 的 1fr 預設不會小於內容的最小寬度，而一串沒有空白的字母的最小寬度
+     就是它整串的寬度 —— 於是那一格被撐開，同一列的另外兩格被擠窄
+     （實測：158.64 / 633.73 / 129.01，正常是 282 三等分）。
+     配合 .slot 的 min-width:0 才完整：前者讓 grid 項目允許縮到內容寬度以下，
+     後者讓內容真的斷得下去。少任何一半都還是會被撐開。
+     **這個 bug 不會有橫向捲軸**，頁面寬度正常，只是三格的比例壞掉，
+     所以它不像跑版、只像「這一格怪怪的」。
+     中文不會踩到（每個字都能斷），踩到的是英文長字與網址。 */
+  .slot .note,.slot .hint{overflow-wrap:anywhere}
   .thumb{width:100%;height:82px;object-fit:cover;border-radius:2px;margin-top:9px;display:block;
     border:1px solid rgba(16,42,134,.2)}
 
