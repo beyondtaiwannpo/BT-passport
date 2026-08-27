@@ -311,7 +311,7 @@ else
   bad "index.html 少了 min-width:0 或 .slot .note,.slot .hint{overflow-wrap:anywhere} 這條宣告本身——兩個都沒有時長英文字串會撐寬格子；只少 overflow-wrap（min-width:0 還在）不會撐寬，是文字溢出格子邊界"
 fi
 
-# 章的數量整個 src/ui.js 只准數一次，就是 milestoneState 裡那次。
+# 章的數量整個 src/ui.js 只准數一次，就是 stampCount 裡那次。
 # barHTML 的「N / 33」、idPageHTML 的 FULL 疊印、里程碑的達成判斷，全部吃它的結果。
 # 這條守的是架構不是行為，測試碰不到：兩邊各自用同一條公式算一次的話，
 # 算出來永遠一樣，任何比對結果的測試都會是綠的（2026-08-25 實測，42 個測試全綠）。
@@ -324,9 +324,9 @@ fi
 # 不去掉的話字串比對永遠對不上。
 n=$(grep -o 'Object\.keys(S\.stamps)\.length' src/ui.js | wc -l | tr -d ' ')
 if [ "$n" = "1" ]; then
-  ok "章的數量只在 milestoneState 裡數一次"
+  ok "章的數量只在 stampCount 裡數一次"
 else
-  bad "src/ui.js 有 $n 處在數 S.stamps，應該只有 milestoneState 那一處"
+  bad "src/ui.js 有 $n 處在數 S.stamps，應該只有 stampCount 那一處"
   grep -n 'Object\.keys(S\.stamps)\.length' src/ui.js
 fi
 

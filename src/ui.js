@@ -65,16 +65,31 @@ function orderSlots(acts) {
   return acts.slice().sort((a, b) => rank(a.category) - rank(b.category));
 }
 
+// 蓋了幾個章。**整個 src/ui.js 只准在這裡數一次** ——
+// barHTML 的「N / 33」與 idPageHTML 的 FULL 疊印都吃它的結果。
+// check.sh 用 grep 守住這件事（見該檔案「章的數量」那條）。
+//
+// 這條守的是架構不是行為，**測試碰不到**：兩邊各自用同一條公式算一次的話，
+// 算出來永遠一樣，任何比對結果的測試都會是綠的（2026-08-25 實測）。
+// 真正會出事的是有人只改了其中一處的定義 —— 那時候畫面上兩個數字會不一致，
+// 而沒有任何東西會報錯。
+//
+// 2026-08-27：這個職責原本在 milestoneState 裡。里程碑拿掉之後它會跟著消失，
+// 而計數這件事還在，所以先搬出來（見 docs/superpowers/plans/2026-08-27-remove-milestones.md）。
+export function stampCount(S) {
+  return Object.keys(S.stamps).length;
+}
+
 // 里程碑的狀態**只有這一個定義點**。頂欄那行提示與資料頁的清單都問它，
 // 不准任何一邊自己再算一次 —— 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
 //
-// done 直接數 S.stamps 的鍵，而且整個檔案只准在這裡數一次 ——
-// check.sh 用 grep 守住這件事（見該檔案「章的數量」那條）。
-// test/ui-milestone.test.mjs 另外驗顯示端（barHTML）有沒有把這個數字印錯。
+// done 交給 stampCount(S) 算 —— 章的數量只准在那裡數一次
+// （見該函式上方的註解與 check.sh「章的數量」那條）。
+// test/ui-count.test.mjs 另外驗顯示端（barHTML）有沒有把這個數字印錯。
 //
 // 沒有「誰達成了什麼」的資料表，達成與否一律即時算（見 supabase/schema.sql 的註解）。
 export function milestoneState(S) {
-  const done = Object.keys(S.stamps).length;
+  const done = stampCount(S);
   // 同門檻時用 id 打破平手，順序才不會在每次載入之間跳動 —— 跟 activities
   // 的 seq 相同時那個坑一樣（見 SLOT_ORDER 的註解）。
   const list = (S.milestones || []).slice()
