@@ -269,7 +269,13 @@ async function requireUser() {
   return user;
 }
 
-// 六個查詢彼此不相依，一起發。序列發的話是六個 RTT，在手機網路上很有感。
+// 這些查詢彼此不相依，一起發。序列發的話是一個查詢一個 RTT，在手機網路上很有感。
+//
+// **刻意不寫數字。** 這句話原本寫「六個查詢」，而查詢數從那之後加過三次
+// （milestones、destinations、visas）又減過一次 —— 註解沒有跟著改，
+// 2026-08-27 拿掉 milestones 的時候它已經錯了兩輪、說的是六而實際是八。
+// 數字不是這句話要傳達的東西，它要傳達的是「為什麼一起發」。
+// 真的要守住數量的是 check.sh 那條「fetchAll 有幾個查詢，firstError 就要收幾個」。
 function fetchAll(user) {
   return Promise.all([
     supabase.from("months").select("*").order("seq"),
