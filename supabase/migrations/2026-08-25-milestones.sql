@@ -1,4 +1,6 @@
 -- BT Passport 遷移：新增里程碑（milestones）
+-- 2026-08-27：這個功能已經從前端移除，這個檔案是歷史紀錄，
+-- 表與資料仍在資料庫裡（見 supabase/schema.sql 裡 milestones 表上方的註解）。
 -- 用法：整份貼進 Supabase SQL Editor 按一次 Run。可以重複執行 ——
 -- create table if not exists 對已存在的表整段跳過，insert 那段用
 -- on conflict (id) do update，重跑只是把同樣的值再寫一次。

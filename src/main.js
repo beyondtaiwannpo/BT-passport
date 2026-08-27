@@ -483,6 +483,11 @@ document.addEventListener("click", async e => {
     // （spec §9.11；資料庫那一側的 delete 見 DATA.clearAll）。
     // destinations 2026-08-26 一度被列進來過 —— 那是控制端 brief 寫錯，
     // 它直接牴觸上面那行「要保留的（user、activities、months、milestones⋯）」。
+    //
+    // milestones 已於 2026-08-27 從前端移除，資料表還在（見 schema.sql 裡
+    // milestones 表上方的註解），不再需要被這份清單記得。上面的判準——
+    // 參考資料不列、護照內容才列——對 destinations、visas 依然成立，
+    // 不因為某張參考資料表沒被讀就不用守。
     Object.assign(S, {
       authMode: "in", authMsg: "",
       profile: null, stamps: {}, entries: {}, visas: {},
@@ -553,6 +558,10 @@ export async function boot() {
     // 里程碑 UI 在正式站上是死的，而 milestoneState 的 (S.milestones || [])
     // 讓它不 throw、安靜地不渲染，所以沒有人發現（2026-08-25 抓到）。
     // Object.assign 讓這個 bug class 不存在，而不是被守住。
+    //
+    // 里程碑功能已於 2026-08-27 從前端移除（milestones 表還在資料庫裡，
+    // 只是不再被讀取），但這個教訓——整包裝進去、不要手寫逐欄指派——
+    // 對 destinations、visas 這些現在還在用的東西一樣成立。
     Object.assign(S, all);
     // active === false 的活動要濾掉。這一行留在這裡而不是搬進 data.js：
     // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。

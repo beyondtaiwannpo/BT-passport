@@ -49,6 +49,11 @@ create table if not exists activities (
 --
 -- **刻意沒有「誰達成了什麼」的表**：達成與否用 stamps 的 count 即時算就好。
 -- 存一份重複的狀態會有不同步問題，而且會多一張帶使用者資料的表要管 RLS。
+--
+-- **2026-08-27：這張表目前沒有被前端讀取。** 里程碑功能已經從前端移除——
+-- 不用去 grep 它在哪裡被讀，找不到的，前端沒有任何地方讀它。
+-- 資料留著：移除是前端的事，這張表繼續留著不影響任何其他功能；
+-- 之後想把功能做回來，表、RLS、policy 都還在，不用重建。
 create table if not exists milestones (
   id          text primary key,      -- 'm05'，人看得懂又穩定
   threshold   int  not null,         -- 需要幾個章
