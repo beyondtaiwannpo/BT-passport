@@ -80,27 +80,8 @@ export function stampCount(S) {
   return Object.keys(S.stamps).length;
 }
 
-// 里程碑的狀態**只有這一個定義點**。頂欄那行提示與資料頁的清單都問它，
-// 不准任何一邊自己再算一次 —— 兩邊各算一次的話，改了其中一邊另一邊會靜靜地說謊。
-//
-// done 交給 stampCount(S) 算 —— 章的數量只准在那裡數一次
-// （見該函式上方的註解與 check.sh「章的數量」那條）。
-// test/ui-count.test.mjs 另外驗顯示端（barHTML）有沒有把這個數字印錯。
-//
-// 沒有「誰達成了什麼」的資料表，達成與否一律即時算（見 supabase/schema.sql 的註解）。
-export function milestoneState(S) {
-  const done = stampCount(S);
-  // 同門檻時用 id 打破平手，順序才不會在每次載入之間跳動 —— 跟 activities
-  // 的 seq 相同時那個坑一樣（見 SLOT_ORDER 的註解）。
-  const list = (S.milestones || []).slice()
-    .sort((a, b) => a.threshold - b.threshold || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const reached = list.filter(m => done >= m.threshold);
-  const next = list.find(m => done < m.threshold) || null;
-  return { done, list, reached, next, remaining: next ? next.threshold - done : 0 };
-}
-
 // 每個月一枚入境章的城市（spec §三 分配規則、§9.9）。**唯一的定義點** ——
-// 跟 SLOT_ORDER、pagesOf、faceOf、milestoneState 同一條原則。
+// 跟 SLOT_ORDER、pagesOf、faceOf、stampCount 同一條原則。
 //
 // 兩個來源，存下來的贏：
 //   S.visas 有紀錄  → 用它。蓋滿的月份城市從此不動，那是這張表存在的全部理由。
@@ -214,7 +195,7 @@ export function pendingVisasOf(S) {
 
 // 這一格現在哪一面朝上。**只有這一個定義點** —— slotHTML 與任何之後要知道
 // 面向的地方都問它，不准任何一邊自己再判斷一次。跟 SLOT_ORDER、pagesOf、
-// milestoneState 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
+// stampCount 同一條原則：兩個地方各判斷一次，改了其中一邊另一邊會靜靜地說謊。
 //
 // 一律預設正面 —— 章在那裡（見 spec §1.1）。未蓋章一律回 "front"，
 // 而且**不看 S.flipped** —— 未蓋章的格子根本不產生背面的 DOM
@@ -251,7 +232,7 @@ export function mrz(p) {
 }
 
 export function barHTML(S) {
-  const ms = milestoneState(S);
+  const done = stampCount(S);
   return `<div class="bar">
     <img src="./logo.png" alt="Beyond Taiwan">
     <div class="tabs" role="tablist">
@@ -260,7 +241,7 @@ export function barHTML(S) {
     </div>
     <button class="btn ghost sm" data-act="signout">登出</button>
     <div class="sp"></div>
-    <div class="prog"><small>Stamps collected</small>${ms.done} <span style="opacity:.4">/ ${S.activities.length}</span>${ms.next ? `<small class="next">下一個里程碑還差 ${ms.remaining} 個章</small>` : ""}</div>
+    <div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
   </div>`;
 }
 
@@ -326,7 +307,7 @@ export function idPageHTML(S) {
   const p = S.profile;
   const [l1, l2] = mrz(p);
   const av = S.profile.avatar ? `<img src="${esc(S.profile.avatar)}" alt="">` : `<span>點此上傳<br>大頭照</span>`;
-  const done = milestoneState(S).done;
+  const done = stampCount(S);
   const total = S.activities.length;
   return `<div class="mhead">
       <div class="mnum">00</div>
@@ -348,7 +329,6 @@ export function idPageHTML(S) {
       </div>
     </div>
     ${total > 0 && done === total ? `<div class="overprint" style="position:static;display:inline-block;margin-top:22px;transform:rotate(-3deg)">${total} / ${total} · FULL</div>` : ""}
-    ${milestonesHTML(S)}
     <div class="mrz">${esc(l1)}<br>${esc(l2)}</div>
     <div class="row" style="margin-top:18px">
       <button class="btn ghost sm" data-act="edit">編輯資料</button>
@@ -356,28 +336,6 @@ export function idPageHTML(S) {
       <button class="btn ghost sm" data-act="import">匯入還原</button>
       <button class="btn sm quiet" data-act="reset">清除這本護照</button>
     </div>`;
-}
-
-// 資料頁的里程碑清單。位置在標語之後、機讀碼之前。
-// 已達成的正常顯示，未達成的降低透明度但**門檻數字與名字都看得到** ——
-// 使用者的要求是「要讓人看得到還有什麼在前面」。
-//
-// 狀態同時寫在 .cat 的文字裡（「5 個章 · 已達成」／「5 個章 · 鎖定」），
-// 不只靠透明度：只靠顏色的話，讀螢幕的人與色覺不同的人拿不到這個資訊。
-//
-// 卡片是 <div class="slot"> 不是 <button>：它不可點，沒有任何動作。
-function milestonesHTML(S) {
-  const ms = milestoneState(S);
-  if (!ms.list.length) return "";   // 沒有里程碑（含讀取失敗）就整塊不出現
-  return `<div class="mstones-h">Milestones / 里程碑</div>
-    <div class="slots mstones">${ms.list.map(m => {
-      const got = ms.done >= m.threshold;
-      return `<div class="slot" data-locked="${got ? 0 : 1}">
-        <span class="cat">${m.threshold} 個章 · ${got ? "已達成" : "鎖定"}</span>
-        <span class="ttl">${esc(m.title_zh)}</span>
-        ${m.description ? `<span class="hint">${esc(m.description)}</span>` : ""}
-      </div>`;
-    }).join("")}</div>`;
 }
 
 function stampInner(act, st, extraClass) {

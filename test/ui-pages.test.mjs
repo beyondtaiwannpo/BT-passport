@@ -81,7 +81,7 @@ test("入境章：蓋滿才出現，而且沒有活動的月份不算蓋滿", ()
   const m = { seq: 1, month: 9, theme_zh: "", theme_en: "" };
   const DEST = [{ code: "TPE", city: "TAIPEI", active: true }];
   const mk = acts => ({ activities: acts, stamps: {}, entries: {}, justStamped: null,
-    months: [m], milestones: [], destinations: DEST, visas: {},
+    months: [m], destinations: DEST, visas: {},
     profile: { id: "00000000-0000-0000-0000-000000000000" } });
   const A = { id: "09A", month: 9, seq: 1, category: "gather", title_zh: "開學電影夜", title_en: "OPENING NIGHT", description: "d" };
   const has = s => monthPageHTML(s, m).includes("estamp");
@@ -101,7 +101,7 @@ test("沒有活動的月份，圓點與頁面說的是同一件事", () => {
   // （README 第 10、12 項）。改成斷言入境章。
   const m = { seq: 1, month: 9, theme_zh: "", theme_en: "" };
   const S2 = { page: 2, months: [m], activities: [], stamps: {}, entries: {}, justStamped: null,
-    milestones: [], destinations: [{ code: "TPE", city: "TAIPEI", active: true }], visas: {},
+    destinations: [{ code: "TPE", city: "TAIPEI", active: true }], visas: {},
     profile: { id: "00000000-0000-0000-0000-000000000000" } };
   const book = bookHTML(S2);
   assert.ok(!book.includes('data-on="1"'), "圓點不該是蓋滿");

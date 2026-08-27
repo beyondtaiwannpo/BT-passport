@@ -179,10 +179,10 @@
   .mtheme.clock b{font-size:34px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 
   .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  /* 三個地方三種高度不是三種例外，是同一條規則的三個實例 ——
+  /* 兩個地方的高度不是巧合，是同一條規則的兩個實例 ——
      只有需要留位置給章的格子才是 270，其他都是內容決定高度。
      月份頁的活動格子 270（下面 min-height:270px）、說明頁的三張卡 0
-     （.slots.guide .slot）、資料頁的里程碑卡 0（.slots.mstones .slot）。 */
+     （.slots.guide .slot）。 */
   .slot{
     border:1.5px dashed rgba(16,42,134,.3);border-radius:var(--r);
     min-height:270px;padding:14px;
@@ -261,28 +261,10 @@
      而且下面接的是說明與章，沒有要對齊的東西。 */
   .slots.guide .slot .ttl{min-height:2.2em}
 
-  /* 資料頁的里程碑卡。沿用 .slots/.slot，高度跟著內容長（理由見 .slot 的註解）。
-     格線用 auto-fit 而不是寫死欄數：里程碑的數量是資料，之後改成三個或六個
-     都不該回來動 CSS。
-     **手機上這條會贏過 @media 裡的 .slots{grid-template-columns:1fr}** ——
-     .slots.mstones 是 (0,2,0)、那條是 (0,1,0)，media query 不增加特異性。
-     那是刻意的：里程碑卡只有三行字，390px 下排兩欄剛好，不像活動格子那樣需要單欄。 */
-  .slots.mstones{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-  .slots.mstones .slot{min-height:0}
-  /* 未達成的里程碑：看得到門檻與名字，只是沉下去。使用者的要求是
-     「要讓人看得到還有什麼在前面」，所以不是藏起來而是變灰。 */
-  .slots.mstones .slot[data-locked="1"]{opacity:.45}
-
-  /* 里程碑區塊的小標。字級與字距刻意跟 .f i（護照欄位的標籤）一致，
-     讓它讀起來屬於資料頁既有的標籤系統，而不是一個新的東西。 */
-  .mstones-h{font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
-    opacity:.5;margin:26px 0 10px}
-
-  /* 頂欄那行「還差幾個章」。.prog small 本來是數字上方的標籤（display:block、
-     大寫、字距 .16em），直接再加一個 <small> 會繼承成第二個標籤 ——
-     中文在 .16em 的字距下會散開。所以覆寫成一般內文的節奏。 */
-  .prog small.next{margin:5px 0 0;font-size:11px;letter-spacing:.02em;
-    text-transform:none;opacity:.62}
+  /* CSS 特異性備忘：兩層 class 選擇器（例如 .slots.guide）是 (0,2,0)，
+     比 @media 裡單層的 .slots{grid-template-columns:1fr}（(0,1,0)）高 ——
+     media query 本身不增加特異性。以後如果哪個 .slots 變體要在手機上
+     保留自己的欄位設定，直接寫規則就會贏，不需要 !important。 */
 
   /* ---------- the stamp ---------- */
   .stampwrap{margin:14px 0 0;display:flex;justify-content:center;padding:6px 0 2px}
