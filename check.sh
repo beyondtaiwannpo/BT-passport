@@ -242,38 +242,51 @@ else
   bad "index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
 fi
 
-# loadAll 的 firstError 清單必須維持五個查詢，**不可以包含 milestones**。
-# 其他五個是「任一失敗就整批失敗」，理由是少了 stamps 的畫面看起來像「一個章都沒蓋」，
-# 學生會以為紀錄不見了然後重蓋一次。milestones 不一樣：讀不到就是沒有里程碑 UI，
-# 不會誤導任何人；而且這讓部署順序不再有先後 —— 前端先上、SQL 還沒跑時查詢會 404，
-# 護照照常運作。把 ms 加進那個清單，會讓「SQL 還沒跑」變成整站壞掉。
-# 單元測試碰不到這件事：data.js 在 module scope 建 supabase client，
-# 沒有網路 stub 就測不到錯誤分支。2026-08-25 實測過：把 ms 加進去，37 個測試全綠。
-# ── 2026-08-26 改寫。這條守門自己踩了 README 第 12 項 ──
-# 原本的寫法是「`firstError([mo, ac, pa, st, en])` 這個字面必須出現兩次」。
-# 它想守的是「ms 不准進清單」，斷言的卻是「清單長得跟當時一模一樣」。
-# 於是 2026-08-26 依規格 §9.4 把 destinations 與 visas 加進清單（那兩張表**應該**
-# 進去，理由見 data.js 的註解）時，這條無辜地 FAIL 了 —— 而 FAIL 的理由跟它
-# 保護的東西無關。這是 README 第 12 項的第四個實例，而且發生在守門這一側。
+# fetchAll 裡的查詢數 = firstError 清單的長度。一個都不准被排除在外。
 #
-# 改成守它真正在意的三件事：出現兩次、兩次一模一樣、兩次都不含 ms。
-# 清單裡有幾個、叫什麼名字，都不關這條守門的事。
+# 2026-08-27 之前這條守的是「ms 不准在清單裡」。里程碑移除之後那個 ms 不存在了，
+# 於是那條守門**永遠通過** —— 它是 README 第 12 項那條「**移除一個字串，
+# 會把所有斷言它不存在的測試變成空的**」的實例，只是發生在守門這一側。
+# **看到這條註解的人請回去讀 README 第 12 項**，那裡有另外四個形狀不同、
+# 病因一樣的例子。
+# 換成數量比對之後才有真實的對象：新增查詢卻忘了加進 firstError，會被抓到。
 #
-# 用 grep -o | wc -l 數出現次數，不用 grep -c —— grep -c 數的是「符合的行數」，
-# 兩處寫在同一行的話只算 1。這裡 grep -o 讓每一筆自成一行，所以後面用
-# `sort -u | wc -l` 數「有幾種不同的寫法」是安全的。
-# 先剝掉整行註解再抓。這個 repo 的註解會解釋規則本身（data.js 那段就在講
-# 「不要把 ms 加進 firstError」），註解裡遲早會出現這個字面。不剝的話，
-# 一個「讓註解說實話」的 commit 會把守門弄紅 —— 方向是安全的（誤報而不是
-# 放行，見 README 第 10 項），但讓文件弄壞建置沒有必要。
-fe=$(grep -v '^[[:space:]]*//' src/data.js | grep -o 'firstError(\[[^]]*\])')
-n=$(printf '%s\n' "$fe" | grep -c 'firstError')
-kinds=$(printf '%s\n' "$fe" | sort -u | grep -c 'firstError')
-if [ "$n" = "2" ] && [ "$kinds" = "1" ] && ! printf '%s\n' "$fe" | grep -qE '(\[|, )ms(\]|,)'; then
-  ok "loadAll 的 firstError 兩處一致且不含 milestones"
+# 用 node 不用 grep：要數的東西有結構（哪些查詢算在 fetchAll 範圍內、
+# firstError([...]) 裡有幾個逗號分隔的識別字），grep 表達不出這種範圍與結構。
+# 先剝掉整行註解（`^\s*//`）再找 fetchAll 的函式邊界，理由跟既有 firstError
+# 那條同一個做法：這個 repo 的註解會解釋規則本身，字面遲早會撞在一起。
+# 只數 fetchAll 函式**內**的 `supabase.from(`——loadAll 以外還有別處在用它
+# （saveProfile、clearAll……），這些不算數，混進來會讓比對失去意義。
+firstErrorGuard=$(node -e '
+  const fs = require("fs");
+  const raw = fs.readFileSync("src/data.js", "utf8");
+  const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+
+  const fm = src.match(/function fetchAll\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+  if (!fm) { console.log("找不到 fetchAll 函式"); process.exit(1); }
+  const q = (fm[1].match(/supabase\.from\(/g) || []).length;
+
+  const fe = src.match(/firstError\(\[[^\]]*\]\)/g) || [];
+  if (fe.length !== 2) {
+    console.log(`firstError([...]) 沒有出現剛好兩次（出現 ${fe.length} 次）`);
+    process.exit(1);
+  }
+  if (fe[0] !== fe[1]) {
+    console.log(`firstError 兩處寫法不一致：\n  ${fe[0]}\n  ${fe[1]}`);
+    process.exit(1);
+  }
+  const inner = fe[0].match(/\[([^\]]*)\]/)[1];
+  const l = inner.split(",").map(s => s.trim()).filter(Boolean).length;
+  if (q !== l) {
+    console.log(`fetchAll 有 ${q} 個查詢，firstError 只收了 ${l} 個`);
+    process.exit(1);
+  }
+  console.log(`fetchAll 有 ${q} 個查詢，firstError 收了 ${l} 個，一致`);
+' 2>&1)
+if [ $? -eq 0 ]; then
+  ok "$firstErrorGuard"
 else
-  bad "src/data.js 的 firstError 出了問題：要嘛不是兩處、兩處不一樣，要嘛 milestones 被加進去了"
-  printf '%s\n' "$fe" | sed 's/^/      /'
+  bad "src/data.js 的 firstError 出了問題：$firstErrorGuard"
 fi
 
 # boot() 必須整包裝填，不可以退回手寫逐欄指派。手寫的話 loadAll 每多回傳一個東西
