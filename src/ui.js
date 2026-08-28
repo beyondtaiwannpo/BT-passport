@@ -24,15 +24,19 @@ const TEAMS = ["Curriculum Team", "Mentorship Team", "Marketing Team",
 // 三個分類的**唯一定義點**。label / short / define 三個欄位分別餵給
 // 月份格子的分類標籤、說明頁卡片的標題、說明頁卡片的定義句。
 //
-// define 那三句跟 activities.json 的 categories.desc 是同一份文字。
-// **兩邊消不掉。** activities.json 執行期不會被讀（它是 seed.sql 的人類可讀原稿，
-// 前端一律吃資料庫），所以它是文件不是來源；真正要單一來源的話得把分類定義
-// 搬進資料庫，那是多一張表加一次查詢，為了三句不會變的話不划算。
-// 折衷是兩邊互相指路：改了這裡要同步 activities.json，反之亦然。
+// 2026-08-28：這裡以前跟 activities.json 的 categories[].desc 各存一份相同的
+// 定義句，靠「改一邊要同步另一邊」維持。那個約定漂移了（文案改英文，JSON 沒跟上），
+// 所以 **JSON 那一份連同解釋它的 categoriesNote 一起刪掉了**，不是改成「以這裡為準」——
+// 留一份確定是錯的中文在 seed 原稿裡，下一個重建資料庫的人就會拿到它。
+// 刪掉之後問題從「哪一份對」變成「只有一份」。
+//
+// 刪之前確認過沒有消費者：categories 這個鍵在全 repo 的程式、SQL、守門裡
+// 一次都沒被讀，schema.sql 也沒有 categories 表（分類是 activities.category
+// 的字串，不是獨立的表）。**不要因為 JSON 看起來少了東西就把 desc 加回去。**
 export const CATEGORY = {
-  gather: { label: "聚會 GATHER", short: "聚會", define: "全 BT 一起做的事", body: "一個月一次，全 BT 一起做一件事。玩遊戲、交換歌單、猜這張照片是誰的。一年下來，你會知道二十九個人的相簿長什麼樣、聽什麼歌、高中是什麼樣子。" },
-  prompt: { label: "題目 PROMPT", short: "題目", define: "一個寫的題目，只有自己看得到", body: "一個月一題，寫給七月的自己。九月你寫下想要什麼，七月護照會拿出來給你看。這裡寫的東西只有你看得到，別人打不開，所以可以誠實一點。" },
-  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "一張照片題目", body: "一個月一張照片。月亮、水溝蓋、公車站——你每天路過但從來沒看過的東西。三十個人拍同一樣東西，六個國家的差別會自己跑出來。" }
+  gather: { label: "聚會 GATHER", short: "聚會", define: "What the whole team does", body: "Once a month, all of BT does one thing together. Games, playlists, guessing whose photo that is. By the end of the year you'll know what twenty nine people's camera rolls look like, what they listen to, what they were like in high school." },
+  prompt: { label: "題目 PROMPT", short: "題目", define: "A question only you can see", body: "Once a month, one question, written to yourself in July. In September you write down what you want, and in July the passport pulls it back out for you. Nobody else can open what you write here, so you can be honest." },
+  frame:  { label: "鏡頭 FRAME",  short: "鏡頭", define: "A photo prompt", body: "Once a month, one photo. The moon, a manhole cover, a bus stop. Things you walk past every day and have never once looked at. Thirty of us shoot the same thing and the difference between six countries shows up on its own." }
 };
 
 // CATNAME 從 CATEGORY 衍生，不要各寫一份 —— 那就又變回兩個真相來源了。

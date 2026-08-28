@@ -116,10 +116,13 @@ test("說明頁的三張卡也是 聚會 → 題目 → 鏡頭", () => {
 });
 
 test("說明頁卡片的 .ttl 放的是定義句，不是分類短名", () => {
-  // 2026-08-23 使用者的決定（對照圖 B）：三句定義已經在 activities.json 定義過，
-  // .ttl 不准再寫一次分類短名（那會讓「聚會」在同一張卡上出現兩次）。
+  // 2026-08-23 使用者的決定（對照圖 B）：.ttl 放的是定義句，
+  // 不准再寫一次分類短名（那會讓「聚會」在同一張卡上出現兩次）。
+  // 下面刻意釘死字面而不是比對 CATEGORY.gather.define —— 後者對任何字串都成立
+  // （含空字串），會變成永遠綠的同義反覆，正是 README 第 12 項第一條的形狀。
+  // 改文案時這條會紅一次，那就是它在做的事：強迫一個人來看一眼。
   const html = guideCardsHTML();
-  assert.ok(html.includes("全 BT 一起做的事"), "gather 那張卡要顯示定義句");
+  assert.ok(html.includes("What the whole team does"), "gather 那張卡要顯示定義句");
   assert.ok(!html.includes('<span class="ttl">聚會</span>'), ".ttl 不准放分類短名");
 });
 
@@ -171,12 +174,13 @@ test("引導頁有一顆送出鍵，而且只有一顆", () => {
   assert.equal((html.match(/data-act="intro-done"/g) || []).length, 1);
 });
 
-test("三張卡的文案都以「一個月一」開頭 —— 並排時第一句要對齊", () => {
+test('三張卡的文案都以 "Once a month" 開頭 —— 並排時第一句要對齊', () => {
   // 使用者的版面要求：三張並排時第一句要對得起來。
   // 開頭統一是那個對齊的基礎，改掉任何一張的開頭就破壞它。
+  // 2026-08-28 文案改成英文，開頭從「一個月一」換成 "Once a month"。
   for (const c of SLOT_ORDER) {
-    assert.ok(CATEGORY[c].body.startsWith("一個月一"),
-      `${c} 的文案要以「一個月一」開頭，實際是「${CATEGORY[c].body.slice(0, 6)}…」`);
+    assert.ok(CATEGORY[c].body.startsWith("Once a month"),
+      `${c} 的文案要以 "Once a month" 開頭，實際是「${CATEGORY[c].body.slice(0, 14)}…」`);
   }
 });
 
@@ -187,16 +191,19 @@ test("每個分類都有非空的文案 —— 少一張不准靜靜地印佔位
   assert.ok(!guideCardsHTML().includes("待補"), "說明頁不准出現佔位字");
 });
 
-test("題目那張必須講「別人打不開」", () => {
+test("題目那張必須講 \"Nobody else can open\"", () => {
   // **這條不是文案偏好，是告知義務。** 使用者的原話：
   // 「那是這裡面有未成年幹部的情況下，唯一必須在第一眼講清楚的事。」
   // 心得與照片只有本人看得到（schema.sql 的 entries_read RLS），
   // 而學生要在寫下第一個字之前就知道這件事。
-  // 有人為了讓三張卡等長而刪掉這五個字的話，這條會紅。
-  assert.ok(CATEGORY.prompt.body.includes("別人打不開"),
-    "題目卡的文案必須包含「別人打不開」");
-  assert.ok(guideCardsHTML().includes("別人打不開"),
-    "「別人打不開」必須真的渲染到說明頁上");
+  // 有人為了讓三張卡等長而刪掉這句話的話，這條會紅。
+  //
+  // 2026-08-28 文案改成英文，這條跟著換字面：舊的中文是「別人打不開」。
+  // **換字面不是刪守門** —— 告知義務跟著文案走，文案改幾次它就換幾次。
+  assert.ok(CATEGORY.prompt.body.includes("Nobody else can open"),
+    '題目卡的文案必須包含 "Nobody else can open"');
+  assert.ok(guideCardsHTML().includes("Nobody else can open"),
+    '"Nobody else can open" 必須真的渲染到說明頁上');
 });
 
 test("CATNAME 的每個值都等於 CATEGORY 的 label —— 兩者不准漂移", () => {

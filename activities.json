@@ -2,11 +2,10 @@
   "version": "1.0",
   "term": "2026-2027",
   "note": "學年制：9 月至隔年 7 月，共 11 個月 33 格。每月固定一格聚會 gather、一格題目 prompt、一格鏡頭 frame。【2026-08-17 起】這個檔案是 supabase/seed.sql 的人類可讀原稿，執行期不再被讀取 —— 前端的活動與月份一律來自資料庫。改了這裡不會影響任何人看到的畫面，要生效必須同步改 seed.sql 並在 Supabase 執行。兩邊不一致時以資料庫為準。【2026-08-22 起】months 的 theme_zh 從月份主題改成時刻，theme_en 清空；08:40 與 23:50 兩個零頭是刻意不整點的，不是打字錯誤。",
-  "categoriesNote": "下面 categories 的 desc 跟 src/ui.js 的 CATEGORY[c].define 是同一份文字，用在說明頁卡片的定義句。執行期的真相在 src/ui.js 的 CATEGORY（這裡不會被讀取，只是文件）——改一邊要同步改另一邊，兩邊不一致時以 src/ui.js 為準。",
   "categories": {
-    "gather": { "zh": "聚會", "en": "GATHER", "desc": "全 BT 一起做的事", "private": false },
-    "prompt": { "zh": "題目", "en": "PROMPT", "desc": "一個寫的題目，只有自己看得到", "private": true },
-    "frame":  { "zh": "鏡頭", "en": "FRAME",  "desc": "一張照片題目", "private": true }
+    "gather": { "zh": "聚會", "en": "GATHER", "private": false },
+    "prompt": { "zh": "題目", "en": "PROMPT", "private": true },
+    "frame":  { "zh": "鏡頭", "en": "FRAME",  "private": true }
   },
   "months": [
     { "seq": 1,  "month": 9,  "theme_zh": "07:00", "theme_en": "" },
