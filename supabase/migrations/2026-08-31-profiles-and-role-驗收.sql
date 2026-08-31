@@ -29,7 +29,7 @@ select * from (
              from pg_attribute a, aclexplode(a.attacl) x
             where a.attrelid = 'public.profiles'::regclass
               and x.grantee = 'authenticated'::regrole and x.privilege_type = 'UPDATE')
-          = 'avatar,name_en,name_zh,tz'
+          = 'avatar,name_en,name_zh,team,tz'
       and (select count(*) from pg_constraint c
             where c.conname in ('stamps_user_id_fkey','entries_user_id_fkey','visas_user_id_fkey')
               and c.confrelid = 'public.profiles'::regclass) = 3
@@ -76,7 +76,7 @@ select * from (
 
   -- ★ 這一條是集合相等，不是「有沒有包含」。多發一欄（例如 role）跟少發一欄
   -- 都會讓它變紅 —— 只檢查「role 不在裡面」的話，哪天多發了 updated_at 不會有人知道。
-  union all select 5, '★ 可改的欄位剛好是那四欄（§3-1 那個洞）', 'avatar,name_en,name_zh,tz',
+  union all select 5, '★ 可改的欄位剛好是那四欄（§3-1 那個洞）', 'avatar,name_en,name_zh,team,tz',
     coalesce((select string_agg(distinct a.attname, ',' order by a.attname)
                 from pg_attribute a, aclexplode(a.attacl) x
                where a.attrelid = 'public.profiles'::regclass
@@ -86,7 +86,7 @@ select * from (
                  from pg_attribute a, aclexplode(a.attacl) x
                 where a.attrelid = 'public.profiles'::regclass
                   and x.grantee = 'authenticated'::regrole and x.privilege_type = 'UPDATE')
-              = 'avatar,name_en,name_zh,tz'
+              = 'avatar,name_en,name_zh,team,tz'
     then 'PASS' else 'FAIL' end
 
   union all select 6, '需要認 cadre 的政策數', '18 條',

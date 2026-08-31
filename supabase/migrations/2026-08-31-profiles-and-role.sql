@@ -141,7 +141,11 @@ create policy profiles_write on profiles
 -- 驗收方式不是「前端沒有那個按鈕」，是拿 student 帳號直接打 API 要看到權限錯誤。
 revoke all on profiles from anon, authenticated;
 grant select on profiles to authenticated;
-grant update (name_zh, name_en, tz, avatar) on profiles to authenticated;
+-- 2026-08-31 修正：原本漏了 team。規格 §3-1 那行範例沒有列 team，但 §3-2 的
+-- 表格有 —— 照範例逐字抄的結果是 saveProfile / clearAll / importPassport 三條路
+-- 整條壞掉（Postgres 要求 SET 清單裡每一欄都要有權限，缺一欄整句被拒）。
+-- 已經跑過舊版的資料庫請跑 2026-08-31-profiles-grant-team.sql 補上。
+grant update (name_zh, name_en, team, tz, avatar) on profiles to authenticated;
 
 -- ---------- 7. 外鍵改指 profiles ----------
 -- 每一個使用者都有 profiles 那一列，指過去才是對的關係；指 passports 的話，

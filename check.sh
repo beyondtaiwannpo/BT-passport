@@ -431,6 +431,77 @@ else
   '
 fi
 
+# 前端往 profiles 寫的每一欄，都必須是資料庫真的發了權限的那幾欄
+#
+# 2026-08-31 出過事：遷移 A 照規格 §3-1 那行範例發欄位層級權限，漏了 team，
+# 而 data.js 有三處會把 team 寫進同一句 update。Postgres 要求 UPDATE 的 SET 清單裡
+# **每一欄**都要有權限，缺一欄整句被拒 —— 所以「護照資料頁存檔」「清除這本護照」
+# 「匯入還原」三條路**整條**都壞掉，不是只有 team 那一格存不了。
+#
+# 為什麼既有的驗收沒抓到：遷移 A 的驗收比對的是「規格那行範例列了哪幾欄」，
+# 不是「前端實際會寫哪幾欄」。斷言寫的是「A 等於 B」，想守的是「A 是對的」
+# —— README 第 12 項那個形狀，只是這次發生在 SQL 與 JS 的接縫上。
+# §8-3 的 API 實測也如實通過了，因為那一句只寫 name_zh，剛好是有權限的那一欄：
+# 量了，但量的是最容易過的那個案例。
+#
+# 清單寫死在這裡，改資料庫的 grant 就要同時改這一行。那是刻意的摩擦，
+# 跟 ESTAMP_PALETTE 同一個做法：例外一次只開一個洞，不是開一扇門。
+PROFILE_WRITABLE="avatar name_en name_zh team tz"
+
+# 先守住這張清單自己。有人看到下面那條紅了，最省事的「修法」是把欄位加進清單 ——
+# 如果加進來的是 role，那就等於用一行 shell 撤掉整份規格 §3-1 那個洞的解法。
+# updated_at 同理：它由資料庫的 trigger 蓋，前端寫得動就等於時間看板的
+# 「上次更新」由客戶端說了算。這兩個名字出現在清單裡一律 FAIL。
+listbad=0
+for c in $PROFILE_WRITABLE; do
+  if [ "$c" = "role" ] || [ "$c" = "updated_at" ]; then
+    bad "PROFILE_WRITABLE 裡出現 ${c}，那一欄不該由前端寫（規格 §3-1）"
+    listbad=1
+  fi
+done
+[ "$listbad" = "0" ] && ok "PROFILE_WRITABLE 清單本身沒有 role / updated_at"
+
+# 寫入點的**數量**也要對得上。沒有這一條的話，守門的掃描範圍會安靜地縮小：
+# 抽取用的 regex 認得的是 `.from("profiles") … .update({`，哪天有人改用
+# .upsert()、把物件拆成變數再傳、或多開一條寫入路徑，這裡就會少抓到幾個寫入點，
+# 而少抓到的部分完全不會有聲音 —— 剩下的幾個仍然全在清單裡，照樣綠燈。
+# 2026-08-31 反向驗證時實測到這件事：故意改掉三個寫入點，守門還是全過。
+# 所以數量寫死，增減寫入路徑就要回來改這一行（跟 ESTAMP_PALETTE 同一個做法）。
+PROFILE_WRITE_SITES=4
+
+profileCols=$(node -e '
+  const fs = require("fs");
+  const raw = fs.readFileSync("passport/src/data.js", "utf8");
+  const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+  const want = Number(process.argv[1]);
+  const re = /\.from\("profiles"\)[\s\S]{0,80}?\.(?:update|upsert)\(\{([\s\S]*?)\}\)/g;
+  const cols = new Set();
+  let m, sites = 0;
+  while ((m = re.exec(src))) {
+    sites++;
+    for (const k of m[1].matchAll(/(^|[{,\s])([a-z_]+)\s*:/g)) cols.add(k[2]);
+  }
+  if (sites !== want) {
+    console.log(`寫入點有 ${sites} 個，check.sh 說應該有 ${want} 個`);
+    process.exit(1);
+  }
+  console.log([...cols].sort().join(" "));
+' "$PROFILE_WRITE_SITES" 2>&1)
+if [ $? -ne 0 ]; then
+  bad "抽不出前端寫進 profiles 的欄位：${profileCols}"
+else
+  extra=""
+  for c in $profileCols; do
+    case " $PROFILE_WRITABLE " in *" $c "*) ;; *) extra="$extra $c" ;; esac
+  done
+  if [ -n "$extra" ]; then
+    bad "data.js 會寫 profiles 的這些欄位，但它們不在 PROFILE_WRITABLE 裡：${extra}"
+    say "     資料庫沒發權限的話，整句 update 都會被拒，不是只有那一欄存不了。"
+  else
+    ok "data.js 寫進 profiles 的欄位（${profileCols}）都在允許清單裡"
+  fi
+fi
+
 # 佔位文案不可以進到已經定稿的部署範圍
 #
 # 2026-08-22 出過事，記在 docs/superpowers/specs/2026-08-22-guide-page-and-slot-order-design.md：

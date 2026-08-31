@@ -160,10 +160,18 @@ beyondtaiwannpo.com/
 解法是**欄位層級的權限**：
 
 ```sql
-grant update (name_zh, name_en, tz, avatar) on profiles to authenticated;
+grant update (name_zh, name_en, team, tz, avatar) on profiles to authenticated;
 ```
 
 只發這幾個欄位，`role` 完全不在裡面。要改角色只能透過一個 `security definer` 的函式，而那個函式會驗邀請碼（見 3-5）。
+
+> **2026-08-31 修正：原本這行漏了 `team`。** 3-2 的表格把 `team` 列在 `profiles` 裡，這一行卻沒有 —— 規格自己前後不一致，而遷移 A 照這行逐字抄。
+>
+> 後果比「team 存不進去」嚴重得多：**Postgres 要求 UPDATE 的 `SET` 清單裡每一欄都要有權限，缺一欄整句被拒。** `data.js` 有三處會把 `team` 跟名字寫在同一句，所以「護照資料頁存檔」「清除這本護照」「匯入還原」三條路整條都壞掉。
+>
+> 兩層驗收都如實地放它過去：遷移 A 的驗收比對的是「這行範例列了哪幾欄」而不是「前端實際會寫哪幾欄」；§8-3 的 API 實測那一句只寫 `name_zh`，剛好是有權限的那一欄。**量了，但量的是最容易過的那個案例。**
+>
+> 已經補上 `supabase/migrations/2026-08-31-profiles-grant-team.sql`，並在 `check.sh` 加了一條守門：前端寫進 `profiles` 的每一欄都必須在允許清單裡，而且寫入點的**數量**也要對得上（否則掃描範圍會安靜地縮小）。
 
 **這跟 `visas` 不給 UPDATE 權限是同一個原則**：不能靠前端自律，要讓資料庫擋。
 
