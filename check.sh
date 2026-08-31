@@ -427,11 +427,28 @@ else
   '
 fi
 
-# CNAME 不可掉
-if [ -f CNAME ]; then
-  ok "CNAME 存在"
-else
+# CNAME 不可掉，而且內容要對
+#
+# 2026-08-31 之前這條只檢查「檔案存在」。那守不住它真正要守的東西：
+# CNAME 的**內容**就是 GitHub Pages 的自訂網域設定，內容錯了站台一樣會掉，
+# 而檔案還在、守門照樣綠。這一輪正好要改它的內容（passport.beyondtaiwannpo.com
+# → beyondtaiwannpo.com），所以一起補上。
+#
+# 比對整個檔案而不是 grep 一個子字串，有兩個理由：
+#   1. grep 子字串的話，'passport.beyondtaiwannpo.com' 裡面也含有
+#      'beyondtaiwannpo.com'，寫錯成舊網域照樣會過。
+#   2. CNAME 沒有註解，整檔比對不會踩到檔頭講的那個「註解餵飽守門」的坑。
+# 這是「必須存在」型的守門，所以錨定到完整形式 —— 就是整個檔案的內容。
+EXPECTED_CNAME="beyondtaiwannpo.com"
+if [ ! -f CNAME ]; then
   bad "CNAME 不見了，自訂網域會掉（spec §8）"
+else
+  actual_cname=$(tr -d ' \t\r\n' < CNAME)
+  if [ "$actual_cname" = "$EXPECTED_CNAME" ]; then
+    ok "CNAME 存在且內容是 $EXPECTED_CNAME"
+  else
+    bad "CNAME 內容不對：預期 ${EXPECTED_CNAME}，實際 ${actual_cname}（spec §8-1）"
+  fi
 fi
 
 [ $fail -eq 0 ] && say "" && say "全部通過。" || { say ""; say "有項目未通過。"; }

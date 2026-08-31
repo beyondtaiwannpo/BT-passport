@@ -3,7 +3,10 @@
 Beyond Taiwan 內部幹部用的數位護照。學年制，9 月到隔年 7 月，11 個月共 33 格，
 完成一格蓋一個章。約 30 位幹部使用。**不是給學員 (mentee) 用的。**
 
-網站：https://passport.beyondtaiwannpo.com
+網站：https://beyondtaiwannpo.com/passport/
+
+2026-08-31 起這個 repo 是 `beyondtaiwannpo/bt-site`，護照是 `beyondtaiwannpo.com`
+這個平台上的第一個功能，跑在 `/passport/`。平台的規格看 `BT-Site-交接規格.md`。
 
 ---
 
@@ -55,7 +58,7 @@ Beyond Taiwan 內部幹部用的數位護照。學年制，9 月到隔年 7 月�
 
 碼單獨丟過去，你就會被問下面每一個問題。**連同這段話一起貼，大部分就不會被問。**
 
-> BT 護照開放了：https://passport.beyondtaiwannpo.com
+> BT 護照開放了：https://beyondtaiwannpo.com/passport/
 >
 > 你的邀請碼：`（貼上他的碼）`
 >
