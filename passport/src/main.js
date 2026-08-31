@@ -57,6 +57,16 @@ function render() {
   // 少了它畫面會掉回登入頁，等於對一個明明登入著的人說「請登入」（spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg); return; }
+  // 登入了但還不是幹部（階段 5，規格 §3-5）。**這一條必須排在申請護照那一條前面。**
+  // 學員沒有 passports 那一列，所以 S.profile 是 null —— 少了這一條，他會被丟到
+  // 「填護照資料」頁，然後存不進去（passports 沒有 insert policy），
+  // 而且畫面上一個活動格子都沒有（RLS 擋掉 months/activities）。那看起來像壞掉。
+  //
+  // 用 `S.role && S.role !== "cadre"` 而不是 `S.role !== "cadre"`：
+  // S.role 是 null 的時候（profiles 那一列查不到、或資料庫還沒遷移）不要接住，
+  // 讓它掉到下面既有的分支去 —— 那些情況跟「是學員」不是同一件事，
+  // 顯示「你還不是幹部」會把一個資料壞掉的幹部誤導成他自己沒升級。
+  if (S.role && S.role !== "cadre") { el.innerHTML = UI.notCadreHTML(S.authMsg); return; }
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
   if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
@@ -271,6 +281,39 @@ document.addEventListener("click", async e => {
       await boot();
     } catch (e) {
       S.authMsg = e.message;
+      render();
+    }
+    return;
+  }
+
+  if (act === "do-google") {
+    S.authMsg = "";
+    try { await DATA.signInWithGoogle(); }
+    catch (e) { S.authMsg = e.message; render(); }
+    // 成功的話瀏覽器已經在往 Google 跳轉，這裡不需要做任何事 ——
+    // 也**不要**在這裡 render()，那會在跳轉前閃一下畫面。
+    return;
+  }
+
+  // 角色升級。**前端唯一碰得到角色的地方就是這裡，而它只是呼叫那支 RPC。**
+  // 規格 §3-5 第 4 點：前端不准有任何「設定角色」的路徑。
+  if (act === "do-claim") {
+    const el = document.getElementById("ci");
+    // .trim() 只是順手。大小寫與前後空白的正規化整套在資料庫做
+    // （claim_invite 兩邊都套 upper(btrim(...))）——**不要在這裡加任何大小寫轉換**，
+    // 理由跟上面 do-signup 那段一模一樣，2026-08-17 已經咬過一次。
+    const code = el ? el.value.trim() : "";
+    if (!code) { S.authMsg = DATA.authMessage(null); render(); return; }
+    b.disabled = true;
+    try {
+      await DATA.claimInvite(code);
+      // 不管回的是 upgraded 還是 already_cadre 都重新 boot：
+      // 角色變了之後 RLS 看得到的東西整組不一樣，只改前端狀態是不夠的。
+      S.authMsg = "";
+      await boot();
+    } catch (e) {
+      S.authMsg = e.message;
+      b.disabled = false;
       render();
     }
     return;

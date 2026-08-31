@@ -18,8 +18,8 @@ import { supabase } from "../../shared/supabase.js";
 import { currentUser } from "../../shared/auth.js";
 
 export { supabase };
-export { authMessage, configMessage, signUp, signIn, signOut,
-         isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
+export { authMessage, configMessage, signUp, signIn, signOut, signInWithGoogle,
+         claimInvite, isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
 
 /* ---------- 護照內容 ---------- */
 
@@ -84,7 +84,9 @@ export async function loadAll() {
   const user = await currentUser();
   // 未登入不是錯誤，是還沒登入。回空的形狀讓 main.js 的 render() 去顯示登入頁，
   // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
-  if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [], destinations: [], visas: {} };
+  // role 也要在這個形狀裡。少了它，登出之後 Object.assign(S, all) 不會覆蓋 S.role，
+  // 上一個使用者的角色會殘留在畫面狀態裡。回傳的形狀要跟正常那條一致。
+  if (!user) return { role: null, profile: null, stamps: {}, entries: {}, activities: [], months: [], destinations: [], visas: {} };
 
   let [mo, ac, pf, pa, st, en, de, vi] = await fetchAll(user);
   let firstErr = firstError([mo, ac, pf, pa, st, en, de, vi]);
@@ -147,6 +149,12 @@ export async function loadAll() {
   // 「填護照資料」頁，而使用者存不進去（passports 沒有 insert policy，補不回來）。
   const me = pf.data || {};
   return {
+    // role 放在最外層而不是塞進 profile，理由是**學員沒有 profile**：
+    // 「有沒有護照」由 passports 那一列決定，而學員沒有那一列，所以下面
+    // profile 會是 null。角色如果只掛在 profile 裡，前端就永遠不知道
+    // 一個沒有護照的人是學員還是資料壞掉 —— 而那兩件事該顯示的畫面完全不同
+    // （前者是「你還不是幹部，有邀請碼嗎」，後者是「填護照資料」）。
+    role: me.role ?? null,
     profile: pa.data ? {
       id:         user.id,
       name_zh:    me.name_zh    ?? null,

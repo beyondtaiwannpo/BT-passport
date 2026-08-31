@@ -677,7 +677,50 @@ export function authHTML(mode, msg) {
       <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
       <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "我有邀請碼，要註冊"}</button>
     </div>
+    <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
+         有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
+         兩條路並存是規格明寫的決定，不是過渡狀態。
+
+         按鈕只有文字、沒有 Google 的彩色 logo：硬規則是一個畫面最多三種顏色
+         （見 shared/brand.css），而那個 logo 自己就有四種。用文字是誠實的取捨，
+         不是偷懶 —— 要放官方 logo 就得先改硬規則，那不是這一步的事。
+
+         登入與註冊兩種模式都放，因為 Google 那條路沒有「註冊」與「登入」之分：
+         第一次點就是註冊，第二次點就是登入，使用者不需要先決定自己是哪一種。 -->
+    <div class="row" style="margin-top:6px">
+      <button class="btn ghost" data-act="do-google">用 Google 登入 / Continue with Google</button>
+    </div>
+    <div class="wnote" style="margin:12px 0 0">用 Google 進來的話不需要密碼。<b>還是需要邀請碼</b>——登入之後再輸入。</div>
     ${up ? "" : `<div class="wnote" style="margin:16px 0 0">忘記密碼？寄信到 beyondtaiwan2020@gmail.com，我們會幫你重設。你的資料都還在。</div>`}
+  </div>`;
+}
+
+// 登入了，但還不是幹部（規格 §3-5）。
+//
+// 這一頁在階段 5 之前不存在，因為在那之前「能登入」等於「是幹部」——
+// 邀請碼擋在註冊那一關。門移到升級之後，就會有一種人是登入著卻什麼都看不到的：
+// 用 Google 進來的新人、或還沒輸入邀請碼的人。**沒有這一頁的話他們會看到
+// 一本沒有任何活動格子的空護照**，那是 RLS 正常運作的樣子，但對使用者來說像壞掉。
+//
+// ⚠ 這一頁的位置是暫時的。規格 §2-2 把升級入口放在 /app/，而 /app/ 是階段 7 才做。
+//    階段 7 要把這一頁搬過去，護照就回到「只有幹部看得到」的單純狀態。
+//
+// 邀請碼那格的 autocapitalize / autocorrect / spellcheck 全部關掉，理由跟
+// authHTML 那格一模一樣（見它上面那段註解）：**大小寫已經不是理由**，
+// 資料庫兩邊都套 upper(btrim(...))；留著是為了擋 autocorrect 把使用者打的字
+// 換成別的字 —— 那是使用者看不見的竄改，資料庫救不了。
+export function notCadreHTML(msg) {
+  return `<div class="card">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>你還不是 BT 幹部</h2>
+    <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長拿"></label>
+    <div class="row">
+      <button class="btn" data-act="do-claim">我是幹部，我有邀請碼</button>
+      <button class="btn sm quiet" data-act="signout">登出</button>
+    </div>
+    <div class="wnote" style="margin:16px 0 0">還不是幹部也沒關係，這個帳號留著。之後開放給學員的功能會用同一個帳號登入。</div>
   </div>`;
 }
 

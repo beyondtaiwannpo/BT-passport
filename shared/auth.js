@@ -144,6 +144,12 @@ const RULES = [
   // 這條最寬，會吃掉所有排在它後面的東西，所以一定要留在最後。
   // （資料庫層的旁證仍然成立：supabase/rls-test.sql 第 65 條，spec §11-5，
   //   trigger 對兩者丟同一個 P0001。現在它是佐證，不再是唯一的依據。）
+  // claim_invite 那個 RPC 驗不過時丟的是 P0001 / message 就是 invalid_invite，
+  // 走 PostgREST 回來是 400，不是 500 —— 所以下面那條「s >= 500」接不到它，
+  // 要單獨一條。文案共用 MSG.invite：對使用者來說「碼不對或用完了」是同一件事，
+  // 不管它發生在註冊還是升級。
+  { key: "invite", when: (e, m) => m === "invalid_invite" },
+
   { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 
@@ -212,6 +218,42 @@ export async function signIn(email, pw) {
 }
 
 export async function signOut() { if (supabase) await supabase.auth.signOut(); }
+
+// Google 登入（規格 §3-4）。Supabase 內建的供應商，前端只有這一顆按鈕。
+//
+// **email + 密碼那條路保留當備援，不要拿掉**：有人沒有 Google 帳號、有人在中國、
+// 有人的 Google 就是登不進去。兩條路並存是規格明寫的。
+//
+// redirectTo 預設回到「現在這一頁」。這一輪護照與登入頁還在同一個位置，
+// 階段 7 有了 /app/ 之後，呼叫端可以傳別的值進來，這個函式不用改。
+// **那個網址必須先加進 Supabase 後台的 Redirect URLs**，否則 OAuth 轉回來會被拒。
+export async function signInWithGoogle(redirectTo) {
+  if (!supabase) throw new Error(MSG.offline);
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: redirectTo || (location.origin + location.pathname) }
+  });
+  // 成功的話瀏覽器已經在跳轉了，下面這行不會執行到。
+  if (error) throw new Error(authMessage(error));
+}
+
+// 角色升級（規格 §3-5）。**前端唯一能改動角色的路徑就是這一個函式**，
+// 而它只是呼叫資料庫那支 security definer 的 RPC —— 驗碼、扣碼、升級、
+// 建 passports 那一列，全部在資料庫裡一次做完。
+//
+// **不要在這裡對 code 做任何正規化。** 大小寫與前後空白由資料庫處理
+// （claim_invite 兩邊都套 upper(btrim(...))）。2026-08-17 出過事：前端偷偷轉大寫，
+// 而資料庫是嚴格比對，管理員建的小寫碼讓所有人都失敗，畫面卻只說「這個邀請碼不對」。
+// 病根是「同一件事在兩個地方各做一半」。呼叫端的 .trim() 只是順手，正確性不靠它。
+//
+// 回傳 'upgraded' 或 'already_cadre'。後者不是錯誤，也不會扣掉一組碼 ——
+// 使用者手滑連點兩下不該燒掉一組（claim_invite 裡那個 for update 就是為了這個）。
+export async function claimInvite(code) {
+  if (!supabase) throw new Error(MSG.offline);
+  const { data, error } = await supabase.rpc("claim_invite", { p_code: code });
+  if (error) throw new Error(authMessage(error));
+  return data;
+}
 
 // 「查不出是誰」有兩種完全不同的原因，而畫面上該顯示的東西正好相反：
 //   沒登入 / session 過期 → 登入頁

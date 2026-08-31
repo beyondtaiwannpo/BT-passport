@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML,
-         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../passport/src/ui.js";
+         idPageHTML, notCadreHTML, authHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../passport/src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },
@@ -226,5 +226,45 @@ test("清除護照的按鈕降級，另外三顆不變", () => {
     const m = html.match(new RegExp(`class="([^"]*)" data-act="${act}"`));
     assert.ok(m, `找不到 data-act="${act}" 的按鈕`);
     assert.ok(!m[1].includes("quiet"), `data-act="${act}" 不該被降級`);
+  }
+});
+
+// ---- 階段 5：非幹部那一頁與 Google 登入按鈕 ----
+// 這幾條守的是「使用者卡在一個沒有出路的畫面」。
+// 非幹部頁如果掉了邀請碼輸入框，登入進來的學員就沒有任何方式升級，
+// 而畫面看起來是好的 —— 沒有錯誤、沒有空白，只是走不下去。
+// 那種壞法不會有任何東西報錯，所以要有測試。
+test("notCadreHTML 有邀請碼輸入框與升級按鈕，而且走得掉", () => {
+  const h = notCadreHTML("");
+  assert.ok(h.includes('id="ci"'), "邀請碼輸入框不見了，學員沒有辦法升級");
+  assert.ok(h.includes('data-act="do-claim"'), "升級按鈕不見了");
+  assert.ok(h.includes('data-act="signout"'), "沒有登出鍵，這一頁沒有 barHTML，使用者會卡住");
+});
+
+// 那格的 autocorrect / autocapitalize / spellcheck 一定要關掉。
+// 大小寫已經不是理由（資料庫兩邊都 upper(btrim(...))），留著是為了擋
+// autocorrect 把使用者打的字換成別的字 —— 那是使用者看不見的竄改，
+// 資料庫救不了，他只會看到「這個邀請碼不對」然後把同一組碼再打十次。
+test("notCadreHTML 的邀請碼那格關掉了自動更正", () => {
+  const h = notCadreHTML("");
+  const field = h.slice(h.indexOf('id="ci"'));
+  for (const attr of ['autocorrect="off"', 'autocapitalize="off"', 'spellcheck="false"'])
+    assert.ok(field.includes(attr), `邀請碼那格少了 ${attr}`);
+});
+
+// 前端唯一能碰角色的路徑是 claim_invite 那支 RPC（規格 §3-5 第 4 點）。
+// 這一頁不准出現任何直接設定角色的東西。
+test("notCadreHTML 沒有任何直接設定角色的路徑", () => {
+  const h = notCadreHTML("");
+  assert.ok(!/role/i.test(h), "這一頁出現了 role，前端不准有設定角色的路徑");
+});
+
+// email + 密碼那條路是備援，不准因為加了 Google 就消失（規格 §3-4）。
+test("登入頁同時有 Google 與 email 密碼兩條路", () => {
+  for (const mode of ["in", "up"]) {
+    const h = authHTML(mode, "");
+    assert.ok(h.includes('data-act="do-google"'), `${mode} 模式少了 Google 登入`);
+    assert.ok(h.includes('id="ae"') && h.includes('id="ap"'),
+              `${mode} 模式少了 email 或密碼欄位 —— 備援那條路不准拿掉`);
   }
 });
