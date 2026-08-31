@@ -1,5 +1,16 @@
 # BT Passport — 開發交接說明 / Build Brief
 
+> **2026-08-31 註記：這是歷史紀錄，內容保持原樣。**
+>
+> 這份是 2026-08-15 專案開工前的 build brief，當時 repo 叫 `BT-passport`、
+> 打算部署到 `passport.beyondtaiwannpo.com`，連「GitHub Pages 或 Netlify」都還沒決定。
+> 2026-08-31 起 repo 改名為 `bt-site`，網域改成 `beyondtaiwannpo.com`，
+> 護照搬進 `/passport/`，登入也要加 Google、邀請碼改成角色升級。
+>
+> **文中的網址、repo 名稱與技術決定沒有跟著改，那是刻意的。** 這份記的是當時的起點，
+> 改了就會讓人以為當初就是現在這樣。現在的狀態一律看 `BT-Site-交接規格.md`，
+> 日常維運看 `README.md`。
+
 給接手開發的人（Claude Code 或工程夥伴）。讀完這份就能開工。
 
 ---

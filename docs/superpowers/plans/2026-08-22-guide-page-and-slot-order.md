@@ -1,5 +1,16 @@
 # 說明頁、三格順序、月份時刻 實作計畫
 
+> **2026-08-31 註記：這是歷史紀錄，內容保持原樣。**
+>
+> 這份寫於 2026-08-22，當時 repo 叫 `BT-passport`、護照跑在
+> `passport.beyondtaiwannpo.com` 的根目錄，本機工作目錄是 `/Users/pinwang/bt-passport`。
+> 2026-08-31 起 repo 改名為 `bt-site`，護照搬進 `/passport/` 子資料夾，
+> 網域也在搬（進行中，見規格）。
+>
+> **文中的網址、repo 名稱與本機路徑沒有跟著改，那是刻意的。** 改了的話這份紀錄
+> 就會讓下一個人以為當時就是新的樣子 —— 紀錄的價值在於它說的是當時的前提。
+> 現在的狀態一律看 `BT-Site-交接規格.md`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修好一條讓全站按鈕外觀失效的 CSS reset，把月份三格順序寫死為 聚會 → 題目 → 鏡頭並加測試釘住，在資料頁與九月之間插一頁說明（含第一次登入的引導頁），把月份主題的版面改成適合顯示時刻。

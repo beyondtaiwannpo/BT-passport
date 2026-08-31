@@ -1,5 +1,16 @@
 # spec §11 驗收紀錄
 
+> **2026-08-31 註記：這是歷史紀錄，內容保持原樣。**
+>
+> 這份寫於 2026-08-16，當時 repo 叫 `BT-passport`、護照跑在
+> `passport.beyondtaiwannpo.com` 的根目錄，本機工作目錄是 `/Users/pinwang/bt-passport`。
+> 2026-08-31 起 repo 改名為 `bt-site`，護照搬進 `/passport/` 子資料夾，
+> 網域也在搬（進行中，見規格）。
+>
+> **文中的網址、repo 名稱與本機路徑沒有跟著改，那是刻意的。** 改了的話這份紀錄
+> 就會讓下一個人以為當時就是新的樣子 —— 紀錄的價值在於它說的是當時的前提。
+> 現在的狀態一律看 `BT-Site-交接規格.md`。
+
 對象：BT Passport，正式站台 https://passport.beyondtaiwannpo.com
 執行：2026-08-17 至 2026-08-18
 資料庫：Supabase 專案 norjaglyaotzewxavmhv
