@@ -1,4 +1,20 @@
 -- BT Passport schema
+--
+-- ⚠⚠ 2026-08-31：這個檔案落後於正式資料庫，**不要拿它建新專案**。⚠⚠
+--
+-- 階段 3+4 的遷移（supabase/migrations/2026-08-31-profiles-and-role.sql）做了三件
+-- 這個檔案還不知道的事：
+--   1. 多了一張 profiles（id / name_zh / name_en / team / role / tz / avatar / updated_at），
+--      使用者資料從 passports 搬過去了；passports 只剩 motto / issued / intro_seen 是活的
+--      （舊的名字欄位還在，但沒有人讀，遷移 B 會 drop）。
+--   2. 每一條 RLS 都改成認 role = 'cadre'（透過 public.is_cadre()），讀寫兩端都是。
+--      profiles 的 UPDATE 是**欄位層級**授權，role 不在發出去的欄位裡。
+--   3. handle_new_user() 會多建一列 profiles。
+--
+-- 要重建一個新專案的話，順序是：這個檔案 → seed.sql → migrations/ 底下**按日期全部跑一遍**。
+-- 這個檔案會在階段 5（邀請碼改成角色升級）之後整份改寫，屆時再變回單一真相來源。
+-- 在那之前，**結構的真相在 migrations/，不在這裡。**
+--
 -- 用法：整份貼進 Supabase SQL Editor 執行。可以重複執行，重跑不會弄壞已經有的資料。
 --
 -- 但「可以重複執行」只保證資料安全，不保證結構會更新。這裡的

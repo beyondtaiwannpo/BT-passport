@@ -47,6 +47,10 @@ function fetchAll(user) {
     // month 之後一定要再 order("seq")：同月份有多個活動，只排 month 的話同月內順序
     // 由資料庫決定，也就是「不保證」—— 活動格子會在每次載入之間換位置，而學生記的是位置。
     supabase.from("activities").select("*").eq("active", true).order("month").order("seq"),
+    // profiles 是「這個人」，passports 是「這本護照」（2026-08-31 拆表）。
+    // 兩個都查，下面合併成同一個 profile 物件 —— ui.js 與 main.js 是照那個形狀寫的，
+    // 拆表在它們眼裡不存在。
+    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     supabase.from("passports").select("*").eq("id", user.id).maybeSingle(),
     supabase.from("stamps").select("act_id, stamped_on").eq("user_id", user.id),
     supabase.from("entries").select("act_id, note, photo").eq("user_id", user.id),
@@ -82,8 +86,8 @@ export async function loadAll() {
   // 這裡 throw 的話畫面會變成錯誤訊息，那是在對還沒登入的人說「出事了」。
   if (!user) return { profile: null, stamps: {}, entries: {}, activities: [], months: [], destinations: [], visas: {} };
 
-  let [mo, ac, pa, st, en, de, vi] = await fetchAll(user);
-  let firstErr = firstError([mo, ac, pa, st, en, de, vi]);
+  let [mo, ac, pf, pa, st, en, de, vi] = await fetchAll(user);
+  let firstErr = firstError([mo, ac, pf, pa, st, en, de, vi]);
 
   // ── PGRST303「JWT issued at future」只重試這一種，而且只重試一次 ──
   //
@@ -113,8 +117,8 @@ export async function loadAll() {
   // 換句話說：調小它能省下的是不存在的成本，賠上的是真實的失敗率。
   if (firstErr && firstErr.code === "PGRST303") {
     await new Promise(r => setTimeout(r, 2000));
-    [mo, ac, pa, st, en, de, vi] = await fetchAll(user);
-    firstErr = firstError([mo, ac, pa, st, en, de, vi]);
+    [mo, ac, pf, pa, st, en, de, vi] = await fetchAll(user);
+    firstErr = firstError([mo, ac, pf, pa, st, en, de, vi]);
   }
 
   // 重試之後仍然失敗就往上丟。main.js 的 boot() 會接住並顯示
@@ -129,12 +133,32 @@ export async function loadAll() {
   const visas = {};
   (vi.data || []).forEach(r => { visas[r.month] = r.code; });
 
+  // 2026-08-31 拆表之後，一個人的資料在兩張表：
+  //   profiles  誰（name_zh / name_en / team / avatar / tz / role）—— 每個人都有
+  //   passports 這本護照（motto / issued / intro_seen）—— 只有幹部有
+  // 這裡合併回一個物件，形狀跟拆表之前一模一樣（多了 role 與 tz）。
+  // **合併是刻意的**：ui.js 有七十幾處讀 S.profile.xxx，讓它們去分辨哪一欄住在
+  // 哪張表，等於把資料庫的形狀洩漏到畫面層，而且拆表的每一次調整都要改兩個檔案。
+  //
+  // 「有沒有護照」由 passports 那一列決定，跟拆表之前同一個判準：
+  // maybeSingle() 沒找到時 data 是 null 而不是報錯。正常情況一定找得到 ——
+  // 註冊 trigger 會先建好（見遷移 2026-08-31-profiles-and-role.sql）。拿到 null 只有兩種
+  // 可能：這個帳號是 trigger 存在之前建的，或是有人手動刪了那一列。兩者都會讓畫面停在
+  // 「填護照資料」頁，而使用者存不進去（passports 沒有 insert policy，補不回來）。
+  const me = pf.data || {};
   return {
-    // maybeSingle() 沒找到時 data 是 null 而不是報錯。正常情況一定找得到 ——
-    // 註冊 trigger 會先建好這一列（schema.sql 的 handle_new_user）。拿到 null 只有兩種可能：
-    // 這個帳號是 trigger 存在之前建的，或是有人手動刪了那一列。兩者都會讓畫面停在
-    // 「填護照資料」頁，而使用者存不進去（passports 沒有 insert policy，補不回來）。
-    profile: pa.data || null,
+    profile: pa.data ? {
+      id:         user.id,
+      name_zh:    me.name_zh    ?? null,
+      name_en:    me.name_en    ?? null,
+      team:       me.team       ?? null,
+      avatar:     me.avatar     ?? null,
+      tz:         me.tz         ?? null,
+      role:       me.role       ?? null,
+      motto:      pa.data.motto,
+      issued:     pa.data.issued,
+      intro_seen: pa.data.intro_seen
+    } : null,
     stamps, entries,
     activities: ac.data || [],
     months: mo.data || [],
@@ -148,19 +172,37 @@ export async function loadAll() {
 // passports_write 註解。所以這裡永遠是改既有的列。
 export async function saveProfile(p) {
   const user = await requireUser();
-  // 不寫 issued：核發日是 trigger 建列時的 current_date，也就是註冊那天。
-  // 從這裡寫的話，每次改暱稱都會把核發日改成今天。
-  const { error } = await supabase.from("passports").update({
-    name_zh: p.name_zh, name_en: p.name_en, team: p.team, motto: p.motto,
+
+  // 拆表之後這裡是兩次寫入：名字與組別屬於「這個人」，motto 屬於「這本護照」。
+  //
+  // **這兩次寫入不是原子的，PostgREST 沒有交易可以包。** 老實說出來比假裝沒事好：
+  // 第一次成功、第二次失敗的話，名字改了而 motto 沒改。但這個失敗是**看得見的**
+  // （throw 上去，畫面會顯示存檔失敗），而且兩次都是冪等的 update，
+  // 使用者再按一次儲存就會補上。真正危險的是安靜的不一致，這裡不是那種。
+  //
+  // **不寫 updated_at。** profiles 的欄位層級 grant 只發了四欄，updated_at 不在裡面；
+  // 資料庫有一條 before update 的 trigger 會自己蓋。送了也是白送（會被覆蓋），
+  // 而且沒有權限，會直接被擋下來。
+  //
+  // 不寫 issued：核發日是註冊那天，從這裡寫的話每次改暱稱都會把它改成今天。
+  const a = await supabase.from("profiles").update({
+    name_zh: p.name_zh, name_en: p.name_en, team: p.team
+  }).eq("id", user.id);
+  if (a.error) throw a.error;
+
+  const b = await supabase.from("passports").update({
+    motto: p.motto,
     updated_at: new Date().toISOString()
   }).eq("id", user.id);
-  if (error) throw error;
+  if (b.error) throw b.error;
 }
 
+// 大頭照是「這個人」的，不是「這本護照」的 —— 之後學員也會有大頭照，
+// 但學員沒有護照。所以它跟名字一起住在 profiles。
 export async function saveAvatar(dataUrl) {
   const user = await requireUser();
-  const { error } = await supabase.from("passports")
-    .update({ avatar: dataUrl, updated_at: new Date().toISOString() })
+  const { error } = await supabase.from("profiles")
+    .update({ avatar: dataUrl })     // updated_at 由 trigger 蓋，見 saveProfile
     .eq("id", user.id);
   if (error) throw error;
 }
@@ -240,8 +282,20 @@ export async function clearAll() {
   // 不比照 destinations／activities／months／milestones 那種「全站共用、清人不清它」。
   const v = await supabase.from("visas").delete().eq("user_id", user.id);
   if (v.error) throw v.error;
+  // 「清除這本護照」不刪任何一列，只把欄位清空 —— 刪掉的話前端補不回來
+  // （profiles 與 passports 都沒有 insert policy），那個帳號會變成一本永遠填不了的空護照。
+  // 拆表之後要清兩張：名字與大頭照在 profiles，motto 在 passports。
+  //
+  // **passports 那幾個舊的名字欄位刻意不清。** 它們在遷移 A 之後就沒有人讀了，
+  // 遷移 B 會整欄 drop 掉。現在去寫它們等於在維護一份沒有人看的資料，
+  // 而且會讓「這段期間寫入只走 profiles」那條規矩破功。
+  const a = await supabase.from("profiles").update({
+    name_zh: null, name_en: null, team: null, avatar: null
+  }).eq("id", user.id);
+  if (a.error) throw a.error;
+
   const p = await supabase.from("passports").update({
-    name_zh: null, name_en: null, team: null, motto: null, avatar: null,
+    motto: null,
     updated_at: new Date().toISOString()
   }).eq("id", user.id);
   if (p.error) throw p.error;
@@ -364,10 +418,16 @@ export async function importPassport(backup, mode) {
 
   // issued 不還原 —— 核發日屬於這個帳號，不屬於備份檔。跨帳號還原時尤其明顯：
   // B 的護照上印 A 的核發日是錯的，那一天 B 根本還沒有護照。
+  // 拆表之後同樣是兩張表。備份檔的格式沒有變（version 1 仍然是同一組欄位）——
+  // 拆的是資料庫，不是備份格式，舊的備份檔照樣還原得回來。
   const p = backup.profile || {};
+  const ua = await supabase.from("profiles").update({
+    name_zh: p.name_zh, name_en: p.name_en, team: p.team, avatar: p.avatar
+  }).eq("id", user.id);
+  if (ua.error) throw ua.error;
+
   const up = await supabase.from("passports").update({
-    name_zh: p.name_zh, name_en: p.name_en, team: p.team,
-    motto: p.motto, avatar: p.avatar,
+    motto: p.motto,
     updated_at: new Date().toISOString()
   }).eq("id", user.id);
   if (up.error) throw up.error;
@@ -377,8 +437,9 @@ export async function importPassport(backup, mode) {
 
 // 全體進度牆（spec §7.2）。一次查詢把所有人與各自的章一起帶回來。
 //
-// `stamps(act_id, stamped_on)` 是 PostgREST 的內嵌關聯查詢，靠 stamps.user_id → passports.id
-// 這條 FK 自動推導。**不要**改成先查 passports 再逐人查 stamps —— 三十個人就是三十一次往返，
+// `stamps(act_id, stamped_on)` 是 PostgREST 的內嵌關聯查詢，靠 stamps.user_id → profiles.id
+// 這條 FK 自動推導（2026-08-31 拆表時外鍵從 passports 改指 profiles，這句查詢跟著改）。
+// **不要**改成先查 profiles 再逐人查 stamps —— 三十個人就是三十一次往返，
 // 在手機網路上是好幾秒。
 //
 // ★ 這個 select 清單裡**沒有** entries，這是這面牆最重要的一件事（spec §11-1）。
@@ -392,11 +453,16 @@ export async function importPassport(backup, mode) {
 // motto 不要：那是護照內頁的東西，牆上不顯示，就不要拉回來。
 export async function loadWall() {
   const { data, error } = await supabase
-    .from("passports")
-    .select("id, name_zh, name_en, team, avatar, stamps(act_id, stamped_on)");
+    .from("profiles")
+    .select("id, name_zh, name_en, team, avatar, stamps(act_id, stamped_on)")
+    .eq("role", "cadre");
   if (error) throw error;
+  // .eq("role","cadre") 是「少傳一點資料回來」，**不是**擋住學員的機制 ——
+  // 真正擋住的是 profiles_read 那條 RLS（學員只讀得到自己那一列）。
+  // 拿掉這一行，資料庫仍然只會回幹部；這一層與那一層不要搞混（同 data.js 檔頭）。
+  //
   // 還沒填資料的人不上牆。註冊完到填完護照之間會有一段空窗，那段時間他在
-  // passports 裡已經有一列（trigger 建的）但名字是 null —— 牆上出現一個沒有名字的人
+  // profiles 裡已經有一列（trigger 建的）但名字是 null —— 牆上出現一個沒有名字的人
   // 只會讓大家問「那是誰」。等他填完自己就會出現。
   return (data || []).filter(p => p.name_zh || p.name_en);
 }
