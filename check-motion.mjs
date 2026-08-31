@@ -12,7 +12,7 @@
 //                 顏色與透明度的過渡不是前庭刺激來源
 import fs from "node:fs";
 
-const html = fs.readFileSync("index.html", "utf8");
+const html = fs.readFileSync("passport/index.html", "utf8");
 const css = html.match(/<style>([\s\S]*?)<\/style>/)[1]
   .replace(/\/\*[\s\S]*?\*\//g, "");   // 先剝註解，否則註解裡的文字會被當成選擇器
 

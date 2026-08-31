@@ -18,7 +18,7 @@ say() { printf '%s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
 ok()  { printf 'ok    %s\n' "$1"; }
 
-FILES="index.html src activities.json"
+FILES="passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -36,12 +36,12 @@ fi
 
 # service_role leg：這個字全 repo 掃一定會撞到 spec/plan 文件討論它的地方——
 # 它是一個合法英文詞，規劃文件會直接當名詞寫，前後沒有能拿來過濾字元數的東西。
-# 所以縮小到真的會被部署出去的範圍：index.html、src/、activities.json、
+# 所以縮小到真的會被部署出去的範圍：passport/index.html、src/、passport/activities.json、
 # .github/（現在還不存在；用 -d 判斷要不要加進掃描清單，不讓「路徑不存在」
 # 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
 # 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
 # service_role 是 API 的一部分）。
-service_scope="index.html src activities.json"
+service_scope="passport/index.html passport/src passport/activities.json"
 [ -d .github ] && service_scope="$service_scope .github"
 if grep -rIq service_role $service_scope 2>/dev/null; then
   bad "§11-6 repo 裡出現 service_role"
@@ -54,11 +54,11 @@ fi
 # ESTAMP-PALETTE 區塊是這條規則**唯一**的例外（使用者 2026-08-26）——
 # 排除它再掃，不是把十個季節色加進允許值。加進允許值等於讓那十色在任何地方
 # 都合法，那就是使用者明確拒絕的「放寬」。$FILES 現在是
-# "index.html src activities.json"：index.html 要先剝掉色盤區塊，
-# 其餘檔案（src、activities.json）不受影響、照舊整份掃。
-strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' index.html \
+# "passport/index.html src passport/activities.json"：passport/index.html 要先剝掉色盤區塊，
+# 其餘檔案（src、passport/activities.json）不受影響、照舊整份掃。
+strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' src activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -v '^#FFC46C$' | grep -v '^#EDE5D8$' | grep -v '^#102A86$')
@@ -79,8 +79,8 @@ ESTAMP_PALETTE="#C77A2E #A85C3A #7E4A48 #4A3F5C #2E3D6B #2A5C6E #2F6B5E #3D7A54 
 # 這裡的 grep -c 數的是「行數」，跟一行一個哨兵的事實一致；不是 firstError
 # 那種「兩處可能擠在同一行」的情境，不受 README 第 12 項那個 grep -c 陷阱影響——
 # 旁邊特別註明，免得下一個人以為這裡也踩到了。
-b=$(grep -c 'ESTAMP-PALETTE-BEGIN' index.html)
-e=$(grep -c 'ESTAMP-PALETTE-END' index.html)
+b=$(grep -c 'ESTAMP-PALETTE-BEGIN' passport/index.html)
+e=$(grep -c 'ESTAMP-PALETTE-END' passport/index.html)
 if [ "$b" = "1" ] && [ "$e" = "1" ]; then
   ok "ESTAMP-PALETTE 的哨兵各一個"
 else
@@ -89,7 +89,7 @@ fi
 
 # 方向一：區塊裡的色碼必須**剛好等於**清單。多一個少一個都 FAIL。
 # 這一條讓「偷偷加第十二色」不可能，而不只是「不鼓勵」——集合相等，不是包含。
-inside=$(sed -n '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/p' index.html \
+inside=$(sed -n '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/p' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{6\}' | tr 'a-f' 'A-F' | sort -u)
 want=$(printf '%s\n' $ESTAMP_PALETTE | tr 'a-f' 'A-F' | sort -u)
 if [ "$inside" = "$want" ]; then
@@ -100,7 +100,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' index.html; cat src/*.js activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat passport/src/*.js passport/activities.json 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -185,10 +185,10 @@ fi
 # 用 class 描述外觀的規則，全站按鈕的邊框與底色會靜靜地全部消失 ——
 # 不會報錯，只是東西不見了，而 .dots 只剩 aria-current 的 outline 撐著一顆圓點。
 # 這個站從原型到 2026-08-22 都是這個狀態。見 spec 2026-08-22 §1。
-if grep -qE '^\s*:where\(#bt-root button\)\{' index.html; then
+if grep -qE '^\s*:where\(#bt-root button\)\{' passport/index.html; then
   ok "按鈕 reset 是零特異性（:where）"
 else
-  bad "index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
+  bad "passport/index.html 的按鈕 reset 不是 :where(#bt-root button)，全站 class 規則會被蓋掉（spec 2026-08-22 §1）"
 fi
 
 # 月份頁的時刻放大只能掛在 .mtheme.clock b 上。直接改 .mtheme b 的話，
@@ -196,33 +196,33 @@ fi
 # 而那是一個沒有任何東西會報錯的視覺回歸。2026-08-22 實測過：把選擇器改回
 # .mtheme b 之後，check.sh 與全部單元測試都還是綠的，所以需要這兩條。
 # 單元測試碰不到這件事：它是 CSS 級聯，要真的瀏覽器才量得出 computed style。
-if grep -qE '^\s*\.mtheme\.clock b\{' index.html; then
+if grep -qE '^\s*\.mtheme\.clock b\{' passport/index.html; then
   ok "時刻放大掛在 .mtheme.clock b 上"
 else
-  bad "index.html 找不到 .mtheme.clock b，時刻放大可能被改到 .mtheme b（spec 2026-08-22 §5.2）"
+  bad "passport/index.html 找不到 .mtheme.clock b，時刻放大可能被改到 .mtheme b（spec 2026-08-22 §5.2）"
 fi
 
 # 基底規則不可以帶放大值。抓的是「.mtheme b{...}」這一行裡出現 34px。
-if grep -E '^\s*\.mtheme b\{' index.html | grep -q '34px'; then
-  bad "index.html 的 .mtheme b 帶了 34px，資料頁右上角會被撐爆（spec 2026-08-22 §5.2）"
+if grep -E '^\s*\.mtheme b\{' passport/index.html | grep -q '34px'; then
+  bad "passport/index.html 的 .mtheme b 帶了 34px，資料頁右上角會被撐爆（spec 2026-08-22 §5.2）"
 else
   ok ".mtheme b 沒有被塞進放大值"
 fi
 
 # 說明頁三張卡的標題要固定兩行高，否則使用者刻意寫成同樣開頭的第一句會錯開。
 # 這件事單元測試碰不到（是版面高度，要真瀏覽器才量得到），只能在這裡守著寫法。
-if grep -qE '^\s*\.slots\.guide \.slot \.ttl\{' index.html; then
+if grep -qE '^\s*\.slots\.guide \.slot \.ttl\{' passport/index.html; then
   ok "說明頁標題固定兩行高（.slots.guide .slot .ttl）"
 else
-  bad "index.html 找不到 .slots.guide .slot .ttl，說明頁三張卡的第一句會錯開（spec 2026-08-22 §4.2）"
+  bad "passport/index.html 找不到 .slots.guide .slot .ttl，說明頁三張卡的第一句會錯開（spec 2026-08-22 §4.2）"
 fi
 
 # 底紋的 SVG 不可以用 %23 編碼的色碼。%23102A86 能正常載入，但 §11-14 的 hex 掃描
 # 看不到它 —— 等於整段底紋悄悄脫離三色檢查的守備範圍。改用 rgba(16,42,134,α) 就沒這問題
 # （未編碼的 # 不能用：它會被當成 data URI 的 fragment，圖直接不載入，2026-08-23 實測）。
-if grep -q '%23' index.html; then
-  bad "index.html 出現 %23 編碼的色碼，三色檢查看不到它（改用 rgba(16,42,134,α)）"
-  grep -n '%23' index.html
+if grep -q '%23' passport/index.html; then
+  bad "passport/index.html 出現 %23 編碼的色碼，三色檢查看不到它（改用 rgba(16,42,134,α)）"
+  grep -n '%23' passport/index.html
 else
   ok "沒有 %23 編碼的色碼，三色檢查涵蓋得到底紋"
 fi
@@ -230,16 +230,16 @@ fi
 # 「清除這本護照」必須維持降級的外觀。它會刪掉一整年的章、心得與照片且不可復原，
 # 跟旁邊三顆可逆的操作長得一樣重的話，遲早有人手滑按到。
 # 這不是視覺偏好是安全設計 —— 視覺偏好可以被下一個人推翻，安全設計不行，所以釘住它。
-if grep -qE '^\s*<button class="btn sm quiet" data-act="reset">' src/ui.js; then
+if grep -qE '^\s*<button class="btn sm quiet" data-act="reset">' passport/src/ui.js; then
   ok "清除護照的按鈕維持降級外觀（.btn.quiet）"
 else
-  bad "src/ui.js 的「清除這本護照」不是 class=\"btn sm quiet\"，它會跟可逆操作等重"
+  bad "passport/src/ui.js 的「清除這本護照」不是 class=\"btn sm quiet\"，它會跟可逆操作等重"
 fi
 
-if grep -qE '^\s*\.btn\.quiet\{' index.html; then
+if grep -qE '^\s*\.btn\.quiet\{' passport/index.html; then
   ok ".btn.quiet 的樣式定義還在"
 else
-  bad "index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
+  bad "passport/index.html 找不到 .btn.quiet 的樣式，那顆按鈕會退回一般外觀"
 fi
 
 # fetchAll 裡的查詢數 = firstError 清單的長度。一個都不准被排除在外。
@@ -259,7 +259,7 @@ fi
 # （saveProfile、clearAll……），這些不算數，混進來會讓比對失去意義。
 firstErrorGuard=$(node -e '
   const fs = require("fs");
-  const raw = fs.readFileSync("src/data.js", "utf8");
+  const raw = fs.readFileSync("passport/src/data.js", "utf8");
   const src = raw.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
 
   const fm = src.match(/function fetchAll\([^)]*\)\s*\{([\s\S]*?)\n\}/);
@@ -286,17 +286,17 @@ firstErrorGuard=$(node -e '
 if [ $? -eq 0 ]; then
   ok "$firstErrorGuard"
 else
-  bad "src/data.js 的 firstError 出了問題：$firstErrorGuard"
+  bad "passport/src/data.js 的 firstError 出了問題：$firstErrorGuard"
 fi
 
 # boot() 必須整包裝填，不可以退回手寫逐欄指派。手寫的話 loadAll 每多回傳一個東西
 # 就要記得加一行，而那件事已經漏過 —— milestones 從上線起就沒被裝進 S，
 # 里程碑 UI 在正式站上是死的，而 (S.milestones || []) 的防呆讓它安靜地不渲染，
 # 所以沒有人發現（2026-08-25）。單元測試碰不到：main.js 一條測試都沒有。
-if grep -qE '^\s*Object\.assign\(S, all\);' src/main.js; then
+if grep -qE '^\s*Object\.assign\(S, all\);' passport/src/main.js; then
   ok "boot() 整包裝填 loadAll 的結果"
 else
-  bad "src/main.js 的 boot() 不是 Object.assign(S, all)，新欄位會靜靜地不進 S"
+  bad "passport/src/main.js 的 boot() 不是 Object.assign(S, all)，新欄位會靜靜地不進 S"
 fi
 
 # 長英文字串與網址會把 grid 的 1fr 撐開，三格寬度重新分配（實測 158/633/129，
@@ -318,13 +318,13 @@ fi
 #
 # 單元測試碰不到這件事（是版面寬度，要真瀏覽器才量得到），而且它不會有橫向捲軸、
 # 不像跑版，只像「某一格怪怪的」，人工也不容易發現。
-if grep -qE '^\s*min-width:0;' index.html && grep -qE '^\s*\.slot \.note,\.slot \.hint\{overflow-wrap:anywhere\}' index.html; then
+if grep -qE '^\s*min-width:0;' passport/index.html && grep -qE '^\s*\.slot \.note,\.slot \.hint\{overflow-wrap:anywhere\}' passport/index.html; then
   ok "長字串不會撐開格子（min-width:0 防斷不了的內容、overflow-wrap:anywhere 防長字串）"
 else
-  bad "index.html 少了 min-width:0 或 .slot .note,.slot .hint{overflow-wrap:anywhere} 這條宣告本身——兩個都沒有時長英文字串會撐寬格子；只少 overflow-wrap（min-width:0 還在）不會撐寬，是文字溢出格子邊界"
+  bad "passport/index.html 少了 min-width:0 或 .slot .note,.slot .hint{overflow-wrap:anywhere} 這條宣告本身——兩個都沒有時長英文字串會撐寬格子；只少 overflow-wrap（min-width:0 還在）不會撐寬，是文字溢出格子邊界"
 fi
 
-# 章的數量整個 src/ui.js 只准數一次，就是 stampCount 裡那次。
+# 章的數量整個 passport/src/ui.js 只准數一次，就是 stampCount 裡那次。
 # barHTML 的「N / 33」、idPageHTML 的 FULL 疊印、里程碑的達成判斷，全部吃它的結果。
 # 這條守的是架構不是行為，測試碰不到：兩邊各自用同一條公式算一次的話，
 # 算出來永遠一樣，任何比對結果的測試都會是綠的（2026-08-25 實測，42 個測試全綠）。
@@ -335,12 +335,12 @@ fi
 # grep -c 回 1，這條檢查就會誤判成「只有一處」而放行，對它要擋的東西沒有效果
 # （2026-08-25 審查實測過）。tr -d ' ' 是因為 macOS 的 wc -l 會補前導空白，
 # 不去掉的話字串比對永遠對不上。
-n=$(grep -o 'Object\.keys(S\.stamps)\.length' src/ui.js | wc -l | tr -d ' ')
+n=$(grep -o 'Object\.keys(S\.stamps)\.length' passport/src/ui.js | wc -l | tr -d ' ')
 if [ "$n" = "1" ]; then
   ok "章的數量只在 stampCount 裡數一次"
 else
-  bad "src/ui.js 有 $n 處在數 S.stamps，應該只有 stampCount 那一處"
-  grep -n 'Object\.keys(S\.stamps)\.length' src/ui.js
+  bad "passport/src/ui.js 有 $n 處在數 S.stamps，應該只有 stampCount 那一處"
+  grep -n 'Object\.keys(S\.stamps)\.length' passport/src/ui.js
 fi
 
 # spec §10.1（2026-08-26 第二輪）：入境章的判準整個換掉，現在**可以**壓到
@@ -354,7 +354,7 @@ fi
 # 那一行然後誤判成 ok。用 `.estamp{` 單獨成行去對，媒體查詢裡那個
 # `.estamp{top:26px;...}`（同一行寫完，選擇器後面不是換行）不會被這個 pattern 選中，
 # 所以只會抓到桌機那個主要宣告——加守門時已經刪掉這行宣告本身跑過一次，確認真的 FAIL。
-if grep -A1 '^\s*\.estamp{$' index.html | tail -1 | grep -qE '^\s*position:absolute;top:[0-9]+px;right:[0-9]+px;z-index:2;pointer-events:none;'; then
+if grep -A1 '^\s*\.estamp{$' passport/index.html | tail -1 | grep -qE '^\s*position:absolute;top:[0-9]+px;right:[0-9]+px;z-index:2;pointer-events:none;'; then
   ok ".estamp 的 pointer-events:none 還在"
 else
   bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
@@ -425,6 +425,26 @@ else
       if (/\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/.test(l)) console.log(`  ${i+1}: ${l.trim()}`);
     });
   '
+fi
+
+# 佔位文案不可以進到已經定稿的部署範圍
+#
+# 2026-08-22 出過事，記在 docs/superpowers/specs/2026-08-22-guide-page-and-slot-order-design.md：
+# 說明頁三段文案留著佔位字，之後又做了三輪都沒再推，正式站對三十個幹部顯示那四個字。
+# 沒有任何東西會提醒你 —— 它不會報錯、畫面也不會壞，只是內容是假的。
+#
+# 這是「必須不存在」型的守門，照本檔檔頭那段說明，這一型不受註解污染影響
+# （註解裡出現只會讓它誤報 FAIL，那個方向是安全的），所以不需要錨定完整形式。
+#
+# 範圍現在只有 passport/。根目錄的 index.html 在 2026-08-31（階段 1）是刻意的骨架，
+# 本文全部是佔位字，文案由使用者提供、還沒給。
+# **階段 7 那一頁的文案定稿之後，把 index.html 加進下面這行的範圍。**
+placeholder_scope="passport/index.html passport/src passport/activities.json"
+if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
+  bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
+  grep -rIn '【待補文案】' ${placeholder_scope}
+else
+  ok "passport/ 裡沒有佔位文案"
 fi
 
 # CNAME 不可掉，而且內容要對

@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond Taiwan Passport</title>
+<!-- 圖示：三十位幹部會把這個網站釘在手機主畫面，那個位置沒圖示會是一張白紙。
+     背景色用 #EDE5D8 不是隨便挑的 —— logo 本來就是坐在卡片的那個紙色上設計的
+     （它同時有深色與淺色筆畫，換成別的底色其中一半會消失）。
+     圖示四周留了 14% 的邊：iOS 會把主畫面圖示切圓角，貼邊的話 logo 會被切掉。
+     apple-touch-icon 是 iOS 用的，manifest 裡的 192/512 是 Android 用的，兩邊都要。
+     **所有尺寸都只用左邊的台灣圖形，不含 Beyond Taiwan 字樣。**
+     兩個理由：整組橫式 logo 縮到 32px 會糊成一團認不出來；而主畫面圖示實際顯示
+     大約 60pt，那個大小下「Beyond Taiwan」那行字也已經看不清了。
+     圖形與文字的切點（原圖 x=160）是量出來的，不是目測：逐欄統計不透明像素，
+     那裡有一段 35px 全透明的空白。
+     一開始大尺寸留了整組 logo、小尺寸用圖形，後來統一成圖形 ——
+     同一個 app 在不同位置長得不一樣，比哪一種好看更糟。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="manifest" href="./site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="BT 護照">
+<meta name="theme-color" content="#102A86">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bt-orange:#FFC46C;
+    --bt-cream:#EDE5D8;
+    --bt-navy:#102A86;
+    --ink:var(--bt-navy);
+    --paper:var(--bt-cream);
+    --display:"Barlow Condensed", "Noto Sans TC", sans-serif;
+    --body:"Inter", "Noto Sans TC", system-ui, sans-serif;
+    --r:3px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  #bt-root{
+    font-family:var(--body);
+    color:var(--ink);
+    line-height:1.55;
+    max-width:940px;
+    margin:0 auto;
+    padding:0 0 40px;
+  }
+  /* 這條 reset 的選擇器**必須**包在 :where() 裡。
+     裸寫 #bt-root button 的特異性是 (1,0,1)，會蓋掉所有用 class 描述外觀的規則 ——
+     .btn 的深藍實心底、.btn.ghost 與 .nav .arrow 的外框、.slot 的虛線框、
+     .tabs 選中時的深藍底、.photo 的框、.dots 的圓框與蓋滿轉橘，一條都沒有生效過。
+     這個站從原型 a2a26c2 到 2026-08-22 為止，畫面上所有按鈕的外觀都是死的，
+     唯一看得見的圓點是 .dots [aria-current] 的 outline —— outline 不受 border/background 影響。
+     :where() 的特異性恆為零，所以這條規則仍然蓋得過瀏覽器預設樣式
+     （作者樣式表無論特異性多低都排在 UA 樣式表前面），但輸給任何一條 class 規則。
+     **不要把 :where() 拿掉**，check.sh 有一條檢查在守它。見 spec 2026-08-22 §1。 */
+  :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* ---------- shell ---------- */
+  .bar{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:14px 18px;margin-bottom:14px;
+    background:var(--paper);
+    border:1px solid rgba(16,42,134,.14);
+    border-radius:var(--r);
+  }
+  .bar img{height:26px;width:auto;display:block}
+  .bar .sp{flex:1}
+  .tabs{display:flex;border:1px solid rgba(16,42,134,.22);border-radius:2px;overflow:hidden}
+  .tabs button{
+    font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;padding:6px 14px;color:rgba(16,42,134,.55);
+    transition:background .15s,color .15s;
+  }
+  .tabs button[aria-selected="true"]{background:var(--bt-navy);color:var(--bt-cream)}
+  .prog{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1}
+  .prog small{font-family:var(--body);font-size:10px;font-weight:600;letter-spacing:.16em;
+    text-transform:uppercase;display:block;opacity:.5;line-height:1;margin-bottom:4px}
+
+  /* ---------- book ---------- */
+  .book{
+    background:var(--paper);
+    border:1px solid rgba(16,42,134,.18);
+    border-radius:var(--r);
+    position:relative;overflow:hidden;
+    min-height:520px;
+    /* min-height 讓書維持固定高度，翻頁時大小不變、上一頁／下一頁不會移動。
+       但內容比 520px 短的時候，多出來的高度會變成 nav 底下一條空白帶
+       （實測：月份頁 44.7px、說明頁 134.2px）。
+       改成 flex column 讓 .page 吸收那段高度、nav 貼著書的底部，
+       死白就變成頁面自己的餘白，而不是書裡的一個破洞。
+       **不要改成「短頁面就拿掉 min-height」** —— 那會讓書在翻到說明頁時變矮，
+       上一頁／下一頁按鈕跟著往上跳。會動的東西比死白更糟。 */
+    display:flex;flex-direction:column;
+  }
+  .book::before{ /* 裝訂線 */
+    content:"";position:absolute;left:0;top:0;bottom:0;width:9px;
+    /* 等距的米白圓點打在深藍上，讀起來像縫線的針孔。
+       圓點用 var(--paper) 實色不用 rgba 的米白：check.sh 的 §11-14 只允許三個
+       rgba 底色（16,42,134 / 255,196,108 / 255,255,255），米白 237,229,216 那個
+       rgba 底色不在允許清單裡，寫了會被擋。
+       半徑 1.6px、間距 22px 是配著 9px 的書脊寬挑的 —— 點再大就變成虛線，
+       再密就糊成一條淺色帶，兩者都不像針孔。
+       opacity 從 .9 拿掉改成 1：原本那條是用來讓深藍不要太實，但現在上面有圓點，
+       整條再壓一次會讓圓點也跟著糊掉。深藍本身的份量改用漸層那層的實色控制。 */
+    background:
+      radial-gradient(circle at 50% 50%, var(--paper) 1.6px, transparent 1.7px) 0 0 / 9px 22px repeat-y,
+      var(--bt-navy);
+  }
+  .book::after{ /* guilloche：120x40 貼片、每片兩排、四條干涉正弦波，2026-08-23 定案 */
+    /* stroke 用 rgba(16,42,134,0.035) 不用 #102A86 + stroke-opacity：
+       2026-08-23 實測三種寫法——未編碼的 # 會被瀏覽器當成 data URI 的 fragment，
+       圖直接不載入（onerror）；URL 編碼過的色碼能載入，但 check.sh 的 §11-14 hex
+       掃描看不到它，等於這段紋路悄悄脫離三色檢查；rgba(16,42,134,...) 能載入，
+       而且本來就是 check.sh 允許的三個 rgba 底色之一，三色檢查涵蓋得到。所以不要
+       「順手」改回 #102A86 加 stroke-opacity 或改成 URL 編碼，那樣會讓這段紋路
+       脫離守備範圍。 */
+    /* 調這組參數之前，先把 stroke 的 alpha 臨時改成 0.07 檢查接縫與帶狀感，
+       確認乾淨了再改回 0.035——低對比會把接縫缺陷藏起來。第一版每條波只畫在
+       貼片中間、帶與帶之間留空隙，重複之後讀成橫條紋，在 3.5% 下完全看不出來，
+       拉到 7% 一眼就看到；修法是讓每條波在 cy、cy-H、cy+H 各畫一次跨過上下邊界，
+       每片再排兩排、相位錯開。 */
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:1;
+    background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='40' viewBox='0 0 120 40'><path d='M0,-30.00L3,-28.12L6,-26.29L9,-24.55L12,-22.95L15,-21.51L18,-20.29L21,-19.31L24,-18.59L27,-18.15L30,-18.00L33,-18.15L36,-18.59L39,-19.31L42,-20.29L45,-21.51L48,-22.95L51,-24.55L54,-26.29L57,-28.12L60,-30.00L63,-31.88L66,-33.71L69,-35.45L72,-37.05L75,-38.49L78,-39.71L81,-40.69L84,-41.41L87,-41.85L90,-42.00L93,-41.85L96,-41.41L99,-40.69L102,-39.71L105,-38.49L108,-37.05L111,-35.45L114,-33.71L117,-31.88L120,-30.00' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,10.00L3,11.88L6,13.71L9,15.45L12,17.05L15,18.49L18,19.71L21,20.69L24,21.41L27,21.85L30,22.00L33,21.85L36,21.41L39,20.69L42,19.71L45,18.49L48,17.05L51,15.45L54,13.71L57,11.88L60,10.00L63,8.12L66,6.29L69,4.55L72,2.95L75,1.51L78,0.29L81,-0.69L84,-1.41L87,-1.85L90,-2.00L93,-1.85L96,-1.41L99,-0.69L102,0.29L105,1.51L108,2.95L111,4.55L114,6.29L117,8.12L120,10.00' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,50.00L3,51.88L6,53.71L9,55.45L12,57.05L15,58.49L18,59.71L21,60.69L24,61.41L27,61.85L30,62.00L33,61.85L36,61.41L39,60.69L42,59.71L45,58.49L48,57.05L51,55.45L54,53.71L57,51.88L60,50.00L63,48.12L66,46.29L69,44.55L72,42.95L75,41.51L78,40.29L81,39.31L84,38.59L87,38.15L90,38.00L93,38.15L96,38.59L99,39.31L102,40.29L105,41.51L108,42.95L111,44.55L114,46.29L117,48.12L120,50.00' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-22.87L3,-22.10L6,-22.10L9,-22.87L12,-24.35L15,-26.37L18,-28.75L21,-31.25L24,-33.64L27,-35.66L30,-37.13L33,-37.90L36,-37.90L39,-37.13L42,-35.65L45,-33.63L48,-31.25L51,-28.75L54,-26.36L57,-24.34L60,-22.87L63,-22.10L66,-22.10L69,-22.87L72,-24.35L75,-26.37L78,-28.75L81,-31.25L84,-33.64L87,-35.66L90,-37.13L93,-37.90L96,-37.90L99,-37.13L102,-35.65L105,-33.63L108,-31.25L111,-28.75L114,-26.36L117,-24.34L120,-22.87' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,17.13L3,17.90L6,17.90L9,17.13L12,15.65L15,13.63L18,11.25L21,8.75L24,6.36L27,4.34L30,2.87L33,2.10L36,2.10L39,2.87L42,4.35L45,6.37L48,8.75L51,11.25L54,13.64L57,15.66L60,17.13L63,17.90L66,17.90L69,17.13L72,15.65L75,13.63L78,11.25L81,8.75L84,6.36L87,4.34L90,2.87L93,2.10L96,2.10L99,2.87L102,4.35L105,6.37L108,8.75L111,11.25L114,13.64L117,15.66L120,17.13' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,57.13L3,57.90L6,57.90L9,57.13L12,55.65L15,53.63L18,51.25L21,48.75L24,46.36L27,44.34L30,42.87L33,42.10L36,42.10L39,42.87L42,44.35L45,46.37L48,48.75L51,51.25L54,53.64L57,55.66L60,57.13L63,57.90L66,57.90L69,57.13L72,55.65L75,53.63L78,51.25L81,48.75L84,46.36L87,44.34L90,42.87L93,42.10L96,42.10L99,42.87L102,44.35L105,46.37L108,48.75L111,51.25L114,53.64L117,55.66L120,57.13' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-26.27L3,-28.19L6,-30.50L9,-32.71L12,-34.32L15,-34.99L18,-34.58L21,-33.16L24,-31.06L27,-28.72L30,-26.67L33,-25.34L36,-25.03L39,-25.80L42,-27.48L45,-29.72L48,-32.02L51,-33.87L54,-34.89L57,-34.83L60,-33.73L63,-31.81L66,-29.50L69,-27.29L72,-25.68L75,-25.01L78,-25.42L81,-26.84L84,-28.94L87,-31.28L90,-33.33L93,-34.66L96,-34.97L99,-34.20L102,-32.52L105,-30.28L108,-27.98L111,-26.13L114,-25.11L117,-25.17L120,-26.27' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,13.73L3,11.81L6,9.50L9,7.29L12,5.68L15,5.01L18,5.42L21,6.84L24,8.94L27,11.28L30,13.33L33,14.66L36,14.97L39,14.20L42,12.52L45,10.28L48,7.98L51,6.13L54,5.11L57,5.17L60,6.27L63,8.19L66,10.50L69,12.71L72,14.32L75,14.99L78,14.58L81,13.16L84,11.06L87,8.72L90,6.67L93,5.34L96,5.03L99,5.80L102,7.48L105,9.72L108,12.02L111,13.87L114,14.89L117,14.83L120,13.73' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,53.73L3,51.81L6,49.50L9,47.29L12,45.68L15,45.01L18,45.42L21,46.84L24,48.94L27,51.28L30,53.33L33,54.66L36,54.97L39,54.20L42,52.52L45,50.28L48,47.98L51,46.13L54,45.11L57,45.17L60,46.27L63,48.19L66,50.50L69,52.71L72,54.32L75,54.99L78,54.58L81,53.16L84,51.06L87,48.72L90,46.67L93,45.34L96,45.03L99,45.80L102,47.48L105,49.72L108,52.02L111,53.87L114,54.89L117,54.83L120,53.73' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-28.02L3,-26.70L6,-26.64L9,-27.86L12,-29.90L15,-31.98L18,-33.30L21,-33.36L24,-32.14L27,-30.10L30,-28.02L33,-26.70L36,-26.64L39,-27.86L42,-29.90L45,-31.98L48,-33.30L51,-33.36L54,-32.14L57,-30.10L60,-28.02L63,-26.70L66,-26.64L69,-27.86L72,-29.90L75,-31.98L78,-33.30L81,-33.36L84,-32.14L87,-30.10L90,-28.02L93,-26.70L96,-26.64L99,-27.86L102,-29.90L105,-31.98L108,-33.30L111,-33.36L114,-32.14L117,-30.10L120,-28.02' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,11.98L3,13.30L6,13.36L9,12.14L12,10.10L15,8.02L18,6.70L21,6.64L24,7.86L27,9.90L30,11.98L33,13.30L36,13.36L39,12.14L42,10.10L45,8.02L48,6.70L51,6.64L54,7.86L57,9.90L60,11.98L63,13.30L66,13.36L69,12.14L72,10.10L75,8.02L78,6.70L81,6.64L84,7.86L87,9.90L90,11.98L93,13.30L96,13.36L99,12.14L102,10.10L105,8.02L108,6.70L111,6.64L114,7.86L117,9.90L120,11.98' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,51.98L3,53.30L6,53.36L9,52.14L12,50.10L15,48.02L18,46.70L21,46.64L24,47.86L27,49.90L30,51.98L33,53.30L36,53.36L39,52.14L42,50.10L45,48.02L48,46.70L51,46.64L54,47.86L57,49.90L60,51.98L63,53.30L66,53.36L69,52.14L72,50.10L75,48.02L78,46.70L81,46.64L84,47.86L87,49.90L90,51.98L93,53.30L96,53.36L99,52.14L102,50.10L105,48.02L108,46.70L111,46.64L114,47.86L117,49.90L120,51.98' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,1.56L3,1.92L6,1.99L9,1.76L12,1.24L15,0.45L18,-0.61L21,-1.89L24,-3.37L27,-5.02L30,-6.79L33,-8.64L36,-10.52L39,-12.39L42,-14.20L45,-15.91L48,-17.47L51,-18.85L54,-20.00L57,-20.92L60,-21.56L63,-21.92L66,-21.99L69,-21.76L72,-21.24L75,-20.45L78,-19.39L81,-18.11L84,-16.63L87,-14.98L90,-13.21L93,-11.36L96,-9.48L99,-7.61L102,-5.80L105,-4.09L108,-2.53L111,-1.15L114,0.00L117,0.92L120,1.56' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,41.56L3,41.92L6,41.99L9,41.76L12,41.24L15,40.45L18,39.39L21,38.11L24,36.63L27,34.98L30,33.21L33,31.36L36,29.48L39,27.61L42,25.80L45,24.09L48,22.53L51,21.15L54,20.00L57,19.08L60,18.44L63,18.08L66,18.01L69,18.24L72,18.76L75,19.55L78,20.61L81,21.89L84,23.37L87,25.02L90,26.79L93,28.64L96,30.52L99,32.39L102,34.20L105,35.91L108,37.47L111,38.85L114,40.00L117,40.92L120,41.56' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,81.56L3,81.92L6,81.99L9,81.76L12,81.24L15,80.45L18,79.39L21,78.11L24,76.63L27,74.98L30,73.21L33,71.36L36,69.48L39,67.61L42,65.80L45,64.09L48,62.53L51,61.15L54,60.00L57,59.08L60,58.44L63,58.08L66,58.01L69,58.24L72,58.76L75,59.55L78,60.61L81,61.89L84,63.37L87,65.02L90,66.79L93,68.64L96,70.52L99,72.39L102,74.20L105,75.91L108,77.47L111,78.85L114,80.00L117,80.92L120,81.56' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-4.60L3,-6.68L6,-9.10L9,-11.60L12,-13.94L15,-15.90L18,-17.28L21,-17.95L24,-17.84L27,-16.96L30,-15.40L33,-13.32L36,-10.90L39,-8.40L42,-6.06L45,-4.10L48,-2.72L51,-2.05L54,-2.16L57,-3.04L60,-4.60L63,-6.68L66,-9.10L69,-11.60L72,-13.94L75,-15.90L78,-17.28L81,-17.95L84,-17.84L87,-16.96L90,-15.40L93,-13.32L96,-10.90L99,-8.40L102,-6.06L105,-4.10L108,-2.72L111,-2.05L114,-2.16L117,-3.04L120,-4.60' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,35.40L3,33.32L6,30.90L9,28.40L12,26.06L15,24.10L18,22.72L21,22.05L24,22.16L27,23.04L30,24.60L33,26.68L36,29.10L39,31.60L42,33.94L45,35.90L48,37.28L51,37.95L54,37.84L57,36.96L60,35.40L63,33.32L66,30.90L69,28.40L72,26.06L75,24.10L78,22.72L81,22.05L84,22.16L87,23.04L90,24.60L93,26.68L96,29.10L99,31.60L102,33.94L105,35.90L108,37.28L111,37.95L114,37.84L117,36.96L120,35.40' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,75.40L3,73.32L6,70.90L9,68.40L12,66.06L15,64.10L18,62.72L21,62.05L24,62.16L27,63.04L30,64.60L33,66.68L36,69.10L39,71.60L42,73.94L45,75.90L48,77.28L51,77.95L54,77.84L57,76.96L60,75.40L63,73.32L66,70.90L69,68.40L72,66.06L75,64.10L78,62.72L81,62.05L84,62.16L87,63.04L90,64.60L93,66.68L96,69.10L99,71.60L102,73.94L105,75.90L108,77.28L111,77.95L114,77.84L117,76.96L120,75.40' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-12.21L3,-14.01L6,-14.93L9,-14.77L12,-13.58L15,-11.61L18,-9.28L21,-7.11L24,-5.57L27,-5.00L30,-5.52L33,-7.01L36,-9.15L39,-11.48L42,-13.49L45,-14.74L48,-14.95L51,-14.08L54,-12.33L57,-10.06L60,-7.79L63,-5.99L66,-5.07L69,-5.23L72,-6.42L75,-8.39L78,-10.72L81,-12.89L84,-14.43L87,-15.00L90,-14.48L93,-12.99L96,-10.85L99,-8.52L102,-6.51L105,-5.26L108,-5.05L111,-5.92L114,-7.67L117,-9.94L120,-12.21' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,27.79L3,25.99L6,25.07L9,25.23L12,26.42L15,28.39L18,30.72L21,32.89L24,34.43L27,35.00L30,34.48L33,32.99L36,30.85L39,28.52L42,26.51L45,25.26L48,25.05L51,25.92L54,27.67L57,29.94L60,32.21L63,34.01L66,34.93L69,34.77L72,33.58L75,31.61L78,29.28L81,27.11L84,25.57L87,25.00L90,25.52L93,27.01L96,29.15L99,31.48L102,33.49L105,34.74L108,34.95L111,34.08L114,32.33L117,30.06L120,27.79' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,67.79L3,65.99L6,65.07L9,65.23L12,66.42L15,68.39L18,70.72L21,72.89L24,74.43L27,75.00L30,74.48L33,72.99L36,70.85L39,68.52L42,66.51L45,65.26L48,65.05L51,65.92L54,67.67L57,69.94L60,72.21L63,74.01L66,74.93L69,74.77L72,73.58L75,71.61L78,69.28L81,67.11L84,65.57L87,65.00L90,65.52L93,67.01L96,69.15L99,71.48L102,73.49L105,74.74L108,74.95L111,74.08L114,72.33L117,70.06L120,67.79' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,-6.69L3,-7.99L6,-10.05L9,-12.10L12,-13.34L15,-13.31L18,-12.01L21,-9.95L24,-7.90L27,-6.66L30,-6.69L33,-7.99L36,-10.05L39,-12.10L42,-13.34L45,-13.31L48,-12.01L51,-9.95L54,-7.90L57,-6.66L60,-6.69L63,-7.99L66,-10.05L69,-12.10L72,-13.34L75,-13.31L78,-12.01L81,-9.95L84,-7.90L87,-6.66L90,-6.69L93,-7.99L96,-10.05L99,-12.10L102,-13.34L105,-13.31L108,-12.01L111,-9.95L114,-7.90L117,-6.66L120,-6.69' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,33.31L3,32.01L6,29.95L9,27.90L12,26.66L15,26.69L18,27.99L21,30.05L24,32.10L27,33.34L30,33.31L33,32.01L36,29.95L39,27.90L42,26.66L45,26.69L48,27.99L51,30.05L54,32.10L57,33.34L60,33.31L63,32.01L66,29.95L69,27.90L72,26.66L75,26.69L78,27.99L81,30.05L84,32.10L87,33.34L90,33.31L93,32.01L96,29.95L99,27.90L102,26.66L105,26.69L108,27.99L111,30.05L114,32.10L117,33.34L120,33.31' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/><path d='M0,73.31L3,72.01L6,69.95L9,67.90L12,66.66L15,66.69L18,67.99L21,70.05L24,72.10L27,73.34L30,73.31L33,72.01L36,69.95L39,67.90L42,66.66L45,66.69L48,67.99L51,70.05L54,72.10L57,73.34L60,73.31L63,72.01L66,69.95L69,67.90L72,66.66L75,66.69L78,67.99L81,70.05L84,72.10L87,73.34L90,73.31L93,72.01L96,69.95L99,67.90L102,66.66L105,66.69L108,67.99L111,70.05L114,72.10L117,73.34L120,73.31' fill='none' stroke='rgba(16,42,134,0.035)' stroke-width='0.5'/></svg>");
+    background-size:120px 40px;
+  }
+  .page{padding:26px 26px 46px 34px;position:relative;z-index:1;flex:1}
+  .page.turn{animation:turn .34s ease}
+  @keyframes turn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  /* 每頁右下角的頁碼。位置絕對定位在 .page 的右下，所以它跟著紙走、不是釘在書上。
+     字級 12px、字距拉開、透明度 .35 —— 它是給人確認「翻到哪了」的，不是要被讀的。
+     tabular-nums 讓 01 到 13 的數字寬度一致，翻頁時不會左右跳動。
+     字體不用指定：.pageno 繼承 #bt-root 的 var(--body) 不對，這裡要 var(--display)
+     跟月份數字同一套，所以明寫。 */
+  .pageno{
+    position:absolute;right:26px;bottom:26px;
+    font-family:var(--display);font-size:12px;font-weight:600;
+    letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(16,42,134,.35);font-variant-numeric:tabular-nums;
+    pointer-events:none;
+  }
+
+  .nav{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px 10px 34px;border-top:1px solid rgba(16,42,134,.14);
+    position:relative;z-index:1;
+  }
+  .nav button.arrow{
+    font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.06em;
+    padding:6px 12px;border:1px solid rgba(16,42,134,.25);border-radius:2px;
+  }
+  .nav button.arrow:disabled{opacity:.3;cursor:default}
+  .dots{display:flex;gap:5px;flex:1;justify-content:center;flex-wrap:wrap}
+  .dots button{width:9px;height:9px;border-radius:50%;border:1px solid rgba(16,42,134,.4)}
+  .dots button[data-on="1"]{background:var(--bt-orange);border-color:var(--bt-orange)}
+  .dots button[aria-current="true"]{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  /* ---------- month page ---------- */
+  .mhead{display:flex;align-items:flex-end;gap:16px;border-bottom:2px solid var(--bt-navy);padding-bottom:10px;margin-bottom:22px}
+  .mnum{font-family:var(--display);font-size:76px;font-weight:700;line-height:.78;letter-spacing:-.02em}
+  .mzh{font-family:var(--display);font-size:30px;font-weight:600;line-height:1;margin-bottom:2px}
+  /* 說明頁沒有月份數字：那一頁不是月份，00 又已經給了資料頁，硬塞一個符號進去
+     只會讓人多看一眼想「這是第幾頁」。少了左邊 76px 的數字，.mhead 的重心會偏，
+     所以改用把標題推到數字那一級來補 —— 52px 跟月份頁「09 九月」的視覺重量對得上。
+     **只能掛在 .mhead.solo 上。** 直接改 .mzh 的話，月份頁的「九月」與資料頁的
+     「持照人資料」會一起變 52px，兩頁的版面都會爆。 */
+  .mhead.solo .mzh{font-size:52px;margin-bottom:0}
+  .mtheme{margin-left:auto;text-align:right;line-height:1.25}
+  .mtheme b{font-family:var(--display);font-size:23px;font-weight:600;letter-spacing:.04em;display:block}
+  .mtheme span{font-size:10px;font-weight:600;letter-spacing:.2em;opacity:.55;text-transform:uppercase}
+  /* 月份頁的右上角放時間數字（07:00），要比主題字大一級才撐得起那個位置，
+     並用 tabular-nums 讓每一頁的冒號對齊。字體不用指定：.mtheme b 本來就是
+     var(--display)，也就是 Barlow Condensed，跟左邊 76px 的月份數字同一套。
+     **不可以直接改 .mtheme b** —— 資料頁的右上角共用同一個元件，
+     那裡放的是「BEYOND TAIWAN / Passport · 2026」，跟著變 34px 會撐爆版面。 */
+  .mtheme.clock b{font-size:34px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+
+  .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  /* 兩個地方的高度不是巧合，是同一條規則的兩個實例 ——
+     只有需要留位置給章的格子才是 270，其他都是內容決定高度。
+     月份頁的活動格子 270（下面 min-height:270px）、說明頁的三張卡 0
+     （.slots.guide .slot）。 */
+  .slot{
+    border:1.5px dashed rgba(16,42,134,.3);border-radius:var(--r);
+    min-height:270px;padding:14px;
+    display:flex;flex-direction:column;text-align:left;width:100%;
+    transition:border-color .16s,background .16s;
+    position:relative;
+    min-width:0;
+  }
+  /* 只剩 :hover。.slot 在 2026-08-25 從 button 改成 div（按鈕不能巢狀，翻面按鈕
+     必須在格子裡面），div 不是原生可聚焦元素也沒有 tabindex，:focus-visible
+     永遠不會命中，留著是死 CSS。鍵盤可及性沒有退化——真正可聚焦的
+     .faceopen 與 .flipbtn 已經套用通用的 #bt-root :focus-visible 規則。 */
+  .slot:hover{border-color:var(--bt-navy);background:rgba(255,196,108,.14)}
+  .slot .cat{font-size:9px;font-weight:700;letter-spacing:.2em;opacity:.5;text-transform:uppercase}
+  .slot .ttl{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;margin:5px 0 3px}
+  .slot .en{font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;opacity:.45}
+  .slot .hint{font-size:12.5px;opacity:.62;margin-top:9px}
+  .slot .cta{
+    margin-top:auto;font-family:var(--display);font-size:15px;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;opacity:.35;
+  }
+  .slot:hover .cta{opacity:.85}
+  .slot[data-done="1"]{border-style:solid;border-color:rgba(16,42,134,.18);background:rgba(255,196,108,.1)}
+  /* 背面那行標題是**標籤不是標題**：正面已經有大字標題與章了，背面補這一行是
+     為了一年後翻回去看照片時知道那格題目是什麼。刻意比正面的 .ttl 小而淡 ——
+     背面的主角是照片與心得（使用者 2026-08-25）。 */
+  .slot .btitle{font-size:12px;font-weight:600;letter-spacing:.02em;opacity:.5}
+  /* 這裡原本有一條 .slot[data-done="1"] .hint{opacity:.42}，理由是「蓋章之後說明
+     留著但淡化，讓標題與章之間的內容連續」（2026-08-23 Task 10）。章移到正面之後
+     說明只剩背面一個去處，那個理由已經不存在，而規則還在的話會讓背面唯一的
+     識別資訊淡到 .42 —— 那正好是使用者要它可讀的那一行。連同理由一起刪掉。 */
+
+  /* ── 翻面卡（spec 2026-08-25）──
+     這是新的視覺元件，是原規格 §3.4 的**明確例外**，使用者 2026-08-25 授權。
+     理由：一格要塞五樣東西，蓋完章之後說明變成死重量，而護照本來就是一頁一頁翻的。
+     這個例外只涵蓋翻面卡本身，不是「以後可以自由新增元件」的先例。
+
+     .flip 用 grid 把兩面疊在同一格，**容器高度自動是兩面的最大值** ——
+     不用 JS 量、不用寫死數字，內容改了也不用回來調。
+     2026-08-25 實測：只放正面 88px、只放背面 145px、兩面疊放 145px、翻面前後不跳。
+
+     backface-visibility:hidden 同時擋掉指標事件（實測），所以背面朝外時
+     點中央命中的是背面的內容，不需要額外的 pointer-events 補丁。 */
+  .slot{perspective:900px}
+  .slot .flip{display:grid;flex:1;transform-style:preserve-3d}
+  .slot .face{grid-area:1/1;backface-visibility:hidden;display:flex;flex-direction:column}
+  .slot .face.back{transform:rotateY(180deg)}
+  .slot[data-face="back"] .flip{transform:rotateY(180deg)}
+  .slot .faceopen{display:flex;flex-direction:column;text-align:left;width:100%;flex:1}
+  /* 翻面按鈕走一般流排在最後、靠右，不用絕對定位 ——
+     絕對定位會蓋到照片或心得，而且不計入高度；這樣排它永遠不會重疊。
+     44px 是 spec §3.3 的最小點擊區要求（手機誤觸）。 */
+  .slot .flipbtn{
+    align-self:flex-end;margin-top:auto;min-width:44px;min-height:44px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;opacity:.4;border-radius:2px;
+  }
+  .slot .flipbtn:hover,.slot .flipbtn:focus-visible{opacity:.9}
+
+  /* 說明頁的三張卡不要固定高度，讓它跟著文案長。
+     .slot 的 min-height:270px 是給月份頁的活動格子用的 —— 蓋章前要先留出章的位置，
+     所以那邊必須維持。說明頁沒有章，固定高度只會在文案短的時候留一大片空白，
+     手機上尤其明顯（一頁只放得下一張半的卡）。
+     **不需要也不要加 align-items:stretch**：.slots 是 grid，同一列的項目預設就是拉伸，
+     三張卡本來就等高。多寫一條沒有作用的宣告，只會讓下一個人以為它在做事。 */
+  .slots.guide .slot{min-height:0}
+
+  /* 說明頁三張卡的標題固定兩行高。三段文案刻意都以同一句開頭（英文版是
+     "Once a month"），要的就是並排時第一句對齊；標題一長一短會把說明往下推，
+     三張的第一句就錯開了。給標題固定兩行高，說明才會從同一條線開始。
+     2.2em 不是隨便挑的：.slot .ttl 的 line-height 是 1.1，兩行正好 2.2em，
+     em 對的是元素自己的 font-size，所以字級改了它也跟著對。
+
+     **這條依賴的前提：三欄版面裡最長的標題會折成兩行、而且不超過兩行。**
+     2026-08-28 文案改英文後重新實測（真瀏覽器，Barlow Condensed 已載入）：
+       視窗 ≥940px（.ttl 251px）→ 三張都只有一行，這條在這個寬度沒有作用，
+                                  拿掉也還是齊的（實測 hint 三張都在 191.6）。
+       視窗 721–900px           → .ttl 縮到 172.7–237.7px，標題開始折行，
+                                  721px 時是 [2,2,1] 行。**這條在這裡是必要的**：
+                                  實測拿掉之後鏡頭那張的說明高了 24.2px。
+       視窗 ≤720px              → @media 轉成單欄，沒有並排就沒有對齊問題。
+     也就是說舊註解寫的「在 251px 放不下」已經不成立（那是中文標題的情況），
+     但這條規則本身要留著 —— 它現在守的是 721–900px 那一段。
+     哪天標題長到三欄最窄處會折成三行，2.2em 就不夠了，要一起改。
+
+     代價是寬螢幕時三張標題下面各多一行空白 —— 那是對齊的代價，是刻意的。
+     **月份頁的 .ttl 不要跟著改**：那裡放的是活動名稱，長度本來就不一，
+     而且下面接的是說明與章，沒有要對齊的東西。 */
+  .slots.guide .slot .ttl{min-height:2.2em}
+
+  /* CSS 特異性備忘：兩層 class 選擇器（例如 .slots.guide）是 (0,2,0)，
+     比 @media 裡單層的 .slots{grid-template-columns:1fr}（(0,1,0)）高 ——
+     media query 本身不增加特異性。以後如果哪個 .slots 變體要在手機上
+     保留自己的欄位設定，直接寫規則就會贏，不需要 !important。 */
+
+  /* ---------- the stamp ---------- */
+  .stampwrap{margin:14px 0 0;display:flex;justify-content:center;padding:6px 0 2px}
+  .tilt{transform-origin:center}
+  .stamp{
+    border:2.5px solid currentColor;border-radius:7px;
+    padding:7px 11px 5px;text-align:center;
+    opacity:.86;filter:url(#bt-ink);
+    position:relative;
+  }
+  .stamp::after{
+    content:"";position:absolute;inset:3px;border:1px solid currentColor;border-radius:4px;opacity:.55;
+  }
+  .stamp .s1{font-size:7.5px;font-weight:700;letter-spacing:.26em;text-transform:uppercase}
+  .stamp .s2{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:.06em;line-height:1.05;margin:1px 0;text-transform:uppercase}
+  .stamp .s3{font-size:9.5px;font-weight:600;letter-spacing:.14em;font-variant-numeric:tabular-nums}
+  /* 聚會章：橘底 + 深藍文字與框線（spec §3.1）。原型的 .ink-orange 用了
+     不在三色名單裡的第四色，已移除；.stamp 既有的 opacity:.86 在有底色時
+     會讓橘底透出紙面，讀起來仍像墨，保留不動。 */
+  .stamp.ink-fill{
+    color:var(--bt-navy);
+    background:var(--bt-orange);
+  }
+  .ink-navy{color:var(--bt-navy)}
+  .stamp.land{animation:land .42s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes land{
+    0%{transform:scale(2.5) rotate(-14deg);opacity:0}
+    55%{transform:scale(.93) rotate(2deg);opacity:.95}
+    100%{opacity:.86}
+  }
+  /* 撕掉這格（Task 7，spec §9.7）。章不是直接消失，是裂成兩半各自往下掉。
+     .tearwrap 用 grid 把兩半疊在同一格 —— 跟下面 .slot .flip 疊放正反面
+     同一個手法，容器大小自動貼合內容，不用額外量。
+     兩半是**同一份章渲染兩次**（見 ui.js 的 stampHTML），各自套一組
+     互補的鋸齒 clip-path（逐字照用需求裡給的路徑）與一個方向相反的動畫。
+     main.js 只在 prefers-reduced-motion 為否時才會渲染出這個分支；
+     reduce 為真時直接刪，不會有 .tearwrap 出現，這裡的動畫也就不會被用到——
+     但機器守門（check-motion.mjs）認的是「宣告了 animation 的選擇器」，
+     不看使用不使用得到，所以下面 reduce 區塊那一行還是要加。 */
+  .tearwrap{display:grid}
+  .tearhalf{grid-area:1/1}
+  .tearhalf.l{clip-path:polygon(0% 0%,48% 0%,52% 10%,47% 20%,53% 30%,48% 40%,52% 50%,47% 60%,53% 70%,48% 80%,52% 90%,47% 100%,0% 100%);animation:tearL .5s ease forwards}
+  .tearhalf.r{clip-path:polygon(48% 0%,100% 0%,100% 100%,47% 100%,52% 90%,48% 80%,53% 70%,47% 60%,52% 50%,48% 40%,53% 30%,47% 20%,52% 10%);animation:tearR .5s ease forwards}
+  @keyframes tearL{to{transform:translateY(70px) rotate(-16deg);opacity:0}}
+  @keyframes tearR{to{transform:translateY(70px) rotate(16deg);opacity:0}}
+  /* 翻面用 animation 不用 transition：main.js 的 render() 是 el.innerHTML = ...，
+     整棵子樹每次都被拆掉重建，transition 永遠不會跑（要過渡的元素沒活到下一幀）。
+     既有的 .stamp.land 與 .page.turn 會動也正是這個原因。
+     **不要「改善」成 transition，也不要為了它去改 render() 的重繪方式**
+     —— 那是拿一個穩定的架構去換一個動畫（spec §5.1）。 */
+  @keyframes flipToBack{from{transform:rotateY(0)}to{transform:rotateY(180deg)}}
+  @keyframes flipToFront{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+  /* 這兩個動畫現在只由手動翻面觸發：章移到正面之後（2026-08-25 設計改動，見
+     spec §5.2），蓋章不再先翻面，兩段時序的串接已經拿掉。 */
+  .flip.turning-back{animation:flipToBack .42s ease}
+  .flip.turning-front{animation:flipToFront .42s ease}
+  /* top:60px 是量出來的，不是目測。疊印**刻意**壓住右上角的時刻
+     （.mtheme.clock）——那是使用者的裁定：真的入境章也會壓到頁碼和邊框，
+     章壓過底下的東西是章該有的樣子，不要「修掉」。
+     但它**不可以**切到活動格子裡的任何東西。原本 top:70px 時會切掉
+     九月三格全蓋滿時第三格（鏡頭 FRAME）分類標籤 .cat 的上半
+     （1280px 實測重疊 251.0×5.2px），所以改成 60px，讓分類標籤下方多出 4.8px 餘裕。
+     之後如果調整 .mhead 的高度、.slot 的 padding 或 .cat 的字級，
+     **要回來重量這個距離**——它是兩個獨立絕對定位/旋轉元素的幾何關係，
+     沒有任何測試守得住。 */
+  .overprint{
+    position:absolute;top:60px;right:26px;z-index:2;pointer-events:none;
+    transform:rotate(-11deg);
+    color:var(--bt-navy);background:var(--bt-orange);
+    opacity:.85;
+    border:3px double currentColor;border-radius:4px;padding:3px 13px;
+    font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:.2em;
+    filter:url(#bt-ink);
+  }
+  .overprint.land{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
+
+  /* 入境章。spec §三、§9.2、§10.1 —— 新的視覺元件，是 §3.4 的第二個明確例外
+     （第一個是 2026-08-25 的翻面卡）。不沿用 .overprint 是因為 .overprint 還在
+     資料頁被 FULL 用（idPageHTML），而它是一行文字、入境章是四行的框，改 .overprint
+     會連帶改到 FULL。位置、斜角、filter:url(#bt-ink)、pointer-events 沿用
+     .overprint 的值，視覺語彙不新增，不得新增顏色。
+
+     ── 2026-08-26 第三輪：拿掉底色，只留墨線（使用者裁定，B 版）──
+     .overprint 的 background:var(--bt-orange) **沒有**沿用進來。章放大到會壓過
+     活動格子的內容之後，實心底色會把壓到的標題整個蓋掉；使用者要的是「壓過去」——
+     像真的入境章蓋在已經印好的頁面上，底下的文字從筆畫（border/文字）之間透出來，
+     不是「蓋掉」。所以 .estamp 只剩 border（墨線）與四行文字，沒有 background。
+     這也是為什麼下面 opacity 只有一個桌機共用值，手機不再需要自己的
+     opacity:1（見手機媒體查詢那段 .estamp 旁的說明）。
+
+     ── 判準第一次寫錯：只量了 .e4，量測本身沒錯，但問錯問題 ──
+     B 版第一次驗收時只量了「.mhead 那條線有沒有穿過 .e4（日期）」，8 格
+     （2 視寬 × 4 角度）全過，當時的結論是「不用做 C」。**控制端指出這是錯的
+     判準**：26px 這組把章放大、桌機 top 從 25 調到 34 之後，日期整個沉到線
+     下面，那格量測自然乾淨——但線改成從 .e2（城市名）正中間切過去，沒人量
+     那一行。真正的判準是「線不准穿過章上任何一行字（.e1/.e2/.e3/.e4）」，
+     不是只看日期。重新用同一個方法（.mhead.getBoundingClientRect().bottom
+     對 .estamp 每一行的 getBoundingClientRect()）量四行 × 兩個視寬 × 四個角度
+     × SALT LAKE CITY／TAIPEI 兩個城市，結果：**.e2 在 1280px 與 390px、
+     兩個城市、全部四個角度都被線穿過**；390px 的 .e3 在 -15°/-11° 也貼線
+     （最近時線只差 0.7px 就不穿過，等於也算穿過）。數字見
+     r2-task-3-report.md。這件事的教訓記在這裡：**做 B／C 的取捨判斷不能只挑
+     「brief 點名的那一行」量，字級跟位置一變，哪一行最先被線切到會跟著換，
+     每次都要把 .e1~.e4 四行一起量一次。**
+
+     ── 於是做 C：把 .mhead 那條線在章的範圍內斷開 ──
+     見下面 .estamp::before。手法：.estamp 因為有 transform 會自成一個
+     stacking context，它的子元素不管 z-index 多負都壓不到 .estamp 自己
+     下面——z-index:-1 的 ::before 落在「章的墨線／文字之下、但仍在 .page
+     內容（含 .mhead 那條線）之上」，正好是把線「擦掉」又不擋住章本身的那一層。
+     ::before 用 background:var(--paper) 蓋掉它所在的那一小段線，四行文字跟
+     border 畫在它上面，兩者互不影響。
+     ::before 用 transform:rotate(calc(-1 * var(--rot))) 把父層 .estamp 的旋轉
+     轉回來，畫出來的是一條真正水平的色塊，不是跟著章一起斜的——推導與實測
+     都證實只要這個色塊的「本地垂直中心」跟 .estamp 自己的旋轉中心（也就是
+     .estamp 未旋轉時的幾何中心，transform-origin 預設 50% 50%）維持同一個
+     top 值，色塊在頁面上的位置**幾乎不隨角度漂移**（本地做過推導：漂移量
+     正比於 (1-cosθ) 與 sinθ，在 -15°~+8° 這個範圍都是零點幾 px 等級），
+     這也是為什麼下面只需要「兩個視寬各一個 top」，不用四個角度各測一個 top
+     ——跟 Task 3 計畫文件裡寫的一致，但這裡多做了一步實測驗證這個假設，
+     不是直接假設它成立。
+     top 的算法是「線的 y（相對 .page，= .mhead.getBoundingClientRect().bottom
+     - .page.getBoundingClientRect().top）減章的未旋轉 top，再退半個 height
+     讓色塊置中在線上」：
+       桌機：lineY=97.27，top:34 → (97.27-34) - 4/2 = 61.27，
+             實測後再上移到 **57.27px** 才會讓色塊同時蓋過線的上緣與下緣
+             （border-bottom 2px 是畫在 .mhead 底部的最後 2px，不是置中在
+             .mhead.bottom 那個 y 上，所以粗算的 61.27 只蓋到線的下半，
+             要往上補；量測方法與過程見 r2-task-3-report.md）
+       手機：lineY=75.68，同樣的邏輯量出來是 **43.68px**
+     height:4px（線寬 2px + 2px 緩衝）、left:0;right:0（章自己的內距寬度，
+     沒有再往外推）：兩個視寬 × 兩個城市（SALT LAKE CITY／TAIPEI）×
+     四個角度，用一個跟 ::before 樣式完全相同、但插進真實 DOM 方便量測的
+     代理 div 反覆量過，缺口穩定蓋住線的實際範圍（每一格都留有 ≥0.7px 的
+     餘裕），螢幕截圖確認缺口的兩端剛好落在章的墨線框邊上，沒有超出去，
+     也沒有留下一小截沒擦乾淨的線頭——不需要再用負的 left/right 往外推。
+
+     ── 2026-08-26 第二輪：判準整個換掉（使用者裁定，見 spec §10.1）──
+     舊判準「不可以切到活動格子裡的任何東西」被推翻。新判準：
+     **可以**壓 .slot 與格子裡的內容（.cat/.ttl/活動章）——那個「壓過去」正是
+     「這個月結束了」的感覺，真的入境章本來就蓋在已經有東西的頁面上。
+     **不可以**壓到 .mnum（月份數字）與 .mzh（月名），那是導航不是內容；
+     也不准超出 .page 的左/右/上邊界，不准出現橫向捲軸。
+     這條裁定也讓 pointer-events:none 從裝飾變成載重的：章蓋在可點的格子上，
+     少了它蓋滿的月份會有兩格點不開（check.sh 有一條錨定的守門在守這個宣告）。
+
+     ── 放大到多少：三個尺寸都量過，用 26px 這組當暫定值，由使用者選 ──
+     .e2 分別試過 20 / 26 / 32px，其餘三行與 padding 按 .e2 的成長比例整組等比放大
+     （例如 26px 是 14px 的 26/14 倍，於是 .e1/.e3/.e4/padding 全部乘上同一個倍數，
+     桌機、手機各自的既有數字各自乘，維持原本桌機:手機的比例不變）。
+     量測矩陣是 3 尺寸 × 3 城市（TAIPEI／SAN FRANCISCO／SALT LAKE CITY）×
+     4 角度（-15/-11/0/+8，angleOf 的全範圍）× 2 視寬（1280/390）＝ 72 格，
+     每格量 .estamp 相對 .page 的矩形、跟 .mnum／.mzh 的重疊面積（矩形相交公式）、
+     有沒有超出 .page 邊界、有沒有橫向捲軸。完整 72 格數字見
+     .superpowers/sdd/2026-08-26-entry-stamp/r2-task-2-report.md。
+
+     結果：**20px 與 26px 兩組全部 72 格裡屬於它們的 48 格都過**（.mnum／.mzh
+     重疊永遠是 0，不超界，無橫向捲軸）；**32px 出局**——390px 視寬下 SAN
+     FRANCISCO／SALT LAKE CITY 四個角度全部壓到 .mzh（最壞 SLC -15° 重疊
+     765.82px²，即使 0° 不轉也還有 388.83px²，不是角度的問題，是框本身在
+     390px 寬度下已經比 .mzh 到 .page 右邊界的距離更寬）。
+
+     **量測結果推翻了原本對「哪個角度最壞」的猜測**：預期正角度（+8°）會把
+     章往左下推、更靠近 .mzh，實測卻是 **-15°** 在所有量到的案例裡最壞
+     （例如 32px/390px/SLC：-15° 重疊 765.82px²，+8° 只有 618.79px²）——
+     這裡的章是用 top+right 錨定（框往左、往下長），旋轉角度的絕對值愈大，
+     框愈往左上頂，-15 的絕對值（15）比 +8（8）大，所以是 -15 贏。
+     **這不是規律，是這組錨定方式量出來的結果**——下一次量的時候還是要四個
+     角度都跑，不要因為這次的結論就只跑 -15。
+
+     top:25px 是第一輪量出來的值，扛不住新判準下更大的框：舊判準時「不壓到
+     格子」是硬限制，這次「不壓到 .page 上邊界」變成唯一還在的硬限制，於是
+     top 要往下調（讓框整體下移，跟旋轉角度無關——top 的位移是純平移，
+     旋轉中心跟著框一起移動，量出來的重疊/超界結果只會整體平移，不會變形）。
+     26px 這組實測 1280px 下最壞是 SLC -15°，原本 top:25px 會超出 .page 上邊界
+     5.59px，調到 **top:34px** 之後餘裕變成 3.41px（safety margin，不是壓線過）。
+     手機 top:26px 沒有這個問題（1280px 才會頂到，390px 單欄版面本來就寬裕），
+     不用跟著調。
+     **之後改任何一行的字級、padding 或角度範圍，要拿「最長城市 SALT LAKE CITY
+     × 角度範圍兩端 -15°/+8°」重量，不要拿 TAIPEI，也不要只量一個角度或
+     假設哪個角度比較壞——上面這段就是量錯猜測的例子。** */
+  /* ==== ESTAMP-PALETTE-BEGIN ==== 這個區塊是 check.sh 三色守門的唯一例外。
+     十一個月一色，九月與七月同色 —— 翻完一本回到原點，那正好是學年的形狀。
+     明度都在 40-55%、飽和度 35-50%，所以每枚章的份量一致，配米白底不會像貼紙
+     （使用者 2026-08-26 的設計說明）。
+     **在這裡新增或修改任何色碼，check.sh 都會 FAIL**，要同時改檢查裡那份
+     寫死的清單。那是刻意的：例外要一次只開一個洞，不是開一扇門。 */
+  .estamp.m09{--ink:#C77A2E}   /* 九月 暖橘 */
+  .estamp.m10{--ink:#A85C3A}   /* 十月 */
+  .estamp.m11{--ink:#7E4A48}   /* 十一月 */
+  .estamp.m12{--ink:#4A3F5C}   /* 十二月 */
+  .estamp.m01{--ink:#2E3D6B}   /* 一月 */
+  .estamp.m02{--ink:#2A5C6E}   /* 二月 */
+  .estamp.m03{--ink:#2F6B5E}   /* 三月 */
+  .estamp.m04{--ink:#3D7A54}   /* 四月 */
+  .estamp.m05{--ink:#5E8248}   /* 五月 */
+  .estamp.m06{--ink:#8A7A3C}   /* 六月 */
+  .estamp.m07{--ink:#C77A2E}   /* 七月 回到暖橘，跟 m09 同色 */
+  /* ==== ESTAMP-PALETTE-END ==== */
+  .estamp{
+    position:absolute;top:34px;right:26px;z-index:2;pointer-events:none;
+    color:var(--ink, var(--bt-navy));
+    opacity:.85;
+    border:3px double currentColor;border-radius:4px;padding:5.57px 18.57px;
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+    font-family:var(--display);font-weight:700;text-align:center;
+    filter:url(#bt-ink);
+  }
+  /* C：把 .mhead 那條線在章的範圍內斷開。完整推導、量測方法與反向驗證見上面
+     .estamp 那則長註解的「於是做 C」段落，這裡只留最終規則。
+     z-index:-1 讓這塊色塊落在 .estamp 自己的 border/文字之下，但因為 .estamp
+     有 transform 自成 stacking context，這塊色塊仍然蓋在 .page 正常流內容
+     （含 .mhead 的線）之上——線被蓋住的地方，章的墨線與文字照常畫在上面。
+     transform 用 --rot 的反向角度把父層的旋轉轉回來，讓這塊色塊維持水平，
+     跟真正的那條線平行，不是跟著章一起斜的。
+     top:57.27px 是桌機（1280px）量出來的值，手機的 43.68px 在下面媒體查詢裡
+     覆寫。**不要把這兩個 top 併成一個值**——它們對應不同視寬下 .mhead 的線
+     跟 .estamp 未旋轉 top 的實際距離，兩個視寬各自量、不共用。 */
+  /* ── left/right 的 -10px 是量出來的，不是留白 ──
+     色塊反轉回水平之後，它的長度等於 .estamp 的**元素寬**（left:0;right:0），
+     但章旋轉之後，線穿過章的那一段比元素寬**更長** —— 線是在章的上半部橫過去，
+     斜邊把交點推到元素寬之外。2026-08-26 實測 1280px（dpr 2），
+     兩個城市 × 四個角度，left:0;right:0 之下線的漏出量：
+       SALT LAKE CITY  -15°  左 7.56  右 3.69   ← 最壞
+                       -11°  左 4.39  右 1.58
+                         0°  左 0     右 0
+                        +8°  左 0.55  右 2.58
+       TAIPEI          -15°  左 5.11  右 1.24
+     漏出的那一小截會在章的框裡面重新冒出來，看起來像線把城市名戳穿。
+     -10px 覆蓋最壞的 7.56 還留 2.44px 餘裕。
+     代價是 0° 時色塊比章寬 10px，線會在章的兩側提早一點斷掉 —— 截圖確認過
+     （c-gap8-1280.png 是 8px 版），那讀起來像章旁邊留了一點呼吸，不像線斷了。
+     **改角度範圍、字級或 padding 之後要回來重量這個數字。** */
+  .estamp::before{
+    content:"";position:absolute;z-index:-1;
+    left:-10px;right:-10px;top:57.27px;height:4px;
+    background:var(--paper);
+    transform:rotate(calc(-1 * var(--rot)));
+    transform-origin:center;
+  }
+  /* ── 字級是**用最長的城市**量出來的，不是用 TAIPEI ── 見上面 .estamp 那則
+     長註解的完整量測方法與數字。這裡只留最終值：.e2=26px 這組的桌機字級，
+     .e1/.e3/.e4 是 8/11/9px（第一輪的值）各自乘上 26/14。
+     四行一起等比縮：.e2 若只縮自己會跟 .e3 一樣大，階層會塌掉。 */
+  .estamp .e1{font-size:14.86px;letter-spacing:.22em;opacity:.75}
+  .estamp .e2{font-size:26px;letter-spacing:.18em}
+  .estamp .e3{font-size:20.43px;letter-spacing:.1em}
+  .estamp .e4{font-size:16.71px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+  .slot .note{font-size:12.5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(16,42,134,.15);opacity:.8}
+  /* 長英文字串與網址要能在任何位置斷行。
+     grid 的 1fr 預設不會小於內容的最小寬度，而一串沒有空白的字母的最小寬度
+     就是它整串的寬度 —— 於是那一格被撐開，同一列的另外兩格被擠窄
+     （實測：158.64 / 633.73 / 129.01，正常是 282 三等分）。
+
+     2026-08-25 實測三種組合（.hint，1280px，無 3D transform 的乾淨路徑）：
+       兩個都有                        → 282/282/282，不溢出
+       只有 overflow-wrap:anywhere     → 282/282/282，不溢出
+       只有 min-width:0                → 282/282/282，但文字溢出格子邊界約 308px
+       兩個都沒有                      → 117/611/117，撐開
+     原因：overflow-wrap:anywhere 會被計入 min-content 尺寸計算（不同於舊式的
+     word-break:break-word），所以它單獨就能讓 grid track 收縮到小於整串字寬。
+
+     兩行都留，但不是「缺一不可」——那是最初這裡寫錯的說法，已被上面的實測推翻。
+     真正的理由是防禦深度：overflow-wrap:anywhere 只斷得了「文字」；
+     min-width:0 擋的是斷不了的東西——一張比格子寬的圖、一段 <pre>、
+     一個 white-space:nowrap 的元素——那些 overflow-wrap 幫不上忙，
+     只有 min-width:0 能讓 track 收縮。兩者擋的是不同的東西，只是在
+     「長英文字串」這個案例上剛好重疊，讓人誤以為兩者等價。
+
+     **這個 bug 不會有橫向捲軸**，頁面寬度正常，只是三格的比例壞掉，
+     所以它不像跑版、只像「這一格怪怪的」。
+     中文不會踩到（每個字都能斷），踩到的是英文長字與網址。 */
+  .slot .note,.slot .hint{overflow-wrap:anywhere}
+  .thumb{width:100%;height:82px;object-fit:cover;border-radius:2px;margin-top:9px;display:block;
+    border:1px solid rgba(16,42,134,.2)}
+
+  /* ---------- ID page ---------- */
+  .idgrid{display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:start}
+  .photo{
+    width:150px;height:190px;border:1px solid rgba(16,42,134,.35);border-radius:2px;
+    background:rgba(255,196,108,.2);display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;
+  }
+  .photo img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(.15) contrast(1.05)}
+  .photo span{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;opacity:.5;text-align:center;padding:0 10px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+  .f{border-bottom:1px solid rgba(16,42,134,.18);padding-bottom:5px}
+  .f i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;display:block}
+  .f b{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:.03em;line-height:1.2;display:block}
+  .f.wide{grid-column:1/-1}
+  .mrz{
+    margin-top:24px;padding:12px 14px;background:rgba(16,42,134,.05);
+    border-top:1px solid rgba(16,42,134,.25);border-radius:2px;
+    font-size:13px;font-weight:600;letter-spacing:.13em;font-variant-numeric:tabular-nums;
+    word-break:break-all;opacity:.75;line-height:1.9;
+  }
+  .motto{font-family:var(--display);font-size:24px;font-weight:500;line-height:1.35;
+    margin-top:22px;padding-left:14px;border-left:3px solid var(--bt-orange)}
+
+  /* ---------- wall ---------- */
+  .wall{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:24px 26px}
+  .wnote{font-size:12px;opacity:.6;margin-bottom:20px;padding:9px 12px;background:rgba(255,196,108,.25);border-radius:2px}
+  .people{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px}
+  .person{border:1px solid rgba(16,42,134,.16);border-radius:2px;padding:12px 14px;background:rgba(255,255,255,.35)}
+  .person b{font-family:var(--display);font-size:21px;font-weight:600;display:block;line-height:1.15}
+  .person .team{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;opacity:.5}
+  .track{display:grid;grid-template-columns:repeat(11,1fr);gap:2px;margin-top:10px}
+  .track i{height:16px;background:rgba(16,42,134,.1);border-radius:1px;display:block}
+  .track i[data-on="1"]{background:var(--bt-orange)}
+  .person .cnt{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.06em;margin-top:7px;opacity:.7}
+  .feed{margin-top:26px;border-top:1px solid rgba(16,42,134,.15);padding-top:16px}
+  .feed h3,.wall h3{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin:0 0 12px}
+  .fitem{display:flex;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px dotted rgba(16,42,134,.16)}
+  .fitem time{font-variant-numeric:tabular-nums;opacity:.5;flex:none;font-size:12px;font-weight:600}
+  .fitem b{font-weight:600}
+
+  /* ---------- setup / modal ---------- */
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:30px 28px;max-width:560px;margin:0 auto}
+  .card h2{font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1}
+  .card .sub{font-size:13px;opacity:.6;margin-bottom:24px}
+  label{display:block;margin-bottom:15px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
+  input,select,textarea{
+    width:100%;font-family:var(--body);font-size:15px;color:var(--ink);
+    padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
+    background:rgba(255,255,255,.55);
+  }
+  textarea{resize:vertical;min-height:64px}
+  .btn{
+    font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    padding:11px 22px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:opacity .15s;
+  }
+  .btn:hover{opacity:.86}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:15px;padding:7px 14px}
+  /* 「清除這本護照」會刪掉一整年的章、心得與照片，而且不可復原
+     （clearAll() 真的刪 stamps 與 entries 的列）。它不該跟旁邊那三顆等重 ——
+     編輯資料、匯出備份、匯入還原都是可逆的，只有這顆不是。
+     拿掉外框、顏色降到 50%、用 margin-left:auto 推到那一列的最右邊，
+     跟前三顆之間空出距離。目標是「找得到，但不會手滑按到」。
+     **這不是視覺偏好，是安全設計** —— 視覺偏好可以被下一個人推翻，安全設計不行，
+     所以 check.sh 有兩條檢查在守它。 */
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.5);margin-left:auto}
+  .btn.quiet:hover{color:var(--ink)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+
+  .scrim{position:fixed;inset:0;background:rgba(16,42,134,.45);display:flex;align-items:center;
+    justify-content:center;padding:16px;z-index:50;overflow:auto}
+  .modal{background:var(--paper);border-radius:var(--r);padding:26px;max-width:440px;width:100%;
+    border:1px solid rgba(16,42,134,.3);max-height:92vh;overflow:auto}
+  .modal h3{font-family:var(--display);font-size:29px;font-weight:700;margin:0 0 2px;line-height:1.05}
+  .modal .mt{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.5;margin-bottom:16px}
+  .prev{width:100%;max-height:210px;object-fit:cover;border-radius:2px;margin-top:8px;display:block}
+
+  .empty{text-align:center;padding:40px 10px;opacity:.55;font-size:14px}
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--bt-navy);color:var(--bt-cream);padding:10px 18px;border-radius:2px;
+    font-size:13px;font-weight:500;z-index:60;box-shadow:0 6px 22px rgba(16,42,134,.3);
+  }
+
+  @media (max-width:720px){
+    .slots{grid-template-columns:1fr}
+    .slot{min-height:0}
+    .idgrid{grid-template-columns:1fr}
+    .photo{width:130px;height:164px}
+    .fields{grid-template-columns:1fr}
+    .mnum{font-size:56px}
+    /* 頁碼絕對定位在 .page 右下角，資料頁的按鈕列最右邊正好是「清除這本護照」——
+       要留出頁碼那一行的空間，不然兩者會疊在一起。這裡留 40px 夠不夠要看下面
+       .pageno 縮到多小的 inset，算式見那條規則的註解。 */
+    .page{padding:20px 18px 40px 24px}
+    /* 頁碼在手機也要跟著版面的邊界縮進來。桌機的 inset 是 26px，但這裡 .page 的
+       padding 是 20/18，頁碼再用 26px 就會比其他東西多縮 8px，跟邊界節奏對不上。
+       改成 18/20 之後，需要留的空間是 bottom(20) + 頁碼高度(18.59) = 38.59，
+       所以上面那行的 padding-bottom 40px 剛好夠，餘裕 1.4px —— 跟桌機的
+       26 + 18.59 = 44.59 對 46px 是同一個餘裕。兩邊對稱不是巧合，是同一條算式。 */
+    .pageno{right:18px;bottom:20px}
+    .nav{padding-left:24px}
+    .mrz{font-size:10.5px;letter-spacing:.08em}
+    /* 手機的疊印要縮小並上移。桌機的 21px 疊印在 390px 下橫跨 274px，
+       幾乎跟整個頁面一樣寬，會壓到月份數字、月名、還有第一格的分類標籤與標題
+       （實測 265.2x10.5 與 265.2x1.3）。
+       縮到 13px 之後框變成 183x66，配上 top:26px 剛好落在「九月」與右上角時刻之間。
+       **壓住時刻是刻意保留的**（見桌機那條規則的註解），但月名跟格子裡的東西不能碰 ——
+       時刻是裝飾，月名是資訊，而手機是三十個幹部主要的使用裝置。
+       改動這裡或 .mhead 的任何尺寸之後，要回來重量一次：這是幾何關係，沒有測試守得住。 */
+    .overprint{font-size:13px;top:26px}
+    /* 入境章的手機尺寸。position 沿用 .overprint 的 top:26px。
+       2026-08-26 第二輪放大：判準換了（見桌機那則 .estamp 長註解），量測矩陣
+       裡手機（390px）的部分是**唯一會摸到 .mzh 的地方**——桌機因為 .mzh 在
+       畫面左半、.estamp 貼右邊界，水平永遠不相交，390px 單欄版面兩者才會
+       靠近。26px 這組（.e2 26/14 倍）在 390px 下三個城市、四個角度（-15/-11/0/+8）
+       跟 .mzh 的重疊全部是 0，**沒有超出 .page 邊界，也沒有橫向捲軸**，
+       top:26px 起手就通過、不用調（跟桌機不一樣，桌機 top 要往下調到 34px
+       才夠，見桌機那則的說明）。32px 那組在這裡出局——SAN FRANCISCO／
+       SALT LAKE CITY 四個角度全部壓到 .mzh，完整數字見
+       .superpowers/sdd/2026-08-26-entry-stamp/r2-task-2-report.md。
+       手機字級跟桌機一樣，是拿最長的城市 SALT LAKE CITY 量的，不是 TAIPEI，
+       理由見桌機那段。 */
+    /* ── 2026-08-26 第三輪：手機不再需要自己的 opacity ── 舊的 opacity:1
+       是為了讓實色底色蓋住 .mhead 底下那條線，避免線穿過日期。B 版拿掉了
+       background（見桌機 .estamp 那則長註解），這個理由整個不存在了：沒有
+       底色可以蓋線，opacity 再怎麼調也蓋不住線，因為線本來就沒被蓋住過、
+       是被色塊蓋住。所以這裡不再覆寫 opacity，手機跟桌機一樣吃上面
+       .estamp 的 opacity:.85（一個定義點）。
+       **不准把 opacity 改回 1 或任何固定值去遮線**——那是舊字級時代的解法，
+       使用者已經明確禁止拿它解這一輪的問題，修線的地方是下面的
+       .estamp::before（C），不是這裡。 */
+    .estamp{top:26px;padding:3.71px 13px;gap:0}
+    /* C 在手機的 top：只覆寫 top，其餘（height/left/right/background/transform）
+       沿用桌機那條 .estamp::before 規則。43.68px 是用 390px 視寬量出來的，
+       跟桌機的 57.27px 不是同一個數字——兩個視寬各自量、不共用，理由見桌機
+       那則 .estamp 長註解的「於是做 C」段落。量測結果（兩個視寬 × 兩個城市
+       SALT LAKE CITY／TAIPEI × 四個角度 -15/-11/0/+8，數字見
+       r2-task-3-report.md）：這個 top 值在全部 16 格裡都讓色塊完整蓋住線的
+       實際範圍，餘裕最小 0.7px（390px、angle -15/-11 附近）。
+       **那個 0.7px 是垂直方向的餘裕**（色塊有沒有蓋住線的厚度）——
+       水平兩端是另一回事，2026-08-26 覆核時發現線會從色塊兩端漏出來最多
+       7.56px，修法見桌機那條 .estamp::before 的 left/right:-10px。 */
+    .estamp::before{top:43.68px}
+    .estamp .e1{font-size:11.14px;letter-spacing:.16em}
+    .estamp .e2{font-size:18.57px;letter-spacing:.14em}
+    .estamp .e3{font-size:14.86px}
+    .estamp .e4{font-size:13px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    /* 五個動畫全部關掉：.stamp.land、.page.turn、.overprint.land、
+       .flip.turning-back、.flip.turning-front（2026-08-25 翻面加的兩個）。
+       .overprint.land 是蓋滿 33 格時「FULL」浮水印的彈跳，
+       它跟 .stamp.land 共用同一組 land keyframe，卻一直漏在這條規則外面 ——
+       因為它只在集滿的那一刻出現，平常根本測不到。2026-08-18 做 §11-17
+       驗收時用 CSSOM 逐條比對才抓到。新增動畫時記得回來加進這一行。
+       2026-08-26 加了 .tearhalf.l、.tearhalf.r（Task 7，撕掉這格裂成兩半
+       往下掉的動畫）——這個分支 reduce 為真時 main.js 根本不會渲染出來，
+       但守門認的是宣告，不是用不用得到，一樣要列進來。 */
+    .stamp.land,.page.turn,.overprint.land,.flip.turning-back,.flip.turning-front,.tearhalf.l,.tearhalf.r{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="bt-ink">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" result="n" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="bt-root"><div class="empty">載入護照中…</div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

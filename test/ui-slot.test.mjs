@@ -2,7 +2,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotHTML, faceOf } from "../src/ui.js";
+import { slotHTML, faceOf } from "../passport/src/ui.js";
 
 const act = {
   id: "09A", month: 9, seq: 1, category: "gather",

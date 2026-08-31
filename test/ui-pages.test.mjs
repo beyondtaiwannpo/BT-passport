@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pagesOf, bookHTML, guideCardsHTML, guidePageHTML, introHTML, monthPageHTML,
-         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../src/ui.js";
+         idPageHTML, CATEGORY, CATNAME, SLOT_ORDER } from "../passport/src/ui.js";
 
 const months = [
   { seq: 1, month: 9,  theme_zh: "07:00", theme_en: "" },

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { visasOf, pendingVisasOf, angleOf, monthPageHTML } from "../src/ui.js";
+import { visasOf, pendingVisasOf, angleOf, monthPageHTML } from "../passport/src/ui.js";
 
 const MONTHS = [9,10,11,12,1,2,3,4,5,6,7].map((month, seq) => ({ seq, month }));
 const DEST = ["TPE TAIPEI","LAX LOS ANGELES","JFK NEW YORK","BNA NASHVILLE","MSN MADISON",
@@ -226,6 +226,6 @@ test("十一個月都拿得到自己的月份 class", () => {
 });
 
 test("ui.js 裡沒有任何色碼 —— 顏色只住在 index.html 的色盤區塊", () => {
-  const src = fs.readFileSync(new URL("../src/ui.js", import.meta.url), "utf8");
+  const src = fs.readFileSync(new URL("../passport/src/ui.js", import.meta.url), "utf8");
   assert.equal(src.match(/#[0-9A-Fa-f]{3,8}\b/g), null, "色碼不准出現在 JS 裡");
 });

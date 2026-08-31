@@ -5,7 +5,7 @@
 // 33 格裡少一格不會報錯、不會變紅，只會有一個人某天發現他的章不見了。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { monthPageHTML, slotHTML, CATNAME, SLOT_ORDER } from "../src/ui.js";
+import { monthPageHTML, slotHTML, CATNAME, SLOT_ORDER } from "../passport/src/ui.js";
 
 const MONTH = { seq: 1, month: 9, theme_zh: "07:00", theme_en: "" };
 

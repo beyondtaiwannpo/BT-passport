@@ -2,7 +2,7 @@
 // 跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { monthPageHTML, idPageHTML } from "../src/ui.js";
+import { monthPageHTML, idPageHTML } from "../passport/src/ui.js";
 
 // 沒有既有的 state 工廠可沿用（原本是單一個 const 物件），這裡把它改成
 // 每次呼叫回傳新物件的工廠，讓後面新增的測試可以用 S()。

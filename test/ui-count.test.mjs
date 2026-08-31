@@ -1,7 +1,7 @@
 // stampCount：蓋了幾個章的唯一定義點。跑法：node --test test/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stampCount, barHTML, idPageHTML } from "../src/ui.js";
+import { stampCount, barHTML, idPageHTML } from "../passport/src/ui.js";
 
 const PROFILE = { id: "00000000-0000-0000-0000-000000000000", name_zh: "王小明",
                    name_en: "Ming Wang", team: "Sponsorship Team", issued: "2026-08-22" };
