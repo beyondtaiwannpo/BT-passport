@@ -655,7 +655,12 @@ export function authHTML(mode, msg) {
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
-    <div class="sub">${up ? "需要一組 BT 邀請碼。跟你的組長拿。" : "用你註冊時的 email 登入。"}</div>
+    <!-- 註冊不再需要邀請碼（2026-09-01，階段 5-7 把門搬到角色升級）。
+         **那格輸入已經移除，不是留著不讀。** 留著的話它是一句謊：使用者會以為
+         自己填的東西有作用，打錯了還會以為是自己的問題，而實際上不管填什麼都會
+         註冊成功、身分都是 student。**沒有作用的輸入框比沒有輸入框更糟。**
+         邀請碼現在在登入之後那一頁輸入（notCadreHTML）。 -->
+    <div class="sub">${up ? "先開帳號，之後再輸入邀請碼升級成幹部。" : "用你註冊時的 email 登入。"}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <!-- 邀請碼那格的 autocapitalize/autocorrect/spellcheck 全部關掉。
          **大小寫那一半已經不再是理由**：trigger 現在是
@@ -671,8 +676,11 @@ export function authHTML(mode, msg) {
          密碼那格不必：type="password" 本來就不會自動大寫或自動更正。 -->
     <label><i>Email</i><input id="ae" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
     <label><i>密碼 / Password${up ? "（至少 6 個字）" : ""}</i><input id="ap" type="password" autocomplete="${up ? "new-password" : "current-password"}"></label>
-    ${up ? `<label><i>邀請碼 / Invite code</i><input id="ai" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長拿"></label>` : ""}
-    ${up ? `<div class="wnote" style="margin:0 0 16px">送出後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>` : ""}
+    <!-- 「會出現在進度牆上」那段告知從註冊頁搬到升級頁（notCadreHTML）。
+         5-7 之後註冊出來的是 student —— 他不會上牆、也還沒有護照，
+         在那個時間點講這段話是錯的時機，而且會讓人以為註冊就等於加入 BT。
+         真正該講的時刻是**升級成幹部的那一下**，那才是資料開始被別人看得到的時刻。
+         規格 §4-5 的原則：要在第一次進入之前明講。 -->
     <div class="row">
       <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
       <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "我有邀請碼，要註冊"}</button>
@@ -716,6 +724,7 @@ export function notCadreHTML(msg) {
     <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長拿"></label>
+    <div class="wnote" style="margin:0 0 16px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
     <div class="row">
       <button class="btn" data-act="do-claim">我是幹部，我有邀請碼</button>
       <button class="btn sm quiet" data-act="signout">登出</button>

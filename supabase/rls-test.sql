@@ -117,12 +117,23 @@ update profiles set name_zh = '測試乙', team = 'Marketing Team'
 update profiles set name_zh = '測試學員'
  where id = '55555555-0000-0000-0000-000000000055';
 
--- 學員不該有護照。trigger 現在會幫每個註冊的人都建一列（因為現在還要邀請碼、
--- 能註冊的都是幹部），所以這裡手動把學員的護照刪掉，做出「學員沒有護照」的狀態。
--- 5-7 之後 trigger 只建 profiles，這幾句就可以拿掉了。
-delete from passports where id in ('55555555-0000-0000-0000-000000000055','66666666-0000-0000-0000-000000000066',
-                                   '11111111-0000-0000-0000-000000000011','22222222-0000-0000-0000-000000000012',
-                                   '33333333-0000-0000-0000-000000000013','44444444-0000-0000-0000-000000000014');
+-- ★ 幹部的 passports 列必須**明確建出來**（2026-09-01，階段 5-7 之後）。
+--
+-- 5-7 之前這一列是註冊 trigger 順手建的，所以測試不必管它。5-7 之後 trigger
+-- 只建 profiles，護照那一列改由 claim_invite 在升級時建 —— 而甲乙是直接
+-- update 成 cadre 的，沒有走過升級，所以**沒有人會幫他們建那一列**。
+--
+-- 少了下面這一句的話，第 33 條「乙改不動甲的 passports，改到 0 列」會通過 ——
+-- 但通過的理由是**那一列根本不存在**，不是政策擋住了。空集合上的
+-- 「改到 0 列」恆為真。這個 repo 已經被同一個 bug class 咬過好幾次
+-- （dotOn 的圓點、idPageHTML 的 FULL 疊印、monthPageHTML 的 full 判斷），
+-- 這是第四次，只是這次發生在測試資料的準備階段。
+--
+-- 學員（S / T / K1-K4）刻意**不**建，那正是要測的狀態（第 59 條）。
+insert into passports (id) values
+  ('aaaaaaaa-0000-0000-0000-000000000001'),
+  ('bbbbbbbb-0000-0000-0000-000000000002')
+on conflict (id) do nothing;
 
 insert into stamps (user_id, act_id, stamped_on) values
   ('aaaaaaaa-0000-0000-0000-000000000001', '09A', '2026-09-10');
@@ -228,10 +239,20 @@ begin
   select count(*) into n from u;
   insert into rls_result values (33, '§11-2 乙改不動甲的 passports', '改到 0 列', '改到 ' || n || ' 列', n = 0);
 
+  -- ★★ 上面那條的對照組。**沒有它，第 33 條在「甲根本沒有 passports 那一列」
+  -- 的時候也會通過** —— 空集合上的「改到 0 列」恆為真，而畫面上看起來一模一樣。
+  --
+  -- 這不是假想：2026-09-01 階段 5-7 把 passports 的建立從註冊 trigger 移到
+  -- claim_invite 之後，測試資料裡的幹部就真的沒有那一列了（甲乙是直接 update
+  -- 成 cadre 的，沒走過升級）。setup 因此補了一句明確的 insert，
+  -- 而這一條是用來證明那句 insert 真的有效 —— 不然下次它壞掉也沒有人會知道。
+  select count(*) into n from passports where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  insert into rls_result values (34, '★【對照】甲確實有 passports 那一列', '1 列', n || ' 列', n = 1);
+
   with u as (update profiles set name_zh = '乙改的'
               where id = 'aaaaaaaa-0000-0000-0000-000000000001' returning 1)
   select count(*) into n from u;
-  insert into rls_result values (34, '乙改不動甲的 profiles', '改到 0 列', '改到 ' || n || ' 列', n = 0);
+  insert into rls_result values (35, '乙改不動甲的 profiles', '改到 0 列', '改到 ' || n || ' 列', n = 0);
 
   -- ★ §3-1 那個洞：幹部也不准改自己的 role（不然誰都能自己升級／降級別人）。
   blocked := false;
@@ -239,7 +260,7 @@ begin
     update profiles set role = 'student' where id = 'bbbbbbbb-0000-0000-0000-000000000002';
   exception when insufficient_privilege then blocked := true;
   end;
-  insert into rls_result values (35, '★ §3-1 幹部改不動自己的 role', '被權限擋下',
+  insert into rls_result values (36, '★ §3-1 幹部改不動自己的 role', '被權限擋下',
     case when blocked then '被權限擋下' else '改成功了' end, blocked);
 
   -- ↓ 對照組。沒有它，上面那條可能只是「整張 profiles 都寫不動」。
@@ -248,7 +269,7 @@ begin
     update profiles set name_zh = '測試乙' where id = 'bbbbbbbb-0000-0000-0000-000000000002';
   exception when insufficient_privilege then blocked := true;
   end;
-  insert into rls_result values (36, '【對照】幹部改得動自己的 name_zh', '改得動',
+  insert into rls_result values (37, '【對照】幹部改得動自己的 name_zh', '改得動',
     case when blocked then '也被擋下 —— 擋的是整張表，不是 role' else '改得動' end, not blocked);
 
   -- ===== invite_codes 對所有登入身分關閉 =====
@@ -556,43 +577,53 @@ begin
 end $$;
 
 -- ============================================================================
--- 6. 註冊時的舊守門
+-- 6. 註冊這條路現在的行為（2026-09-01，階段 5-7 之後翻面）
 -- ============================================================================
--- ⚠⚠ **這一整段在階段 5-7 之後要換掉，不是刪掉。** ⚠⚠
+-- 5-7 之前這一節測的是「沒有邀請碼就註冊不了」。那道門已經搬到 claim_invite，
+-- 所以下面 90 / 91 的斷言**翻了面**，不是被刪掉。
 --
--- 5-7 會把邀請碼從註冊 trigger 拿掉、role 的 default 改成 'student'。
--- 那之後下面 90 / 91 兩條的斷言會**變成相反的**：
---     90 「無效邀請碼註冊失敗」→「不帶邀請碼也能註冊」
---     91 「註冊失敗不留下 auth.users」→「註冊後 role 是 student、沒有 passports 那一列」
+-- **為什麼不能直接刪掉這一節**（README 第 12 項）：移除一個字串，會把所有斷言
+-- 它不存在的測試變成空的。刪掉的話「註冊這條路的行為」從此沒有任何東西在守，
+-- 而剩下的測試會全綠 —— 因為它們測的是別的東西。
+-- 註冊仍然是一條真實的路徑，只是它的正確行為變了：
+--   以前：沒有碼 → 擋下來
+--   現在：沒有碼 → 開一個什麼都看不到的 student 帳號
 --
--- **不要在 5-7 把這兩條刪掉了事。** README 第 12 項：移除一個字串，會把所有斷言
--- 它不存在的測試變成空的 —— 直接刪掉這一段的話，「註冊這條路的行為」從此沒有任何
--- 東西在守，而剩下的測試會全綠，因為它們測的是別的東西。
---
--- 92 / 93 兩條（有效碼註冊成功、兩張表都建出來）在 5-7 之後仍然成立，不用動 ——
--- 5-7 之後帶著有效碼註冊仍然可以，只是不再是必要條件。
+-- 門本身沒有消失，第 5 節那一整段就是它現在住的地方。
 reset role;
 select set_config('request.jwt.claims', '', false);
 
 do $$
-declare n int; blocked boolean; r text;
+declare n int; blocked boolean; r text; before_uses int;
 begin
-  -- spec §11-4：無效邀請碼，註冊必須失敗且不留下 auth.users
+  select uses_left into before_uses from invite_codes where code = 'RLSTEST-SETUP';
+
+  -- ★ 翻面：不帶任何邀請碼也能註冊
   blocked := false;
   begin
     insert into auth.users (id, email, encrypted_password, created_at, updated_at,
                             raw_user_meta_data, aud, role)
     values ('cccccccc-0000-0000-0000-000000000003','rlstest-c@example.com','x',
-            now(), now(), '{"invite":"THIS-CODE-DOES-NOT-EXIST"}','authenticated','authenticated');
+            now(), now(), '{}', 'authenticated','authenticated');
   exception when sqlstate 'P0001' then blocked := true;
   end;
-  insert into rls_result values (90, '§11-4 無效邀請碼註冊失敗〔5-7 後要改成相反〕', '被 trigger 擋下',
-    case when blocked then '被 trigger 擋下' else '註冊成功了' end, blocked);
+  insert into rls_result values (90, '★ 不帶邀請碼也能註冊（門已經搬走）', '註冊成功',
+    case when blocked then '被擋下 —— 門還在註冊那一關' else '註冊成功' end, not blocked);
 
-  select count(*) into n from auth.users where id = 'cccccccc-0000-0000-0000-000000000003';
-  insert into rls_result values (91, '§11-4 註冊失敗不留下 auth.users〔5-7 後要改成相反〕', '0 列', n || ' 列', n = 0);
+  -- ★ 翻面：註冊出來的是 student，而且沒有護照
+  select role into r from profiles where id = 'cccccccc-0000-0000-0000-000000000003';
+  insert into rls_result values (91, '★ 註冊出來的 role 是 student', 'student',
+    coalesce(r, '（連 profiles 都沒建）'), r = 'student');
 
-  -- ↓ 對照組。沒有這兩條，上面那兩條的「被擋下」可能只是 auth.users 根本插不進去。
+  select count(*) into n from passports where id = 'cccccccc-0000-0000-0000-000000000003';
+  insert into rls_result values (92, '★ 註冊不再順手建 passports', '0 列', n || ' 列', n = 0);
+
+  -- ↓ 對照組。沒有這條，上面那個 0 列可能只是 auth.users 根本沒插進去。
+  select count(*) into n from profiles where id = 'cccccccc-0000-0000-0000-000000000003';
+  insert into rls_result values (93, '【對照】註冊仍然會建 profiles（不能省）', '1 列', n || ' 列', n = 1);
+
+  -- 帶著邀請碼註冊也還是可以 —— 它只是不再是必要條件。
+  -- 這條的存在是為了確認「門搬走」沒有順手把註冊本身弄壞。
   blocked := false;
   begin
     insert into auth.users (id, email, encrypted_password, created_at, updated_at,
@@ -601,15 +632,17 @@ begin
             now(), now(), '{"invite":"RLSTEST-SETUP"}','authenticated','authenticated');
   exception when sqlstate 'P0001' then blocked := true;
   end;
-  insert into rls_result values (92, '【對照】有效邀請碼註冊得成功', '註冊成功',
-    case when blocked then '被 trigger 擋下，擋過頭了' else '註冊成功' end, not blocked);
+  insert into rls_result values (94, '【對照】metadata 裡帶著邀請碼也照樣註冊得成功', '註冊成功',
+    case when blocked then '被擋下了' else '註冊成功' end, not blocked);
 
-  select count(*) into n from profiles where id = 'dddddddd-0000-0000-0000-000000000004';
-  insert into rls_result values (93, '【對照】註冊後 profiles 自動建列', '1 列', n || ' 列', n = 1);
-
-  select role into r from profiles where id = 'dddddddd-0000-0000-0000-000000000004';
-  insert into rls_result values (94, '註冊後的 role 是這一步的 default', 'cadre',
-    coalesce(r, '（查不到）'), r = 'cadre');
+  -- ★ 而且那組碼**沒有被扣**。metadata 裡的 invite 現在是一個沒有人讀的欄位。
+  -- 這條很重要：如果 trigger 還留著扣碼那一句（只是不 raise），
+  -- 上面每一條都會綠，而碼會被安靜地燒掉 —— 三十個人註冊完，
+  -- 所有的碼都歸零，而沒有人知道為什麼。
+  select uses_left into n from invite_codes where code = 'RLSTEST-SETUP';
+  insert into rls_result values (95, '★ 註冊不再扣掉邀請碼的次數',
+    before_uses || ' 次（沒變）', coalesce(n::text,'（查不到）') || ' 次',
+    coalesce(n, -1) = before_uses);
 end $$;
 
 -- ---------- 7. 清掉測試資料 ----------
@@ -642,8 +675,8 @@ do $$
 declare n int;
 begin
   select count(*) into n from rls_result;
-  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '52 條',
-    n || ' 條', n = 52);
+  insert into rls_result values (98, '★ 這次實際跑完了幾條測試', '54 條',
+    n || ' 條', n = 54);
 end $$;
 
 -- ---------- 9. 總結那一列 ----------
