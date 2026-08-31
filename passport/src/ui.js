@@ -238,7 +238,7 @@ export function mrz(p) {
 export function barHTML(S) {
   const done = stampCount(S);
   return `<div class="bar">
-    <img src="./logo.png" alt="Beyond Taiwan">
+    <img src="../shared/logo.png" alt="Beyond Taiwan">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>
@@ -586,7 +586,7 @@ export function guidePageHTML() {
 // 那是尺寸不是新元件，仍符合原規格 §3.4。
 export function introHTML() {
   return `<div class="card" style="max-width:940px">
-    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>怎麼用這本護照</h2>
     <div class="sub">一年 33 格，每個月三格。這一頁之後在護照裡隨時翻得到。</div>
     ${guideCardsHTML()}
@@ -653,7 +653,7 @@ export function wallHTML(S) {
 export function authHTML(mode, msg) {
   const up = mode === "up";
   return `<div class="card">
-    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
     <div class="sub">${up ? "需要一組 BT 邀請碼。跟你的組長拿。" : "用你註冊時的 email 登入。"}</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
@@ -693,7 +693,7 @@ export function authHTML(mode, msg) {
 // 分辨原因是維護者的事，所以原始錯誤留在 console（見 main.js 的 boot）。
 export function downHTML() {
   return `<div class="card">
-    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>資料庫休眠中</h2>
     <div class="wnote" style="margin:16px 0 0">
       資料庫休眠中，你的資料都還在。請寄信到 beyondtaiwan2020@gmail.com 請人恢復。
@@ -705,7 +705,7 @@ export function downHTML() {
 export function setupHTML(p, user) {
   p = p || {};
   return `<div class="card">
-    <img src="./logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${p.id ? "編輯護照資料" : "申請你的 BT 護照"}</h2>
     <div class="sub">${p.id ? "改完按儲存，章不會消失。" : "一年 33 格，每個月三個。蓋滿的人，年底會有一整本回憶。"}</div>
     <label><i>中文名 / Name</i><input id="fz" value="${esc(p.name_zh || "")}" placeholder="王小明" maxlength="20"></label>

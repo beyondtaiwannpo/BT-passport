@@ -18,7 +18,11 @@ say() { printf '%s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
 ok()  { printf 'ok    %s\n' "$1"; }
 
-FILES="passport/index.html passport/src passport/activities.json"
+# 2026-08-31（階段 2）：加入 index.html 與 shared/。
+# 色票與字體 token 搬到 shared/brand.css 之後，範圍不跟著擴的話，
+# 三色與兩字體這兩條規則就等於對「色票實際住的地方」完全不設防——
+# 守門會照樣全綠，因為它掃的是一個已經沒有色票的檔案（README 第 10 項）。
+FILES="index.html shared passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -41,7 +45,7 @@ fi
 # 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
 # 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
 # service_role 是 API 的一部分）。
-service_scope="passport/index.html passport/src passport/activities.json"
+service_scope="index.html shared passport/index.html passport/src passport/activities.json"
 [ -d .github ] && service_scope="$service_scope .github"
 if grep -rIq service_role $service_scope 2>/dev/null; then
   bad "§11-6 repo 裡出現 service_role"
@@ -58,7 +62,7 @@ fi
 # 其餘檔案（src、passport/activities.json）不受影響、照舊整份掃。
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' passport/src passport/activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html shared passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -v '^#FFC46C$' | grep -v '^#EDE5D8$' | grep -v '^#102A86$')
@@ -100,7 +104,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat passport/src/*.js passport/activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html shared/* passport/src/*.js passport/activities.json 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then

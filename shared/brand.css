@@ -1,0 +1,38 @@
+/* Beyond Taiwan 的品牌 token。beyondtaiwannpo.com 底下每一個頁面都讀這一份。
+ *
+ * 2026-08-31（階段 2）：原樣從 passport/index.html 的 :root 區塊搬出來，
+ * 一個值都沒改。搬出來的理由是「加一個新功能的成本 = 開一個資料夾、放一個 HTML、
+ * 讀那三個共用檔案」（見 BT-Site-交接規格.md §2-3）——色票與字體如果留在護照裡，
+ * 下一個做時間看板的人只能用複製貼上，然後兩份就會慢慢不一樣。
+ *
+ * ── 這個檔案只放 token，不放版面 ──
+ * 顏色、字體家族、圓角。**不要**把按鈕、卡片、格線的樣式搬進來。
+ * 那些是各個功能自己的事，搬進來就變成一個沒有人敢動的全站樣式表。
+ *
+ * ── 硬規則（見規格 §6）──
+ * 一個畫面最多 3 種顏色、最多 2 種字體，check.sh 會擋住違規。
+ * 下面三個色碼就是全部；`--ink` 與 `--paper` 是語意別名，不是第四、第五色。
+ * **不要載入中文網頁字體**，中文走系統 CJK fallback ——
+ * 那會變成第三種字體，而且檔案很大，海外幹部的網路不一定好。
+ *
+ * ── 字體檔案的載入不在這裡 ──
+ * Google Fonts 的 <link> 留在各自的 HTML。改成在這裡 @import 的話，
+ * 瀏覽器要先下載完 brand.css 才會開始要字體，多一個來回。
+ * 這裡只負責「用哪一套字」，不負責「去哪裡拿」。
+ *
+ * ── logo ──
+ * shared/logo.png。**不可改色、拉伸、旋轉、調透明度。**
+ * 它是圖檔不是 CSS，所以放在旁邊而不是寫進這個檔案；引用它的頁面自己寫 <img>，
+ * 這樣 alt 文字才在，讀螢幕的人聽得到「Beyond Taiwan」。
+ */
+
+:root{
+  --bt-orange:#FFC46C;
+  --bt-cream:#EDE5D8;
+  --bt-navy:#102A86;
+  --ink:var(--bt-navy);
+  --paper:var(--bt-cream);
+  --display:"Barlow Condensed", "Noto Sans TC", sans-serif;
+  --body:"Inter", "Noto Sans TC", system-ui, sans-serif;
+  --r:3px;
+}

@@ -66,13 +66,24 @@ beyondtaiwannpo.com/
 ├── index.html              對外的 BT 簡介，右上角一顆登入按鈕。不需要登入就看得到
 ├── CNAME                   內容改成 beyondtaiwannpo.com
 ├── shared/
-│   ├── supabase.js         連線設定與 client
+│   ├── supabase.js         連線設定與 client（整站只有這一個）
 │   ├── auth.js             登入、目前使用者、角色判斷
-│   └── brand.css           色票、字體、logo
+│   ├── brand.css           色票、字體
+│   └── logo.png            旁邊放著，因為 CSS 檔載不了 PNG
+├── vendor/                 supabase-js，第三方相依，平台層級
 ├── app/                    登入頁 + 登入後依角色顯示的功能選單
 ├── passport/               現有的 BT Passport 搬進來
 └── availability/           新的每週時間看板
 ```
+
+**`shared/` 是三個檔案加一張圖（2026-08-31，階段 2）。** 規格原本寫「只有三個檔案」，
+`logo.png` 是第四個 —— 但它不是第四個「模組」，是 `brand.css` 那一行「色票、字體、logo」
+裡的 logo 本身。CSS 檔沒辦法把 PNG 包進去，而護照與首頁需要的是**同一張圖**；
+放兩份的話兩份遲早會不一樣。用 CSS `background-image` 就能少一個檔案，但那樣
+`<img>` 的 alt 文字會消失，讀螢幕的人聽不到「Beyond Taiwan」——不值得。
+
+`vendor/` 從 `passport/` 移到根目錄，因為 `shared/supabase.js` 要 import 它。
+留在 `passport/` 的話會變成「共用層相依於某一個功能」，方向是反的。
 
 **根目錄是對外的門面，不是登入框（2026-08-31 的決定）。** 原本的規劃是 `/` 直接放登入頁，改掉了。理由：以後會開放給學員，也會有人從搜尋或 IG 找過來，打開官網看到一個登入框很奇怪，而且那樣 BT 等於沒有對外的門面。有這一頁，`beyondtaiwannpo.com` 才是可以放進 IG 簡介、放進贊助提案的網址。
 
