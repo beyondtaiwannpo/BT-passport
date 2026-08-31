@@ -5,8 +5,12 @@
 -- 階段 3+4 的遷移（supabase/migrations/2026-08-31-profiles-and-role.sql）做了三件
 -- 這個檔案還不知道的事：
 --   1. 多了一張 profiles（id / name_zh / name_en / team / role / tz / avatar / updated_at），
---      使用者資料從 passports 搬過去了；passports 只剩 motto / issued / intro_seen 是活的
---      （舊的名字欄位還在，但沒有人讀，遷移 B 會 drop）。
+--      使用者資料從 passports 搬過去了。**遷移 B（2026-09-01-passports-drop-old-columns.sql）
+--      已經把 passports 的 name_zh / name_en / team / avatar 四欄 drop 掉了**，
+--      正式資料庫的 passports 現在只有 id / motto / issued / updated_at / intro_seen。
+--      下面那段 create table passports 仍然建得出那四欄 —— 那是刻意的，不是漏改：
+--      重建流程是「這個檔案 → seed.sql → migrations/ 按日期全部跑一遍」，
+--      遷移 B 會在最後把它們 drop 掉，終點狀態一樣。
 --   2. 每一條 RLS 都改成認 role = 'cadre'（透過 public.is_cadre()），讀寫兩端都是。
 --      profiles 的 UPDATE 是**欄位層級**授權，role 不在發出去的欄位裡。
 --   3. handle_new_user() 會多建一列 profiles。
