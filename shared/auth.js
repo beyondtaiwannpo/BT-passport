@@ -54,15 +54,39 @@ const MSG = {
 // 由上往下比，第一條命中就用它，所以順序本身也是判斷的一部分：
 // 連不上要排在最前面（連不上的時候其他欄位都不可信），籠統的 500 要排在最後面
 // （它是「剩下的都算邀請碼問題」，會吃掉所有排在它後面的情況）。
+// ── 順序有意義：find() 取第一個命中的，所以 exact match 一律排最前面 ──
+//
+// 2026-09-01 出過事：invalid_invite 那條被放在 offline 後面，於是打錯邀請碼的人
+// 看到的是「現在連不上資料庫」。一個學生打錯一個字母，畫面告訴他系統壞了 ——
+// 他不會再試、也不會回報，他會以為網站壞掉然後安靜地放棄，而沒有人會知道。
+// 順帶還把一個「打錯字」的問題升級成一封要組長回的信。
 const RULES = [
-  // 連不上：判斷的是 status 0，不是 name。
+  // claim_invite 那支 RPC 驗不過時丟的。**實測（2026-09-01，正式專案，真實使用者 token）：**
+  //   HTTP 400，body {"code":"P0001","details":null,"hint":null,"message":"invalid_invite"}
+  //   supabase-js 交過來的物件只有 {code, details, hint, message} 四個 key ——
+  //   **沒有 status、沒有 name，也不是 Error 的實例。**
+  // 那個形狀正是下面 offline 那條會誤判它的原因，所以這條要排在它前面。
+  { key: "invite", when: (e, m) => m === "invalid_invite" },
+
+  // 連不上：判斷的是 status 0 **而且沒有錯誤碼**，不是 name。
   // **不要改成用 name 判斷。** 本機拿 vendored supabase-js 實測過兩件事：
   //   真的連不上 → name "AuthRetryableFetchError"、status 0、message "fetch failed"
   //                （瀏覽器是 "Failed to fetch"）
   //   伺服器回 500 → name 也是 "AuthRetryableFetchError"，但 status 是 500
   // 兩者共用同一個 name，所以只認 name 會把「邀請碼錯」誤報成「連不上」——
   // 這正是 trigger raise 之後最可能走到的那條路。分辨兩者的是 status。
-  { key: "offline", when: (e, m, s) => s === 0 || e.name === "TypeError"
+  //
+  // ⚠ **`s === 0` 不能單獨成立，一定要加上 `&& !c`。**（2026-09-01 修）
+  // PostgREST 的錯誤物件**根本沒有 status 這個欄位**，所以 Number(err.status || 0)
+  // 一律是 0 —— 那不代表「這次請求沒拿到回應」，只代表「這個物件不長那樣」。
+  // 少了 `&& !c` 的話，**任何**經由 .rpc() 回來的錯誤都會被說成「連不上資料庫」，
+  // 而資料庫其實好端端地回答了。這不只影響邀請碼，是所有 RPC 共通的。
+  //
+  // 為什麼 `!c` 分得開 —— 三條路都實測過（2026-09-01）：
+  //   auth 網路失敗       status 0        code undefined  → !c 為真，仍判離線 ✓
+  //   postgrest 網路失敗  status undefined code ""        → !c 為真，仍判離線 ✓
+  //   postgrest P0001     status undefined code "P0001"   → !c 為偽，不再誤判 ✓
+  { key: "offline", when: (e, m, s, c) => (s === 0 && !c) || e.name === "TypeError"
       || m.includes("failed to fetch") || m.includes("fetch failed")
       || m.includes("networkerror") || m.includes("load failed") },
 
@@ -144,12 +168,9 @@ const RULES = [
   // 這條最寬，會吃掉所有排在它後面的東西，所以一定要留在最後。
   // （資料庫層的旁證仍然成立：supabase/rls-test.sql 第 65 條，spec §11-5，
   //   trigger 對兩者丟同一個 P0001。現在它是佐證，不再是唯一的依據。）
-  // claim_invite 那個 RPC 驗不過時丟的是 P0001 / message 就是 invalid_invite，
-  // 走 PostgREST 回來是 400，不是 500 —— 所以下面那條「s >= 500」接不到它，
-  // 要單獨一條。文案共用 MSG.invite：對使用者來說「碼不對或用完了」是同一件事，
-  // 不管它發生在註冊還是升級。
-  { key: "invite", when: (e, m) => m === "invalid_invite" },
-
+  // 註冊 trigger 那條路：GoTrue 把 trigger 丟的 P0001 包成 500。
+  // 跟最上面那條 invalid_invite 共用同一句文案 —— 對使用者來說
+  // 「碼不對或用完了」是同一件事，不管它發生在註冊還是升級。
   { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 
@@ -167,7 +188,25 @@ export function authMessage(err) {
   // 但「使用者看到同一句」不代表「除錯的人也只能看到同一句」。原始錯誤留在 console，
   // 免得下一個人為了知道是哪一種而去讀原始碼（2026-08-17 真的發生過）。
   // console 是給部署／維護的人看的，畫面上永遠不會出現原始錯誤（spec §6.1）。
-  if (hit && hit.key === "invite") {
+  // 兩條路都歸到 MSG.invite，但**除錯時該看的東西完全不同**，所以分開印。
+  //
+  // 2026-09-01：這段原本只為註冊那條路寫的，升級那條路加進來之後它就開始說謊 ——
+  // 對著一個 claim_invite 的錯誤印「註冊失敗」、還教人去查 trigger。
+  // 更要緊的是它描述的那個模糊性（「這一句同時涵蓋伺服器出狀況」）
+  // **在 RPC 這條路上不存在**：invalid_invite 是明確的答案。
+  // 前提沒了，話就要跟著改（README 第 11 項）。
+  if (hit && hit.key === "invite" && m === "invalid_invite") {
+    console.error(
+      "升級失敗：claim_invite 回 invalid_invite —— 這組碼不存在，或 uses_left 已經是 0。\n" +
+      "**這一句是明確的**，不像註冊那條路那樣同時涵蓋「伺服器出狀況」：\n" +
+      "資料庫確實回答了，答案就是「這組碼不能用」。\n" +
+      "要確認是哪一種，用跟函式同一套正規化去查：\n" +
+      "  select code, uses_left from invite_codes\n" +
+      "   where upper(btrim(code)) = upper(btrim('使用者實際輸入的碼'));\n" +
+      "直接用 code = '...' 會查不到而誤判。\n" +
+      "原始錯誤：",
+      { name: err.name, status: err.status, code: err.code, message: err.message });
+  } else if (hit && hit.key === "invite") {
     console.error(
       "註冊失敗，被歸到「邀請碼不對或已用完」那一句。\n" +
       "這一句同時涵蓋「伺服器出狀況」—— 兩者在前端完全分不出來，所以要自己查是哪一種：\n" +
