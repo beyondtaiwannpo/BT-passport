@@ -7,33 +7,41 @@
 
 <!-- 這一頁是對外的門面，不是登入頁（見 BT-Site-交接規格.md §2-1）。
      不認識 BT 的人、從搜尋或 IG 連過來的人，看到的是這一頁。
-     **它不碰 auth**：不載入 supabase、不判斷登入狀態、不知道使用者是誰。
-     那些全部在 /app/。右上角那顆按鈕只是一個連結。
+     **它不碰 auth**：不載入 supabase、不判斷登入狀態、沒有任何 JavaScript。
+     右上角那顆按鈕只是一個連結。
 
-     ── 目前是骨架（2026-08-31，階段 1）──
-     文案由使用者提供，還沒給，所以本文全部是【待補文案】。
-     check.sh 有一條守門會擋住【待補文案】進入 passport/，
-     階段 7 這一頁的文案定稿之後要把守門的範圍擴到根目錄（守門裡有寫）。
+     ── 這一版是最小版本（2026-09-01）──
+     做它的直接原因是 Google 的 OAuth 審查退件：
+     「Your home page does not explain the purpose of your app」。
+     審查員會直接打開這一頁，所以它**必須不需登入、而且說的必須是真的**。
 
-     ── 還剩一個暫時的路徑 ──
-     logo 已經收進 ./shared/logo.png（階段 2），色票與字體也走 ./shared/brand.css。
-     **favicon 還指在 ./passport/**：那三個圖示是護照 PWA 的身分（跟 site.webmanifest
-     綁在一起），平台自己還沒有一套。階段 7 這一頁定稿時一起處理。
-     **不要為了好看先複製一份到根目錄** —— 兩份圖遲早會不一樣。
+     ⚠ **這一頁不准出現佔位文案。** 上一版整頁都是那種方括號包起來的待補標記，
+     那正是被退件的原因。check.sh 有一條守門在擋（範圍已含 index.html）。
+     （這段說明刻意不把那個標記本身寫出來 —— 那是「必須不存在」型的守門，
+       註解裡出現一次就會讓它抓到自己，方向雖然安全但會變成常紅的假警報。
+       同一個坑 2026-09-01 在連線字串那條守門上踩過一次。）
 
-     右上角的按鈕現在連到 ./passport/，階段 7 有了 /app/ 之後改成 ./app/。
-     這樣每一個階段結束時網站都是可以用的，不會有一顆連到 404 的按鈕。 -->
+     下面每一句的出處：
+       「台灣的學生非營利組織…海外升學的選項」→ 規格 §0 與 BT-隱私政策.md，
+         使用者自己寫的句子，不是我編的。
+       「幹部團隊約 30 人，散在…」→ 規格 §0。
+       「一年 33 件事、散在 11 個月」→ README「它解決什麼問題」。
+       時間看板寫成「開發中」而不是既有功能，因為**它還沒做**（規格 §4，階段 8）。
+         寫成已經有的話這一頁就在說謊，而這一頁正是要拿去證明我們說真話的。
 
-<meta name="description" content="Beyond Taiwan 是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。">
+     階段 7 會整個重做（含信念與使命的正式文案、依角色顯示的功能選單）。
+     階段 7 重做時，右上角的連結要從 ./passport/ 改成 ./app/。 -->
+
+<meta name="description" content="Beyond Taiwan 是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。這個網站是 BT 幹部的內部工具。">
 <meta property="og:title" content="Beyond Taiwan">
-<meta property="og:description" content="Beyond Taiwan 是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。">
+<meta property="og:description" content="台灣的學生非營利組織，幫公立高中生看見海外升學的選項。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/">
+<meta name="theme-color" content="#102A86">
 
 <link rel="icon" type="image/png" sizes="32x32" href="./passport/favicon-32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="./passport/favicon-48.png">
 <link rel="apple-touch-icon" href="./passport/apple-touch-icon.png">
-<meta name="theme-color" content="#102A86">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,15 +49,13 @@
 <link rel="stylesheet" href="./shared/brand.css">
 
 <style>
-/* 色票與字體家族全部來自 ../shared/brand.css，這個檔案裡沒有任何寫死的色碼
+/* 色票與字體家族全部來自 ./shared/brand.css，這個檔案裡沒有任何寫死的色碼
    （唯一的例外是 <head> 的 theme-color，那是 meta 屬性，吃不了 var()）。
    要換色請改 brand.css，改這裡只會讓兩邊不一樣。
    硬規則：一個畫面最多 3 種顏色、最多 2 種字體，check.sh 會擋。 */
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);
-  font:400 16px/1.7 var(--body);
-  -webkit-font-smoothing:antialiased}
-h1,h2,.brand{font-family:var(--display);font-weight:700;letter-spacing:.01em}
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased}
 
 header{display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:18px clamp(20px,5vw,64px)}
@@ -61,14 +67,23 @@ header img{height:34px;display:block}
 .login:hover{filter:brightness(.96)}
 .login:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 
-main{max-width:760px;margin:0 auto;padding:clamp(32px,8vw,88px) clamp(20px,5vw,64px) 96px}
-h1{font-size:clamp(40px,9vw,72px);line-height:1.05;margin:0 0 24px}
-h2{font-size:clamp(22px,4vw,30px);margin:56px 0 12px}
-p{margin:0 0 18px;max-width:62ch}
-.todo{color:var(--ink);opacity:.55}
+main{max-width:34em;margin:0 auto;padding:clamp(24px,6vw,56px) clamp(20px,5vw,64px) 72px}
+h1{font-family:var(--display);font-size:clamp(38px,9vw,64px);line-height:1.05;margin:0 0 20px}
+h2{font-family:var(--display);font-size:clamp(22px,4.5vw,28px);line-height:1.25;margin:44px 0 10px}
+p{margin:0 0 16px}
+.lead{font-size:19px}
+ul{margin:0 0 16px;padding-left:1.25em}
+li{margin:0 0 10px}
 
-footer{padding:28px clamp(20px,5vw,64px);font-size:14px;opacity:.7}
+.en{margin-top:52px;padding-top:28px;border-top:1px solid var(--bt-orange)}
+.en h2{margin-top:0}
 
+footer{max-width:34em;margin:0 auto;padding:24px clamp(20px,5vw,64px) 56px;
+  border-top:1px solid var(--bt-orange);font-size:15px}
+footer a{color:var(--ink);font-weight:600}
+footer p{margin:0 0 8px}
+
+@media (max-width:420px){ body{font-size:16px} .lead{font-size:17px} }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -81,17 +96,80 @@ footer{padding:28px clamp(20px,5vw,64px);font-size:14px;opacity:.7}
 </header>
 
 <main>
-  <h1>【待補文案】</h1>
-  <p class="todo">【待補文案】一段話說明 BT 是誰、在做什麼。</p>
+  <h1>Beyond Taiwan</h1>
 
-  <h2>【待補文案】</h2>
-  <p class="todo">【待補文案】</p>
+  <p class="lead">Beyond Taiwan（BT）是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。</p>
 
-  <h2>【待補文案】</h2>
-  <p class="todo">【待補文案】</p>
+  <p>幹部團隊約 30 人，散在台灣、美國、加拿大、歐洲、澳洲與日韓——大多是自己走過那條路、
+  或正在路上的學生。</p>
+
+  <h2>這個網站是什麼</h2>
+
+  <p><strong>這是 BT 幹部的內部工具，不是對外的服務。</strong>它上面目前有一個功能，
+  另一個在開發中：</p>
+
+  <ul>
+    <li><strong>BT 護照</strong>（已上線）——幹部一年有 33 件事要做，散在 11 個月裡。
+    護照是一個看得到「我做了哪些、還差哪些」的地方，也是留下當時想法的地方。
+    完成一格蓋一個章。</li>
+    <li><strong>每週時間看板</strong>（開發中）——團隊散在六個時區，
+    每次開會都要重新約時間。看板讓每個人維護自己的「每週固定有空時段」，
+    要開會時直接看，不必每次重新問一輪。</li>
+  </ul>
+
+  <h2>誰用得到</h2>
+
+  <p>目前只有 BT 幹部。註冊需要一組由組長發出的邀請碼——沒有邀請碼的帳號看不到任何內容。</p>
+
+  <p><strong>之後會開放給 BT 的學員（高中生）使用。</strong>現在還沒有給學員的功能，
+  但帳號與權限的結構已經先做好了，功能加進來時不需要回頭重做。</p>
+
+  <h2>資料與隱私</h2>
+
+  <p>幹部在護照裡寫的心得與上傳的照片<strong>只有本人看得到</strong>，
+  這件事由資料庫的權限規則保證，不是靠介面隱藏。BT 的成員包含未滿 18 歲者，
+  我們把這件事寫得很明確——詳見<a href="./privacy/">隱私政策</a>。</p>
+
+  <p>本網站不使用任何追蹤或廣告工具。</p>
+
+  <div class="en" lang="en">
+    <h2>About Beyond Taiwan</h2>
+
+    <p>Beyond Taiwan is a student-run non-profit organisation in Taiwan, working to help
+    students at public high schools see their options for studying abroad. The cadre team
+    is around 30 people, spread across Taiwan, the United States, Canada, Europe, Australia,
+    Japan and Korea.</p>
+
+    <p><strong>This website is an internal tool for BT cadres, not a public service.</strong>
+    It currently hosts one feature, with a second in development:</p>
+
+    <ul>
+      <li><strong>BT Passport</strong> (live) — cadres have 33 activities across 11 months
+      of the school year. The passport is where they can see what they have done and what
+      is left, and where they record what they were thinking at the time.</li>
+      <li><strong>Weekly availability board</strong> (in development) — the team spans six
+      time zones. The board lets each person maintain their recurring weekly availability,
+      so meetings can be scheduled without asking everyone each time.</li>
+    </ul>
+
+    <p>Access requires an invite code issued by a team lead. Accounts without one cannot see
+    any content. We plan to open the site to BT's high-school students later; the account and
+    permission structure is already built for that.</p>
+
+    <p>What cadres write and the photos they upload are visible <strong>only to
+    themselves</strong>, enforced by database-level access rules rather than by hiding
+    things in the interface. Some members are under 18, and we are explicit about how their
+    data is handled — see our <a href="./privacy/">privacy policy</a>.</p>
+
+    <p>This site uses no tracking or advertising tools.</p>
+  </div>
 </main>
 
-<footer>Beyond Taiwan</footer>
+<footer>
+  <p><a href="./privacy/">隱私政策 / Privacy Policy</a></p>
+  <p>beyondtaiwan2020@gmail.com</p>
+  <p>Beyond Taiwan</p>
+</footer>
 
 </body>
 </html>

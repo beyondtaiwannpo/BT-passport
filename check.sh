@@ -528,6 +528,116 @@ else
   fi
 fi
 
+# 給維護者看的註解，不可以變成頁面上看得到的字
+#
+# 2026-09-01 出過事：首頁那段長註解在編輯時被提早關閉（結束標記移到了中間），
+# 後半段整個跑到頁面上 —— 上面印著「下面每一句的出處：…使用者自己寫的句子，
+# 不是我編的」。而那一頁正要拿給 Google 的 OAuth 審查員看。
+#
+# **當時我做過一次檢查，而它通過了**：數註解的開頭與結尾各出現幾次，兩邊都是 2。
+# 分隔符是平衡的，錯的是「哪些字被關在裡面」—— 那個檢查數的東西跟它想守的東西
+# 不是同一件事（README 第 12 項）。所以這一條不數分隔符，
+# **直接把註解剝掉、看剩下的字裡有沒有維護者才會寫的詞。**
+#
+# 詞的清單寫死在下面的 node 腳本裡，不經過 shell 變數 —— 第一版用環境變數傳，
+# 忘了 export，node 讀到 undefined 當場丟例外，而那個例外訊息被當成「外洩內容」
+# 報成紅燈。**抽取失敗與真的有外洩是兩件事，下面分開報。**
+#
+# 清單不求完整，求的是「內部筆記外洩」這件事至少有一個東西在看。
+leakOut=$(node -e '
+  const fs = require("fs");
+  // 廣度：維護者才會寫的詞，出現在可見文字裡就是外洩。這一層是啟發式的，
+  // 抓得到多數情況，但抓不到「剛好沒用到這些詞」的註解 —— 所以還有下面那一層。
+  const WORDS = ["check.sh", "README", "TODO", "FIXME", "規格 §", "反向驗證", "守門"];
+
+  // 精確：每一頁各釘一組句子。**負向那句取自該頁註解的內部、正向那句取自本文。**
+  // 這一組同時擋住兩種壞法：
+  //   註解提早關閉 → 註解裡的句子變成可見 → 負向那條紅
+  //   註解忘了關   → 後面的本文被吞掉      → 正向那條紅
+  // 第一版只有 WORDS，實測時「隱私頁的註解提早關閉」照樣全過，
+  // 因為那段註解剛好沒用到清單裡的任何一個詞。
+  // 改了這些句子就要回來改這裡 —— 刻意的摩擦，跟 ESTAMP_PALETTE 同一個做法。
+  // ⚠ 兩組錨點的**位置**跟內容一樣重要，第一版就是位置挑錯而漏抓（2026-09-01 實測）：
+  //
+  //   mustHide 要取**註解的最後一句**。取中間那句的話，破壞點在它後面時
+  //   它仍然被關在註解裡 —— 隱私頁那次就是這樣漏掉的。
+  //   取最後一句，任何位置的提早關閉都會把它漏出來。
+  //
+  //   mustShow 要**橫跨頁首、本文、頁尾**。只取本文一句的話，
+  //   註解忘了關而吞掉整個 head 與 header 時，本文那句還在 —— 首頁那次就是這樣漏掉的。
+  //   三個區域各釘一句，任何一段被吞掉都會少一個。
+  const ANCHORS = {
+    "index.html": {
+      mustShow: ["登入 / Sign in", "幫公立高中生看見海外升學的選項", "隱私政策 / Privacy Policy"],
+      mustHide: ["右上角的連結要從"]
+    },
+    "privacy/index.html": {
+      mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
+      mustHide: ["因為手機上會有人真的從頭讀到尾"]
+    }
+  };
+
+  const files = process.argv.slice(1);
+  let bad = [];
+  for (const f of files) {
+    if (!fs.existsSync(f)) { console.error("找不到檔案 " + f); process.exit(2); }
+    const raw = fs.readFileSync(f, "utf8");
+
+    // 第零層：註解的開頭與結尾必須一樣多。
+    //
+    // ⚠ **這一層與下面三層對付的是不同的壞法，缺一不可。**
+    //   提早關閉 → 數量仍然平衡，靠下面的錨點抓。
+    //   忘了關   → 數量不平衡，只有這一層抓得到。
+    //
+    // 2026-09-01 的教訓在這一條上繞了兩圈：先做了數量檢查、發現它抓不到提早關閉，
+    // 於是「改成不數分隔符」—— 那是矯枉過正，把一個對別的壞法有效的檢查丟掉了。
+    // 後來實測「忘了關」時三層全部漏抓才發現。
+    //
+    // 為什麼忘了關特別嚴重：HTML5 裡沒有結束標記的註解會一路吃到檔案結尾，
+    // 瀏覽器上的症狀是**整頁空白**。而純文字的抽取看不到這件事 ——
+    // 抽取用的 <[^>]+> 會從 <!-- 一路吃到下一個 >，等於把外洩的註解又藏起來，
+    // 於是三層錨點全部通過。**抽取方式本身騙過了檢查。**
+    const opens = (raw.match(/<!--/g) || []).length;
+    const closes = (raw.match(/-->/g) || []).length;
+    if (opens !== closes)
+      bad.push("  " + f + " 的註解沒有成對：<!-- 有 " + opens + " 個、--> 有 " + closes +
+               " 個。少一個結束標記，瀏覽器會把後面整份文件都吃掉。");
+
+    let t = raw.replace(/<!--[\s\S]*?-->/g, "");
+    t = t.replace(/<(script|style)[\s\S]*?<\/\1>/g, "");
+    t = t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    for (const w of WORDS) if (t.includes(w)) bad.push("  " + f + " 的可見文字裡出現「" + w + "」");
+    const a = ANCHORS[f];
+    if (!a) { console.error("ANCHORS 裡沒有 " + f + " —— 加了新的對外頁面就要在這裡補一組"); process.exit(2); }
+    for (const k of a.mustShow) if (!t.includes(k))
+      bad.push("  " + f + " 的可見文字裡**找不到**「" + k + "」（那一段被吞掉了？註解忘了關？）");
+    for (const k of a.mustHide) if (t.includes(k))
+      bad.push("  " + f + " 的可見文字裡出現了註解裡的句子「" + k + "」（註解提早關閉？）");
+
+    // 第三層：結構。註解**忘了關**的話，它會一路吞到下一個結束標記為止 ——
+    // 吞掉的可能是 <head> 與樣式，而本文還在，於是上面兩層都看不出問題
+    // （2026-09-01 實測：首頁那次就是這樣，吞噬區間剛好停在 header 裡的第二個註解，
+    //   登入按鈕活了下來）。瀏覽器上的症狀是「整頁沒有樣式、logo 不見」，
+    //   而純文字的檢查看不到樣式。所以這一層檢查的是「剝掉註解之後標籤還在不在」。
+    const stripped = raw.replace(/<!--[\s\S]*?-->/g, "");
+    for (const tag of ["<title>", "<style>", "shared/brand.css", "<img "])
+      if (!stripped.includes(tag))
+        bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
+  }
+  if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
+' index.html privacy/index.html 2>&1)
+leakCode=$?
+if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
+  bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
+  printf '%s\n' "$leakOut"
+elif [ $leakCode -eq 1 ]; then
+  bad "維護者的註解跑到頁面上看得到的地方了："
+  printf '%s\n' "$leakOut"
+  say "     多半是某個註解被提早關閉。剝掉註解之後那些字還在，就代表它們沒被關住。"
+else
+  ok "對外的兩頁沒有把內部註解露出來"
+fi
+
 # 佔位文案不可以進到已經定稿的部署範圍
 #
 # 2026-08-22 出過事，記在 docs/superpowers/specs/2026-08-22-guide-page-and-slot-order-design.md：
@@ -537,10 +647,17 @@ fi
 # 這是「必須不存在」型的守門，照本檔檔頭那段說明，這一型不受註解污染影響
 # （註解裡出現只會讓它誤報 FAIL，那個方向是安全的），所以不需要錨定完整形式。
 #
-# 範圍現在只有 passport/。根目錄的 index.html 在 2026-08-31（階段 1）是刻意的骨架，
-# 本文全部是佔位字，文案由使用者提供、還沒給。
-# **階段 7 那一頁的文案定稿之後，把 index.html 加進下面這行的範圍。**
-placeholder_scope="passport/index.html passport/src passport/activities.json"
+# 範圍在 2026-09-01 加入 index.html 與 privacy/。
+#
+# **那不是因為文案定稿了**（階段 7 還會整個重做首頁），是因為那兩頁現在是
+# Google OAuth 審查會直接打開的東西 —— 上一版首頁整頁都是待補標記，
+# 而 Google 的退件理由正是「Your home page does not explain the purpose of your app」。
+# 換句話說：這條守門的對象從「別讓幹部看到假文案」變成
+# 「別讓審查員看到我們還沒寫完」，兩者都值得守，而後者的失敗更貴。
+#
+# ⚠ 這是「必須不存在」型的守門，所以**上面這段說明裡不能寫出那個標記本身**，
+#   不然它會抓到自己而變成常紅（同一個坑在連線字串那條守門上踩過一次）。
+placeholder_scope="index.html privacy passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}
