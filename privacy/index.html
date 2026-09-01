@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隱私政策 / Privacy Policy — Beyond Taiwan</title>
+
+<!-- ⚠ **這一頁就是政策本身，沒有第二份。**
+     BT-隱私政策.md 是 2026-08-31 的原稿，留著只為了記錄原始文字與後來補了什麼。
+     **要改政策就改這個檔案。** 兩份都能編輯的話遲早會不一樣，而讀者看到的
+     永遠是這一份 —— 這個 repo 反覆踩到的病根就是「同一件事在兩個地方各做一半」。
+
+     這一頁刻意不需要登入、不載入 supabase、沒有任何 JavaScript。
+     它會被家長與學校讀，而且 Google 的 OAuth 同意畫面也要指到這裡 ——
+     那些讀者不會有帳號，也不該為了讀一份政策而執行任何程式。
+
+     版面：三個色碼與兩種字體全部來自 ../shared/brand.css，這裡不宣告任何顏色。
+     行寬壓在 34em 以內、字級 17px 起跳，因為手機上會有人真的從頭讀到尾。 -->
+
+<meta name="description" content="Beyond Taiwan 的隱私政策：我們收集什麼資料、誰看得到、你可以怎麼管理。Privacy policy for Beyond Taiwan.">
+<meta name="theme-color" content="#102A86">
+<link rel="icon" type="image/png" sizes="32x32" href="../passport/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../passport/favicon-48.png">
+<link rel="apple-touch-icon" href="../passport/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/brand.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.75 var(--body);-webkit-font-smoothing:antialiased}
+
+.wrap{max-width:34em;margin:0 auto;padding:0 20px 72px}
+
+header{padding:28px 0 8px}
+header img{height:32px;display:block}
+h1{font-family:var(--display);font-size:34px;line-height:1.15;margin:20px 0 6px}
+.meta{font-size:15px;opacity:.7;margin:0 0 4px}
+
+/* 語言切換：純錨點，沒有 JavaScript。中英文上下排，兩邊都完整。
+   用切換的話沒有 JS 就得靠 :target，而那在有人直接連到某個段落時會壞掉。 */
+nav{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 0;
+  border-top:1px solid var(--bt-orange);border-bottom:1px solid var(--bt-orange);padding:12px 0}
+nav a{color:var(--ink);text-decoration:none;font-weight:600;font-size:15px;
+  border:1px solid var(--bt-orange);border-radius:999px;padding:5px 14px}
+nav a:hover{background:var(--bt-orange)}
+nav a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+section{padding-top:8px}
+h2{font-family:var(--display);font-size:25px;line-height:1.25;margin:38px 0 10px}
+h3{font-family:var(--display);font-size:20px;margin:26px 0 8px}
+p{margin:0 0 16px}
+ul{margin:0 0 16px;padding-left:1.25em}
+li{margin:0 0 8px}
+code{font-size:.92em;background:var(--bt-orange);padding:1px 5px;border-radius:3px}
+strong{font-weight:700}
+
+/* 表格在手機上會爆版，所以包一層可橫向捲動的容器。
+   不用「窄螢幕就改成堆疊」那種寫法：這幾張表是「這個東西 → 誰看得到」的對照，
+   拆成上下兩行之後對照關係就讀不出來了。 */
+.tw{overflow-x:auto;margin:0 0 20px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:19em;font-size:16px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--bt-orange);vertical-align:top}
+th{font-weight:700;white-space:nowrap}
+
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--bt-orange);font-size:15px}
+footer a{color:var(--ink);font-weight:600}
+
+@media (max-width:420px){
+  body{font-size:16px}
+  h1{font-size:29px}
+  h2{font-size:22px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <img src="../shared/logo.png" alt="Beyond Taiwan">
+  <h1>隱私政策<br>Privacy Policy</h1>
+  <p class="meta">最後更新 / Last updated: 2026-09-01</p>
+  <nav>
+    <a href="#zh">中文</a>
+    <a href="#en">English</a>
+    <a href="../">回首頁 / Home</a>
+  </nav>
+</header>
+
+<section id="zh" lang="zh-Hant">
+<h2>關於這份政策</h2>
+<p>當你在 <code>beyondtaiwannpo.com</code> 使用我們的服務時，我們會儲存部分與你有關的資料。這份政策說明我們收集什麼、誰能存取、以及你可以如何管理這些資料。</p>
+<h2>關於我們</h2>
+<p>Beyond Taiwan 是台灣的非營利組織，致力於讓公立高中的學生看見海外升學的選項。</p>
+<p>聯絡信箱：beyondtaiwan2020@gmail.com</p>
+<h2>我們收集的資料</h2>
+<h3>帳號資料</h3>
+<div class="tw"><table><thead><tr><th>資料</th><th>用途</th></tr></thead><tbody><tr><td>Email</td><td>登入識別與必要的聯絡</td></tr><tr><td>密碼</td><td>經加密後儲存，我們無法讀取原文</td></tr></tbody></table></div>
+<p>若你選擇以 Google 登入，我們會取得你的 email 與姓名。我們不會取得你的 Google 密碼，也不會存取你的信件、雲端硬碟或任何其他 Google 服務。</p>
+<h3>使用服務時產生的資料</h3>
+<div class="tw"><table><thead><tr><th>資料</th><th>內容</th></tr></thead><tbody><tr><td>個人資料</td><td>中英文姓名、所屬團隊、大頭照、時區</td></tr><tr><td>護照資料</td><td>個人標語、核發日期</td></tr><tr><td>蓋章紀錄</td><td>完成的活動項目與日期</td></tr><tr><td>心得</td><td>你在各項目中寫下的文字</td></tr><tr><td>照片</td><td>你為各項目上傳的影像</td></tr><tr><td>入境章</td><td>完成當月所獲得的城市</td></tr></tbody></table></div>
+<h2>資料的可見範圍</h2>
+<div class="tw"><table><thead><tr><th>資料</th><th>可見對象</th></tr></thead><tbody><tr><td>姓名、團隊、大頭照</td><td>其他 BT 幹部（顯示於進度牆）</td></tr><tr><td>蓋章紀錄與日期</td><td>其他 BT 幹部</td></tr><tr><td><strong>心得</strong></td><td><strong>僅限本人</strong></td></tr><tr><td><strong>照片</strong></td><td><strong>僅限本人</strong></td></tr><tr><td>Email 與密碼</td><td>不對任何使用者開放</td></tr></tbody></table></div>
+<p>心得與照片的隔離是在資料庫層級實作的權限規則，而非僅在介面上隱藏。其他使用者即使直接對系統發出請求，也無法取得這些內容。</p>
+<h3>管理者的存取範圍</h3>
+<p>管理者透過資料庫後台，技術上能夠存取所有資料，包含心得與照片。任何需要維護資料庫的組織都無法在技術上排除這一點，因此我們以明確的內部規範限制它：</p>
+<ul><li>不會為了任何非必要的理由讀取使用者的心得或照片</li><li>收到與隱私有關的疑慮回報時，不會以「查證」為由讀取相關內容</li><li>僅在使用者本人請求協助時（例如要求匯出或刪除資料）存取其資料</li></ul>
+<p>我們選擇明確說明這項限制，而非以概括的措辭迴避它。</p>
+<h2>你的瀏覽器裡存了什麼</h2>
+<p>登入後，我們會在你的瀏覽器存一筆登入憑證，用途只是讓你不必每次重新整理都重新登入。登出即清除。</p>
+<p>我們不使用 cookie，也不追蹤你在其他網站的行為。</p>
+<h2>資料儲存位置與經手的第三方</h2>
+<div class="tw"><table><thead><tr><th>第三方</th><th>角色</th></tr></thead><tbody><tr><td>Supabase</td><td>資料庫，伺服器位於新加坡</td></tr><tr><td>GitHub Pages</td><td>網站託管；會產生我們無法存取的伺服器紀錄</td></tr><tr><td>Google Fonts</td><td>提供本站使用的字體</td></tr><tr><td>Google</td><td>僅在你選擇以 Google 登入時</td></tr></tbody></table></div>
+<p>本網站使用 Google Fonts 載入字體，因此你的瀏覽器會向 Google 發出請求，Google 會取得你的 IP 位址與瀏覽器資訊。這不涉及任何追蹤或分析，但它是資料離開本站到第三方，所以在此說明。</p>
+<p>我們未將任何使用者資料提供給廣告服務、資料仲介或其他第三方組織。</p>
+<p>本網站不使用任何追蹤或廣告工具，包含 Google Analytics、Facebook Pixel 及行為追蹤 cookie。</p>
+<h2>未成年使用者</h2>
+<p>BT 的成員包含未滿 18 歲者。我們採取以下措施：</p>
+<ul><li>不公開任何使用者的個人聯絡方式，email 不會出現在其他使用者可見的任何位置</li><li>不安排未經團隊記錄的一對一私下聯繫</li><li>大頭照將顯示於進度牆供其他幹部查看，此事會在上傳當下再次提示</li><li>使用者可隨時移除自己的大頭照</li></ul>
+<p>未滿 18 歲使用者的家長或監護人如需了解我們所儲存的資料，可來信洽詢。</p>
+<h2>你的權利</h2>
+<p><strong>查看與更正</strong>：登入後可於護照中檢視全部資料，姓名、團隊與大頭照均可自行修改。</p>
+<p><strong>匯出</strong>：護照資料頁提供「匯出備份」，可下載包含你全部資料的檔案。</p>
+<p><strong>刪除部分資料</strong>：「清除這本護照」將永久刪除你的蓋章紀錄、心得與照片。此操作無法復原。</p>
+<p><strong>刪除帳號</strong>：來信至 beyondtaiwan2020@gmail.com，我們將刪除你的帳號與所有相關資料。</p>
+<p>所有刪除操作皆為永久刪除，而非隱藏或停用，且無法復原。建議於刪除前先行匯出備份。</p>
+<h2>我們不做的事</h2>
+<ul><li>不販售、出租或交換使用者資料</li><li>不將使用者資料用於廣告投放</li><li>未經同意不將使用者的姓名、照片或文字內容用於對外宣傳</li><li>不追蹤使用者在其他網站的行為</li></ul>
+<h2>資料保存期間</h2>
+<p>帳號存續期間，資料將持續保存。收到刪除請求時，我們將執行刪除。</p>
+<h2>政策變更</h2>
+<p>若我們變更資料的收集或使用方式，將更新本頁日期並於網站公告。涉及新增資料類型或改變可見範圍等重大變更，將另行以 email 通知使用者。</p>
+<h2>聯絡我們</h2>
+<p>beyondtaiwan2020@gmail.com</p>
+</section>
+
+<section id="en" lang="en">
+<h2 style="margin-top:52px">English</h2>
+<h2>About this policy</h2>
+<p>When you use our services at <code>beyondtaiwannpo.com</code>, we store certain information about you. This policy explains what we collect, who can access it, and how you can manage it.</p>
+<h2>About us</h2>
+<p>Beyond Taiwan is a non-profit organisation in Taiwan working to help students at public high schools see their options for studying abroad.</p>
+<p>Contact: beyondtaiwan2020@gmail.com</p>
+<h2>What we collect</h2>
+<h3>Account information</h3>
+<div class="tw"><table><thead><tr><th>Data</th><th>Purpose</th></tr></thead><tbody><tr><td>Email address</td><td>Login identification and necessary correspondence</td></tr><tr><td>Password</td><td>Stored encrypted; we cannot read it</td></tr></tbody></table></div>
+<p>If you sign in with Google, we receive your email address and name. We do not receive your Google password, and we do not access your mail, Drive, or any other Google service.</p>
+<h3>Information created through use of the service</h3>
+<div class="tw"><table><thead><tr><th>Data</th><th>Content</th></tr></thead><tbody><tr><td>Profile</td><td>Name in Chinese and English, team, profile photo, time zone</td></tr><tr><td>Passport details</td><td>Personal line, date of issue</td></tr><tr><td>Stamps</td><td>Which activities you completed and on what date</td></tr><tr><td>Entries</td><td>Text you write for each activity</td></tr><tr><td>Photos</td><td>Images you upload for each activity</td></tr><tr><td>Entry stamps</td><td>The city awarded for each completed month</td></tr></tbody></table></div>
+<h2>Who can see what</h2>
+<div class="tw"><table><thead><tr><th>Data</th><th>Visible to</th></tr></thead><tbody><tr><td>Name, team, profile photo</td><td>Other BT cadres, shown on the progress wall</td></tr><tr><td>Stamps and dates</td><td>Other BT cadres</td></tr><tr><td><strong>Entries</strong></td><td><strong>You only</strong></td></tr><tr><td><strong>Photos</strong></td><td><strong>You only</strong></td></tr><tr><td>Email and password</td><td>No other user</td></tr></tbody></table></div>
+<p>The isolation of entries and photos is enforced by database-level access rules, not by hiding them in the interface. Other users cannot retrieve this content even by querying the system directly.</p>
+<h3>Administrator access</h3>
+<p>Administrators can technically access all data, including entries and photos, through the database console. No organisation that maintains a database can eliminate this technically, so we constrain it by explicit internal rule:</p>
+<ul><li>We do not read anyone's entries or photos without a necessary reason</li><li>When a privacy concern is reported, we do not read the content in question in order to verify it</li><li>We access a user's data only when that user asks us for help, such as with an export or deletion request</li></ul>
+<p>We state this limitation explicitly rather than obscuring it with broader language.</p>
+<h2>What is stored in your browser</h2>
+<p>After you sign in, we store one login credential in your browser. Its only purpose is so that you do not have to sign in again every time the page reloads. It is cleared when you sign out.</p>
+<p>We do not use cookies, and we do not track your activity on other websites.</p>
+<h2>Where data is stored, and the third parties involved</h2>
+<div class="tw"><table><thead><tr><th>Third party</th><th>Role</th></tr></thead><tbody><tr><td>Supabase</td><td>Database; servers located in Singapore</td></tr><tr><td>GitHub Pages</td><td>Site hosting; produces server logs that we cannot access</td></tr><tr><td>Google Fonts</td><td>Serves the typefaces this site uses</td></tr><tr><td>Google</td><td>Only if you choose to sign in with Google</td></tr></tbody></table></div>
+<p>This site loads its typefaces from Google Fonts, so your browser makes a request to Google, and Google receives your IP address and browser information. This involves no tracking or analytics, but it is data leaving this site to a third party, so we state it here.</p>
+<p>We do not provide user data to advertising services, data brokers, or any other third-party organisation.</p>
+<p>This site uses no tracking or advertising tools, including Google Analytics, Facebook Pixel, and behavioural tracking cookies.</p>
+<h2>Users under 18</h2>
+<p>Some BT members are under 18. We apply the following measures:</p>
+<ul><li>No user's personal contact details are made public; email addresses do not appear anywhere visible to other users</li><li>We do not arrange one-to-one private contact that is not recorded by the team</li><li>Profile photos are shown to other cadres on the progress wall; this is stated again at the moment of upload</li><li>Users may remove their profile photo at any time</li></ul>
+<p>Parents or guardians of users under 18 may contact us to learn what data we hold.</p>
+<h2>Your rights</h2>
+<p><strong>Access and correction.</strong> All your data is visible in your passport once you sign in. Name, team, and profile photo can be changed by you at any time.</p>
+<p><strong>Export.</strong> The passport's details page provides an export function that downloads a file containing all of your data.</p>
+<p><strong>Deleting part of your data.</strong> The reset function permanently deletes your stamps, entries, and photos. This cannot be undone.</p>
+<p><strong>Deleting your account.</strong> Write to beyondtaiwan2020@gmail.com and we will delete your account and all associated data.</p>
+<p>All deletions are permanent rather than hidden or deactivated, and cannot be reversed. We recommend exporting a backup first.</p>
+<h2>What we do not do</h2>
+<ul><li>We do not sell, rent, or trade user data</li><li>We do not use user data for advertising</li><li>We do not use anyone's name, photo, or written content in external communications without consent</li><li>We do not track users across other websites</li></ul>
+<h2>Retention</h2>
+<p>Data is retained for as long as your account exists. We delete it when you ask us to.</p>
+<h2>Changes to this policy</h2>
+<p>If we change how we collect or use data, we will update the date on this page and post a notice on the site. For significant changes, such as collecting a new category of data or changing who can see what, we will notify users by email.</p>
+<h2>Contact</h2>
+<p>beyondtaiwan2020@gmail.com</p>
+</section>
+
+<footer>
+  <p><a href="../">← 回 Beyond Taiwan 首頁 / Back to home</a></p>
+  <p>beyondtaiwan2020@gmail.com</p>
+</footer>
+
+</div>
+</body>
+</html>
