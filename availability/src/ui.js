@@ -83,6 +83,15 @@ export function tzSetupHTML(guess, q, results, msg) {
 // counts: Map("dayIndex:minute" → [memberId]）；viewerTz 只用來顯示欄位標題。
 export function boardHTML(S, counts, dates) {
   const total = S.members.filter(m => m.tz).length;
+  // ⚠ **空的看板要說話。** 一片空白同時可能是三件事：沒有人填、沒有人設時區、
+  // 或者大家真的都沒空。三者長得一模一樣，而使用者只會得到「壞了」這個結論。
+  // 2026-09-02 咬過一次類似的：格子其實畫出來了，只是在畫面外。
+  const filled = S.members.filter(m => (S.slots.get(m.id) || new Set()).size > 0).length;
+  const notice = counts.size === 0 ? `<div class="wnote big">這一週的看板是空的。<br>${
+      total === 0 ? "還沒有人設定時區，所以誰的時間都畫不出來。"
+    : filled === 0 ? "還沒有人填過自己的每週時間。到「我的時間」填一次，其他人就看得到了。"
+    : "有人填過，但這一週沒有任何一格對得上——如果剛改過時區，先確認那邊是對的。"
+    }</div>` : "";
   const rows = [];
   for (let min = 0; min < 1440; min += 30) {
     const cells = COL_ORDER.map((_, col) => {
@@ -93,11 +102,12 @@ export function boardHTML(S, counts, dates) {
     }).join("");
     rows.push(`<tr><th class="hr">${min % 60 === 0 ? esc(hhmm(min)) : ""}</th>${cells}</tr>`);
   }
-  return `<div class="gridwrap"><table class="grid">
+  return `${notice}<div class="gridwrap"><table class="grid">
     <thead><tr><th></th>${COL_ORDER.map((wd, i) =>
       `<th>${DAY_ZH[wd]}<span>${esc(dates[i] || "")}</span></th>`).join("")}</tr></thead>
     <tbody>${rows.join("")}</tbody></table></div>
     <div class="wnote" style="margin-top:14px">格子裡的數字是有空的人數，點一格看是誰。
+      一天完整 24 小時都在，往上下捲得到。
       欄位是<b>你自己的</b>星期與時間 —— 別人的時段已經換算過來了，
       所以台北的週一早上會出現在美東的週日晚上。</div>`;
 }

@@ -5,6 +5,7 @@ import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays } from "./edit.js";
+import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
 import { startOfWeek, slotInstants, cellOf, detectTz, partsIn, addDays, toInstant } from "./tz.js";
 
 const root = () => document.getElementById("bt-root");
@@ -17,31 +18,10 @@ let S = {
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
-  peek: null, msg: "", busy: false
+  peek: null, msg: "", busy: false, boardTop: null
 };
 
 // ── 換算：把所有人的時段落到觀看者的格子上 ──────────────────────────
-function boardCounts() {
-  const counts = new Map();
-  for (const m of S.members) {
-    if (!m.tz) continue;                       // 沒設時區的人畫不出來（成員清單會列他）
-    for (const k of (S.slots.get(m.id) || [])) {
-      const [wd, min] = k.split(":").map(Number);
-      for (const inst of slotInstants(S.weekStart, wd, min, m.tz)) {
-        const c = cellOf(inst, S.weekStart, S.myTz);
-        if (!c) continue;
-        // **週起點就是星期一**（setWeek 傳 firstWeekday = 1），而畫面欄位也是
-        // 星期一到星期日，所以 dayIndex 直接就是欄號，中間沒有轉換。
-        // 第一版讓週起點停在星期日、欄位卻從星期一排，那個錯開需要一段對映程式碼，
-        // 而我在那段裡寫出了一個算成兩倍的式子。**讓那段對映不存在比寫對它更好。**
-        const key = c.dayIndex + ":" + c.minute;
-        if (!counts.has(key)) counts.set(key, []);
-        if (!counts.get(key).includes(m.id)) counts.get(key).push(m.id);
-      }
-    }
-  }
-  return counts;
-}
 
 function weekDates() {
   const p = partsIn(S.weekStart, S.myTz);
@@ -67,11 +47,24 @@ function render() {
   if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
 
   let inner, label = null;
-  if (S.tab === "board") { inner = UI.boardHTML(S, boardCounts(), weekDates()); label = weekLabel(); }
+  if (S.tab === "board") {
+    const counts = calcCounts(S.members, S.slots, S.weekStart, S.myTz);
+    S.boardTop = firstBusyMinute(counts);
+    inner = UI.boardHTML(S, counts, weekDates());
+    label = weekLabel();
+  }
   else if (S.tab === "mine") inner = UI.mineHTML(S);
   else inner = UI.membersHTML(S, Date.now());
   el.innerHTML = UI.shellHTML(S.tab, inner, label);
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
+  // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
+  // 也就是容器頂端往下 600 多 px，而容器一次只看得到二十幾列。
+  // **格子其實畫出來了，使用者卻看到一片空的凌晨然後以為壞了**（2026-09-02 實際發生）。
+  // 所以開起來就捲到第一個有人有空的時刻。整天 24 小時仍然都在，只是不從凌晨開始看。
+  if (S.tab === "board" && S.boardTop != null) {
+    const g = el.querySelector(".gridwrap");
+    if (g) g.scrollTop = Math.max(0, (S.boardTop / 30) * 16 - 32);
+  }
 }
 
 // ── 啟動 ────────────────────────────────────────────────────────────
@@ -237,7 +230,7 @@ document.addEventListener("click", async e => {
 
   if (act === "peek") {
     const col = +b.dataset.c, min = +b.dataset.m;
-    const free = boardCounts().get(col + ":" + min) || [];
+    const free = calcCounts(S.members, S.slots, S.weekStart, S.myTz).get(col + ":" + min) || [];
     S.peek = UI.peekHTML(S, free, "星期" + UI.DAY_ZH[UI.COL_ORDER[col]], min, localTimesFor(col, min));
     render(); return;
   }
