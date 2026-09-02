@@ -9,7 +9,7 @@ import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 
 let S = {
-  user: null, authMode: "in", authMsg: "",
+  user: null, authMode: "in", authMsg: "", authEmail: "",
   profile: null, stamps: {}, entries: {},
   activities: [], months: [], destinations: [], visas: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
@@ -56,7 +56,7 @@ function render() {
   // 這一條要排在所有其他分支前面：連不上資料庫的時候，S.user / S.profile 全是空的，
   // 少了它畫面會掉回登入頁，等於對一個明明登入著的人說「請登入」（spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg); return; }
+  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail); return; }
   // 登入了但還不是幹部（階段 5，規格 §3-5）。**這一條必須排在申請護照那一條前面。**
   // 學員沒有 passports 那一列，所以 S.profile 是 null —— 少了這一條，他會被丟到
   // 「填護照資料」頁，然後存不進去（passports 沒有 insert policy），
@@ -283,6 +283,29 @@ document.addEventListener("click", async e => {
       S.authMsg = e.message;
       render();
     }
+    return;
+  }
+
+  // 忘記密碼：要一封重設連結。
+  if (act === "do-forgot") {
+    const email = document.getElementById("fpe").value.trim();
+    if (!email) { S.authMsg = DATA.authMessage(null); render(); return; }
+    // 重設頁的網址用相對路徑算出來，不要寫死 https://beyondtaiwannpo.com/reset/ ——
+    // 寫死的話本機就測不了（本機按下去會收到一封叫你去線上那一頁的信，
+    // 而本機發出的 recovery token 在那邊沒有用）。從 /passport/ 往上一層就是 /reset/。
+    const redirectTo = new URL("../reset/", location.href).href;
+    try {
+      await DATA.sendPasswordReset(email, redirectTo);
+    } catch (e) {
+      // 真的連不上（斷網、設定沒填）才報錯 —— 那種時候說「信寄出去了」是騙人的。
+      S.authMsg = e.message; render(); return;
+    }
+    // ⚠ 這裡**不分辨**「這個 email 有沒有帳號」，因為分辨不了、也不該分辨：
+    // Supabase 對兩種情況都回成功。理由寫在 ui.js 的 sent 那一段。
+    S.authEmail = email;
+    S.authMsg = "";
+    S.authMode = "sent";
+    render();
     return;
   }
 
@@ -532,7 +555,7 @@ document.addEventListener("click", async e => {
     // 參考資料不列、護照內容才列——對 destinations、visas 依然成立，
     // 不因為某張參考資料表沒被讀就不用守。
     Object.assign(S, {
-      authMode: "in", authMsg: "",
+      authMode: "in", authMsg: "", authEmail: "",
       profile: null, stamps: {}, entries: {}, visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
       down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null

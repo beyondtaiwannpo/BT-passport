@@ -33,8 +33,17 @@ const AUTH_OFFLINE = { __isAuthError: true, name: "AuthRetryableFetchError", sta
 const PGRST_OFFLINE = { message: "TypeError: fetch failed", details: "…ENOTFOUND…", hint: "", code: "" };
 
 // ── 實測形狀 4：註冊 trigger 丟的（GoTrue 包成 500）──
-const SIGNUP_INVITE = { name: "AuthApiError", status: 500, code: null,
-                        message: "Database error saving new user" };
+// 伺服器 5xx。**這個常數 2026-09-01 改名了**：本來叫 SIGNUP_INVITE，
+// 因為當時唯一會回 500 的路就是註冊 trigger 檢查邀請碼失敗。
+// 階段 5-7 把門搬去 claim_invite 之後 trigger 不再檢查邀請碼，這個形狀就
+// 只剩下「伺服器真的出事」一種意思了。名字留著舊意思的話，下一個人會照名字
+// 去理解它在測什麼，然後守錯東西。
+const SERVER_5XX = { name: "AuthApiError", status: 500, code: null,
+                     message: "Database error saving new user" };
+
+// GoTrue 的寄信限流（照文件寫的形狀，還沒實測 —— 走一次忘記密碼連按兩下會撞到）。
+const RATE_LIMITED = { name: "AuthApiError", status: 429, code: "over_email_send_rate_limit",
+                       message: "For security purposes, you can only request this after 51 seconds." };
 
 test("★ 打錯邀請碼要說「邀請碼不對」，不能說「連不上資料庫」", () => {
   const msg = quiet(() => authMessage(RPC_INVALID_INVITE));
@@ -51,8 +60,32 @@ test("真正的網路失敗仍然要說「連不上」（postgrest 那條路）"
   assert.match(authMessage(PGRST_OFFLINE), /連不上/);
 });
 
-test("註冊時邀請碼錯（500 那條路）維持原本的判法", () => {
-  assert.match(quiet(() => authMessage(SIGNUP_INVITE)), /邀請碼/);
+// ★ 這一條 2026-09-01 整個翻面了，翻面本身就是重點。
+// 舊版叫「註冊時邀請碼錯（500 那條路）維持原本的判法」，斷言 500 要說「邀請碼」。
+// 那在 5-7 之前是對的。門搬到 claim_invite、trigger 不再檢查邀請碼之後，
+// 500 就再也不代表邀請碼有問題了 —— 而那句話會蓋住每一個真正的伺服器故障，
+// 還會出現在**根本沒有邀請碼欄位**的忘記密碼頁上，叫人去跟組長要一組新的碼。
+// 舊測試不是寫錯，是它的前提被刪掉了；前提沒了就要改寫，不是刪掉（README 第 11 項）。
+test("伺服器 5xx 不准再說是邀請碼的問題", () => {
+  const msg = quiet(() => authMessage(SERVER_5XX));
+  assert.doesNotMatch(msg, /邀請碼/,
+    "5xx 又被說成邀請碼問題了 —— trigger 早就不檢查邀請碼，這句話沒有任何情況是對的");
+  assert.match(msg, /伺服器/, "沒有誠實說是伺服器出狀況");
+});
+
+// 限流的意思正是「現在再試一定失敗」。給「再試一次」等於叫他去撞牆，
+// 而且他會以為是自己打錯了什麼。
+test("寄信被限流要叫人等，不要叫人再試一次", () => {
+  const msg = quiet(() => authMessage(RATE_LIMITED));
+  assert.match(msg, /等/, "沒有叫他等 —— 限流的當下再按一次一定又失敗");
+  assert.doesNotMatch(msg, /^出了點狀況，再試一次/, "掉到通用的「再試一次」了");
+});
+
+// 忘記密碼的入口做出來之後，這句話不該再把人推去寫信。
+test("密碼錯的那句指向自助重設，不是叫人寫信", () => {
+  const msg = authMessage({ name: "AuthApiError", status: 400,
+                            code: "invalid_credentials", message: "Invalid login credentials" });
+  assert.match(msg, /重設連結/, "沒有指向自助那條路");
 });
 
 // 兩種完全不同的錯誤不可以給同一句話。

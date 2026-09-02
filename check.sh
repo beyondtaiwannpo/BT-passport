@@ -408,6 +408,20 @@ else
   bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
 fi
 
+# ui.js 裡不准有重複的 id。
+# 2026-09-01：忘記密碼那格本來也叫 id="fe"，跟設定頁的「英文名」撞名。
+# 那兩頁互斥、永遠不會同時出現在 DOM 裡，所以**當下沒有壞** ——
+# 這種 bug 的代價全部在未來：有人把 getElementById("fe") 複製到別的地方、
+# 或有人讓兩頁同時出現，就會安靜地讀到另一格的值。
+# 真的咬到人的是反向驗證：破壞 id="fe" 的時候，改動落在兩處，
+# 於是「哪一條測試該變紅」變得說不清楚。重複的 id 會讓驗證本身失去解析度。
+DUP_IDS=$(grep -o 'id="[a-zA-Z0-9_-]*"' passport/src/ui.js | sort | uniq -d)
+if [ -z "$DUP_IDS" ]; then
+  ok "ui.js 裡沒有重複的 id"
+else
+  bad "ui.js 有重複的 id：$(echo "$DUP_IDS" | tr '\n' ' ')"
+fi
+
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
 # 在一支檢查腳本裡長得一模一樣，那正是最容易騙過自己的地方。
 #

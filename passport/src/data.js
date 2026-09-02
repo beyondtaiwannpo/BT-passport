@@ -19,7 +19,7 @@ import { currentUser } from "../../shared/auth.js";
 
 export { supabase };
 export { authMessage, configMessage, signUp, signIn, signOut, signInWithGoogle,
-         claimInvite, isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
+         claimInvite, sendPasswordReset, isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
 
 /* ---------- 護照內容 ---------- */
 

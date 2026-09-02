@@ -650,8 +650,44 @@ export function wallHTML(S) {
 // 只用既有的 .card / label / .btn / .wnote，不新增任何樣式（spec §3.4）。
 // 忘記密碼只有登入頁底部那一行提示：不做自助重設、不做重設畫面、
 // 不呼叫 resetPasswordForEmail（spec §6.3）。
-export function authHTML(mode, msg) {
+// mode：in（登入）／up（註冊）／forgot（要重設連結）／sent（寄出去了）
+// email 只有 sent 用得到，用來把使用者剛才打的字回顯 —— 打錯字的人才看得出來。
+export function authHTML(mode, msg, email) {
   const up = mode === "up";
+
+  // ── 忘記密碼：輸入 email ──
+  if (mode === "forgot") return `<div class="card">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>忘記密碼</h2>
+    <div class="sub">輸入你註冊時用的 email，我們寄一封重設連結給你。</div>
+    ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
+    <label><i>Email</i><input id="fpe" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
+    <div class="row">
+      <button class="btn" data-act="do-forgot">寄出重設連結</button>
+      <button class="btn ghost" data-act="switch-auth" data-m="in">回登入</button>
+    </div>
+    <div class="wnote" style="margin:16px 0 0"><b>用 Google 登入的話不需要密碼</b>，回登入頁直接按那顆 Google 按鈕就好。這一頁只對「用 email + 密碼註冊」的人有用。</div>
+    <div class="wnote" style="margin:12px 0 0">連 email 也想不起來？寄信到 beyondtaiwan2020@gmail.com，我們幫你找。</div>
+  </div>`;
+
+  // ── 寄出之後 ──
+  // ⚠ **這裡的文案不可以寫「已寄出」。**
+  // Supabase 對「存在的信箱」與「不存在的信箱」回一模一樣的成功，那是刻意的：
+  // 不然任何人都能拿這個表單一次一個 email 問「這個人是不是 BT 幹部」，
+  // 而幹部名單本身就是我們不該外流的東西。
+  // 前端的文案要跟那個事實一致 —— 寫「如果這個信箱有帳號」，不要寫「已寄出」。
+  // test/ui-pages.test.mjs 有一條在守這件事。
+  if (mode === "sent") return `<div class="card">
+    <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
+    <h2>信寄出去了</h2>
+    <div class="sub">如果 <b>${esc(email || "那個信箱")}</b> 有帳號，我們寄了一封重設連結給它。</div>
+    <div class="wnote" style="margin:0 0 16px">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
+    <div class="row">
+      <button class="btn ghost" data-act="switch-auth" data-m="in">回登入</button>
+    </div>
+    <div class="wnote" style="margin:16px 0 0">試了幾次都收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
+  </div>`;
+
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
@@ -699,7 +735,11 @@ export function authHTML(mode, msg) {
       <button class="btn ghost" data-act="do-google">用 Google 登入 / Continue with Google</button>
     </div>
     <div class="wnote" style="margin:12px 0 0">用 Google 進來的話不需要密碼。<b>還是需要邀請碼</b>——登入之後再輸入。</div>
-    ${up ? "" : `<div class="wnote" style="margin:16px 0 0">忘記密碼？寄信到 beyondtaiwan2020@gmail.com，我們會幫你重設。你的資料都還在。</div>`}
+    <!-- 2026-09-01：寄信接好之後，忘記密碼改成自助為主、組織信箱為輔。
+         **組織信箱那條不要刪** —— 自助那條路需要「還記得自己用哪個 email」，
+         而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。
+         一條自助路徑蓋不住所有情況，留著人工那條的成本只是一行字。 -->
+    ${up ? "" : `<div class="wnote" style="margin:16px 0 0">忘記密碼？<button class="btn sm quiet" data-act="switch-auth" data-m="forgot">寄一封重設連結給我</button><br>連 email 也想不起來的話，寄信到 beyondtaiwan2020@gmail.com。</div>`}
   </div>`;
 }
 

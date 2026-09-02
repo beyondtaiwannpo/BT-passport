@@ -25,7 +25,22 @@ const MSG = {
   badEmail: "這個 email 看起來不太對，檢查一下有沒有打錯。",
   shortPw:  "密碼至少要 6 個字。",
   offline:  "現在連不上資料庫。請寄信到 beyondtaiwan2020@gmail.com，資料都還在。",
-  badLogin: "email 或密碼不對。忘記密碼的話寄信到 beyondtaiwan2020@gmail.com。",
+  // 2026-09-01：後半句從「寄信到組織信箱」改成指向自助那顆鍵。
+  // 自助入口做好之後，叫人寫信給我們等於把一件他三十秒能自己做完的事
+  // 變成一封信加上一次人工重設。組織信箱那條路沒有消失，它在忘記密碼頁上。
+  badLogin: "email 或密碼不對。忘記密碼的話，按下面的「寄一封重設連結給我」。",
+  // 寄信被限流（2026-09-01 加，忘記密碼那條路上）。
+  // **不可以用 other 那句「再試一次」頂著。** 限流的意思正是「現在再試一次一定失敗」，
+  // 叫他馬上再按等於叫他去撞牆，而且他會以為是自己哪裡打錯了。
+  // 這一句要講的是「等」跟「信可能已經在路上」。
+  tooMany:  "剛剛已經寄過一封了，等一分鐘再按一次。信可能還在路上，先看一下垃圾郵件匣。",
+  // 伺服器出狀況。**2026-09-01 之前這一句是「這個邀請碼不對」。**
+  // 那時候唯一會回 500 的路是註冊 trigger 檢查邀請碼失敗，所以那樣講是對的。
+  // 階段 5-7 把門搬去 claim_invite 之後，trigger 裡已經沒有邀請碼檢查了
+  // （實測 pg_proc.prosrc：只剩 insert into profiles），
+  // **於是那句話變成在任何情況下都是錯的** —— 而且它會出現在根本沒有邀請碼欄位的
+  // 忘記密碼頁上，叫使用者去跟組長要一組新的碼。前提沒了，話要跟著改（README 第 11 項）。
+  serverError: "伺服器出了狀況，等一下再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。",
   other:    "出了點狀況，再試一次。還是不行的話寄信到 beyondtaiwan2020@gmail.com。"
 };
 
@@ -150,6 +165,16 @@ const RULES = [
   { key: "badLogin", when: (e, m, s, c) => c.includes("invalid_credentials")
       || m.includes("invalid login credentials") },
 
+  // 寄信限流。GoTrue 對「同一個 email 短時間內重複要重設信」回
+  //   status 429 / code "over_email_send_rate_limit"
+  //   message "For security purposes, you can only request this after 51 seconds."
+  // （形狀照 GoTrue 文件寫的，**還沒實測** —— 走過一次忘記密碼流程、連按兩下
+  //   就會撞到，那時候把 console 裡的原始錯誤記下來回頭校對這一條。）
+  // 位置：一定要排在最後那條 serverError 前面。429 不是 5xx，所以其實吃不到，
+  // 但下一個人把 serverError 放寬成 s >= 400 的話順序就會開始有意義。
+  { key: "tooMany", when: (e, m, s, c) => s === 429 || c.includes("rate_limit")
+      || m.includes("only request this after") },
+
   // 邀請碼：trigger raise 之後 GoTrue 回通用 500「Database error saving new user」。
   // **兩種邀請碼問題都已實測，而且回的東西逐字相同（2026-08-17）**：
   //   第一輪情境 1，無效的碼 "WRONG-CODE" →
@@ -168,10 +193,19 @@ const RULES = [
   // 這條最寬，會吃掉所有排在它後面的東西，所以一定要留在最後。
   // （資料庫層的旁證仍然成立：supabase/rls-test.sql 第 65 條，spec §11-5，
   //   trigger 對兩者丟同一個 P0001。現在它是佐證，不再是唯一的依據。）
-  // 註冊 trigger 那條路：GoTrue 把 trigger 丟的 P0001 包成 500。
-  // 跟最上面那條 invalid_invite 共用同一句文案 —— 對使用者來說
-  // 「碼不對或用完了」是同一件事，不管它發生在註冊還是升級。
-  { key: "invite", when: (e, m, s) => s >= 500 || m.includes("database error") }
+  // ⚠ **2026-09-01：這條規則換了意思，不要照舊註解讀它。**
+  // 它原本是 `{ key: "invite" }`，因為當時唯一會回 500 的路就是註冊 trigger
+  // 檢查邀請碼失敗。階段 5-7 把門搬到 claim_invite 之後，那個前提消失了：
+  // 現在 trigger 裡只剩 `insert into profiles`，不可能因為邀請碼而 raise。
+  // 也就是說「邀請碼不對」那句從那一刻起就**沒有任何情況是對的**，而它照樣
+  // 會蓋住每一個真正的伺服器故障，還會出現在沒有邀請碼欄位的忘記密碼頁上。
+  // 上面那幾段講「兩種邀請碼問題實測逐字相同」的註解記錄的是 5-7 之前的世界，
+  // 留著是因為那是真的量到的東西（README 第 11 項：歷史不改寫），
+  // **但它們已經不再是這條規則的理由**。
+  //
+  // 邀請碼現在唯一的錯誤路徑是最上面那條 invalid_invite（400 / P0001）。
+  // 這條剩下的工作是誠實地說「伺服器出狀況」——最寬，所以留在最後。
+  { key: "serverError", when: (e, m, s) => s >= 500 || m.includes("database error") }
 ];
 
 // 絕對不能把原始錯誤丟給高中生看（spec §6.1）。一律翻譯。
@@ -206,17 +240,13 @@ export function authMessage(err) {
       "直接用 code = '...' 會查不到而誤判。\n" +
       "原始錯誤：",
       { name: err.name, status: err.status, code: err.code, message: err.message });
-  } else if (hit && hit.key === "invite") {
+  } else if (hit && hit.key === "serverError") {
     console.error(
-      "註冊失敗，被歸到「邀請碼不對或已用完」那一句。\n" +
-      "這一句同時涵蓋「伺服器出狀況」—— 兩者在前端完全分不出來，所以要自己查是哪一種：\n" +
-      "  1. SQL Editor：select code, uses_left from invite_codes\n" +
-      "       where upper(btrim(code)) = upper(btrim('學生實際輸入的碼'));\n" +
-      "     比對不分大小寫、也不分前後空白（trigger 兩邊都套 upper(btrim(...))），\n" +
-      "     所以這裡也要照同樣的寫法查，直接用 code = '...' 會查不到而誤判。\n" +
-      "  2. 查不到那一列，或 uses_left = 0 → 真的是邀請碼的問題。\n" +
-      "  3. 查得到而且 uses_left > 0 → 不是邀請碼，去看 Supabase 後台的 Logs，\n" +
-      "     多半是資料庫或註冊 trigger 出事。\n" +
+      "伺服器回了 5xx。**這裡不再是邀請碼的問題**（2026-09-01 起）：\n" +
+      "註冊 trigger 已經不檢查邀請碼了，它只做 insert into profiles，\n" +
+      "所以走到這裡代表資料庫或 GoTrue 真的出了狀況。\n" +
+      "去看 Supabase 後台的 Logs（Auth 與 Postgres 兩邊都看），\n" +
+      "不要再去查 invite_codes —— 那條線索在這條路上已經不存在。\n" +
       "原始錯誤：",
       { name: err.name, status: err.status, code: err.code, message: err.message });
   }

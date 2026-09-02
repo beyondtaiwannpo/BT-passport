@@ -268,3 +268,69 @@ test("登入頁同時有 Google 與 email 密碼兩條路", () => {
               `${mode} 模式少了 email 或密碼欄位 —— 備援那條路不准拿掉`);
   }
 });
+
+// ── 忘記密碼（2026-09-01）─────────────────────────────────────────────
+// 自助那條路需要「還記得自己用哪個 email」。換過信箱、當初用學校信箱註冊、
+// 或根本想不起來的人，沒有第二條路就出不去，所以組織信箱那條要一起活著。
+test("登入頁的忘記密碼有自助與組織信箱兩條路", () => {
+  const h = authHTML("in", "");
+  assert.ok(h.includes('data-m="forgot"'), "登入頁沒有自助重設的入口");
+  assert.ok(h.includes("beyondtaiwan2020@gmail.com"),
+            "組織信箱那條路不見了 —— 連 email 都想不起來的人就沒有出口了");
+});
+
+// 忘記密碼頁自己也要留組織信箱那條路：走到這一頁還是有可能寄不出去
+// （打錯 email、根本沒有用那個信箱註冊），那時候他已經離開登入頁了。
+// 反向驗證發現過：只守登入頁的話，把這一頁的組織信箱刪掉是全綠的。
+// authHTML 畫的頁面沒有 barHTML，也沒有任何導覽 —— 這幾頁的「出口」只有頁面上
+// 自己那顆按鈕。反向驗證發現過：把寄出頁的「回登入」拔掉是全綠的，
+// 而那正是使用者最常停下來的一頁（信寄了、他回來要登入）。
+test("忘記密碼與寄出頁都走得掉", () => {
+  for (const mode of ["forgot", "sent"]) {
+    const h = authHTML(mode, "", "a@b.co");
+    assert.ok(h.includes('data-act="switch-auth" data-m="in"'),
+              `${mode} 這一頁回不去登入頁 —— 這幾頁沒有導覽列，使用者會卡在這裡`);
+  }
+});
+
+test("忘記密碼頁自己也留著組織信箱那條路", () => {
+  assert.ok(authHTML("forgot", "").includes("beyondtaiwan2020@gmail.com"),
+            "忘記密碼頁沒有人工那條路，自助失敗的人就卡住了");
+  assert.ok(authHTML("sent", "", "a@b.co").includes("beyondtaiwan2020@gmail.com"),
+            "寄出頁沒有人工那條路 —— 收不到信的人正好停在這一頁");
+});
+
+test("忘記密碼頁有 email 欄位、送出鍵，而且回得去登入頁", () => {
+  const h = authHTML("forgot", "");
+  assert.ok(h.includes('id="fpe"'), "沒有 email 欄位");
+  assert.ok(h.includes('data-act="do-forgot"'), "沒有送出鍵");
+  assert.ok(h.includes('data-m="in"'), "回不去登入頁，使用者會卡在這一頁");
+});
+
+// 用 Google 登入的人根本沒有密碼，走到這一頁是走錯路。不講的話他會寄信給自己、
+// 收不到（Google 帳號的 email 在 auth.users 裡是有的，其實收得到，
+// 但他重設完仍然會習慣性去按 Google），然後以為系統壞了。
+test("忘記密碼頁講清楚 Google 登入的人不需要密碼", () => {
+  const h = authHTML("forgot", "");
+  assert.ok(h.includes("Google"), "沒有提到 Google —— 用 Google 登入的人會在這一頁繞圈");
+});
+
+// ⚠ 這一條在守的是「帳號存不存在」不准外流。
+// Supabase 對存在與不存在的信箱回一模一樣的成功；文案要是寫成「已寄出」，
+// 這一頁就變成一次一個 email 的查詢工具，而幹部名單本身就不該外流。
+test("寄出後的文案是條件句，沒有斷定那個信箱有帳號", () => {
+  const h = authHTML("sent", "", "a@b.co");
+  assert.match(h, /如果[\s\S]{0,80}有帳號/,
+               "寄出頁少了「如果…有帳號」這個條件句，它會變成帳號存在與否的查詢工具");
+  for (const bad of ["已寄出", "已經寄", "寄給了", "寄到了"])
+    assert.ok(!h.includes(bad), `寄出頁出現了斷定句「${bad}」，那等於承認這個信箱有帳號`);
+});
+
+// 回顯的是使用者剛才打進去的字，所以它是一條輸入路徑。
+// 注意這裡不能斷言「輸出裡沒有 onerror 這幾個字」—— 跳脫成功之後那幾個字仍然在，
+// 只是以文字的身分在。要看的是那個 < 有沒有變成 &lt;，也就是它還是不是一個標籤。
+test("寄出頁回顯的 email 有跳脫", () => {
+  const h = authHTML("sent", "", '<img src=x onerror=alert(1)>');
+  assert.ok(!h.includes("<img src=x"), "使用者打的字被原樣當成標籤塞進 HTML 了");
+  assert.ok(h.includes("&lt;img src=x"), "那段字根本沒被回顯，這條測試等於沒測到東西");
+});
