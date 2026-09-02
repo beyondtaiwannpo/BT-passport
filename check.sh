@@ -756,8 +756,12 @@ leakOut=$(node -e '
   //   三個區域各釘一句，任何一段被吞掉都會少一個。
   const ANCHORS = {
     "index.html": {
-      mustShow: ["登入 / Sign in", "幫公立高中生看見海外升學的選項", "隱私政策 / Privacy Policy"],
-      mustHide: ["右上角的連結要從"]
+      // 2026-09-02 換成定稿文案。這幾句是那一頁存在的理由，少一句就是文案被吃掉了。
+      mustShow: ["登入 / Sign in", "還有別條路，只是沒有人跟你說過。",
+                 "There are other paths. No one told you about them.",
+                 "收到超過 150 份申請，協助超過 100 位國內高中生",
+                 "隱私政策 / Privacy Policy"],
+      mustHide: ["之後要改文案", "scripts/check-photos.mjs"]
     },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],

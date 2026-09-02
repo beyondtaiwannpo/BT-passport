@@ -5,39 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Beyond Taiwan</title>
 
-<!-- 這一頁是對外的門面，不是登入頁（見 BT-Site-交接規格.md §2-1）。
+<!-- 這一頁是對外的門面，不是登入頁（規格 §2-1）。
      不認識 BT 的人、從搜尋或 IG 連過來的人，看到的是這一頁。
      **它不碰 auth**：不載入 supabase、不判斷登入狀態、沒有任何 JavaScript。
      右上角那顆按鈕只是一個連結。
 
-     ── 這一版是最小版本（2026-09-01）──
-     做它的直接原因是 Google 的 OAuth 審查退件：
-     「Your home page does not explain the purpose of your app」。
-     審查員會直接打開這一頁，所以它**必須不需登入、而且說的必須是真的**。
+     ── 2026-09-02：階段 7 的定稿版本 ──
+     文案是使用者的定稿（BT-官網文案-定稿.md，同資料夾），中文全文在上、
+     英文全文在下，各自能單獨讀完，不做語言切換 —— 跟 privacy/ 同一個做法。
+     寫完之後用程式對過：定稿檔裡每一段正文都一字不差地出現在這一頁。
+     之後要改文案**直接改這個檔案**，那份 .md 是紀錄不是來源（跟隱私政策同一個決定）。
 
-     ⚠ **這一頁不准出現佔位文案。** 上一版整頁都是那種方括號包起來的待補標記，
-     那正是被退件的原因。check.sh 有一條守門在擋（範圍已含 index.html）。
-     （這段說明刻意不把那個標記本身寫出來 —— 那是「必須不存在」型的守門，
-       註解裡出現一次就會讓它抓到自己，方向雖然安全但會變成常紅的假警報。
-       同一個坑 2026-09-01 在連線字串那條守門上踩過一次。）
+     照片五張，各 1200×800（3:2），webp 加 jpg 兩份用 <picture> 讓瀏覽器挑 ——
+     只給 webp 的話舊 iOS 會安靜地不顯示。每張都寫 width/height 防版面跳動，
+     第一張不 lazy（在第一屏）、其餘 lazy。scripts/check-photos.mjs 守著這些。
+     照片可以放的依據寫在 README「官網首頁的照片：可以放的依據是什麼」。
 
-     下面每一句的出處：
-       「台灣的學生非營利組織…海外升學的選項」→ 規格 §0 與 BT-隱私政策.md，
-         使用者自己寫的句子，不是我編的。
-       「幹部團隊約 30 人，散在…」→ 規格 §0。
-       「一年 33 件事、散在 11 個月」→ README「它解決什麼問題」。
-       時間看板寫成「開發中」而不是既有功能，因為**它還沒做**（規格 §4，階段 8）。
-         寫成已經有的話這一頁就在說謊，而這一頁正是要拿去證明我們說真話的。
+     ⚠ 這一頁不准出現佔位文案，check.sh 有守門。 -->
 
-     階段 7 會整個重做（含信念與使命的正式文案、依角色顯示的功能選單）。
-     2026-09-02 已改：右上角的連結指向 ./app/（登入與登入後的入口），
-     不再直接指進 ./passport/。 -->
-
-<meta name="description" content="Beyond Taiwan 是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。這個網站是 BT 幹部的內部工具。">
+<meta name="description" content="Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。">
 <meta property="og:title" content="Beyond Taiwan">
-<meta property="og:description" content="台灣的學生非營利組織，幫公立高中生看見海外升學的選項。">
+<meta property="og:description" content="還有別條路，只是沒有人跟你說過。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://beyondtaiwannpo.com/">
+<meta property="og:image" content="https://beyondtaiwannpo.com/photos/hero-listening.jpg">
 <meta name="theme-color" content="#102A86">
 
 <link rel="icon" type="image/png" sizes="32x32" href="./shared/favicon-32.png">
@@ -52,9 +43,8 @@
 <link rel="stylesheet" href="./shared/brand.css">
 
 <style>
-/* 色票與字體家族全部來自 ./shared/brand.css，這個檔案裡沒有任何寫死的色碼
+/* 色票與字體家族全部來自 ./shared/brand.css，這裡沒有任何寫死的色碼
    （唯一的例外是 <head> 的 theme-color，那是 meta 屬性，吃不了 var()）。
-   要換色請改 brand.css，改這裡只會讓兩邊不一樣。
    硬規則：一個畫面最多 3 種顏色、最多 2 種字體，check.sh 會擋。 */
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);
@@ -62,7 +52,7 @@ body{margin:0;background:var(--paper);color:var(--ink);
 
 header{display:flex;align-items:center;justify-content:space-between;gap:16px;
   padding:18px clamp(20px,5vw,64px)}
-header img{height:34px;display:block}
+header img{height:34px;width:auto;display:block}
 /* logo 不可改色、拉伸、旋轉、調透明度（硬規則） */
 
 .login{display:inline-block;background:var(--bt-orange);color:var(--bt-navy);text-decoration:none;
@@ -70,20 +60,38 @@ header img{height:34px;display:block}
 .login:hover{filter:brightness(.96)}
 .login:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 
-main{max-width:34em;margin:0 auto;padding:clamp(24px,6vw,56px) clamp(20px,5vw,64px) 72px}
-h1{font-family:var(--display);font-size:clamp(38px,9vw,64px);line-height:1.05;margin:0 0 20px}
-h2{font-family:var(--display);font-size:clamp(22px,4.5vw,28px);line-height:1.25;margin:44px 0 10px}
+main{max-width:40em;margin:0 auto;padding:clamp(16px,4vw,40px) clamp(20px,5vw,64px) 72px}
+h1{font-family:var(--display);font-size:clamp(36px,8.5vw,60px);line-height:1.08;margin:0 0 14px;
+  letter-spacing:.005em}
+.lead{font-size:19px;margin:0 0 28px}
+h2{font-family:var(--display);font-size:clamp(24px,5vw,30px);line-height:1.2;margin:0 0 14px;
+  letter-spacing:.01em}
+h3{font-size:17px;font-weight:600;margin:22px 0 6px}
 p{margin:0 0 16px}
-.lead{font-size:19px}
-ul{margin:0 0 16px;padding-left:1.25em}
-li{margin:0 0 10px}
+section{margin-top:52px}
+a{color:var(--ink);font-weight:600}
 
-.en{margin-top:52px;padding-top:28px;border-top:1px solid var(--bt-orange)}
-.en h2{margin-top:0}
+/* ---------- 照片 ---------- */
+/* width/height 由 HTML 屬性給（1200×800），這裡只讓它縮到容器寬；
+   aspect-ratio 讓瀏覽器在圖還沒載入時就先留好高度 —— 這就是不跳版的來源。 */
+.photo{display:block;margin:0 0 22px}
+.photo img{display:block;width:100%;height:auto;aspect-ratio:3/2;border-radius:var(--r);
+  background:rgba(16,42,134,.06)}
 
-footer{max-width:34em;margin:0 auto;padding:24px clamp(20px,5vw,64px) 56px;
+/* ---------- 數字 ---------- */
+.nums{display:grid;grid-template-columns:repeat(2,1fr);gap:18px 22px;margin:8px 0 0}
+.nums div{border-top:2px solid var(--bt-orange);padding-top:10px}
+.nums b{display:block;font-family:var(--display);font-size:clamp(26px,5.5vw,34px);
+  font-weight:700;line-height:1.1;margin-bottom:4px}
+.nums p{font-size:15px;line-height:1.55;margin:0;opacity:.85}
+@media (min-width:640px){.nums{grid-template-columns:repeat(3,1fr)}}
+
+/* ---------- 英文區塊 ---------- */
+.en{margin-top:64px;padding-top:36px;border-top:1px solid var(--bt-orange)}
+.en section:first-of-type{margin-top:0}
+
+footer{max-width:40em;margin:0 auto;padding:24px clamp(20px,5vw,64px) 56px;
   border-top:1px solid var(--bt-orange);font-size:15px}
-footer a{color:var(--ink);font-weight:600}
 footer p{margin:0 0 8px}
 
 @media (max-width:420px){ body{font-size:16px} .lead{font-size:17px} }
@@ -94,78 +102,158 @@ footer p{margin:0 0 8px}
 
 <header>
   <img src="./shared/logo.png" alt="Beyond Taiwan" width="386" height="191">
-  <!-- 階段 7 改成 ./app/ -->
   <a class="login" href="./app/">登入 / Sign in</a>
 </header>
 
 <main>
-  <h1>Beyond Taiwan</h1>
 
-  <p class="lead">Beyond Taiwan（BT）是台灣的學生非營利組織，幫公立高中生看見海外升學的選項。</p>
+<!-- ═══════════ 中文 ═══════════ -->
+<div lang="zh-Hant">
 
-  <p>幹部團隊約 30 人，散在台灣、美國、加拿大、歐洲、澳洲與日韓——大多是自己走過那條路、
-  或正在路上的學生。</p>
+<section style="margin-top:0">
+  <h1>還有別條路，只是沒有人跟你說過。</h1>
+  <p class="lead">Beyond Taiwan 是一群從台灣公立高中走出去的大學生。我們回來，把自己走過的路講給你聽。</p>
+  <picture class="photo">
+    <source srcset="./photos/hero-listening.webp" type="image/webp">
+    <img src="./photos/hero-listening.jpg" alt="一排高中生坐著聽台上的人講話，前景是兩個模糊的後腦勺" width="1200" height="800">
+  </picture>
+</section>
 
-  <h2>這個網站是什麼</h2>
+<section>
+  <h2>我們為什麼在</h2>
+  <picture class="photo">
+    <source srcset="./photos/talking-laptop.webp" type="image/webp">
+    <img src="./photos/talking-laptop.jpg" alt="一位橘髮的男生抱著筆電，正在跟對面的人說話" width="1200" height="800" loading="lazy">
+  </picture>
+  <p>在台灣，「出國念書」常被當成一件家裡有錢才能想的事。</p>
+  <p>這不完全是錯覺。留學代辦的費用不低，公立學校能給的海外升學資源，通常也比不上私立或國際學校。真正的問題不是錢而已，是資訊：你身邊如果沒有人走過，你連要問什麼都不知道。</p>
+  <p>於是很多人在還沒認真了解之前，就先把這個選項刪掉了。不是因為不適合，是因為沒有人告訴他這件事實際上長什麼樣子。</p>
+  <p>Beyond Taiwan 處理的就是這一段落差。我們幾乎所有活動都免費，導生配對計畫、探索營、講座，都不收費。我們沒辦法幫你做決定，但可以讓你在做決定之前，先知道自己有哪些選擇。</p>
+</section>
 
-  <p><strong>這是 BT 幹部的內部工具，不是對外的服務。</strong>它上面目前有一個功能，
-  另一個在開發中：</p>
+<section>
+  <h2>我們做什麼</h2>
+  <picture class="photo">
+    <source srcset="./photos/three-at-laptop.webp" type="image/webp">
+    <img src="./photos/three-at-laptop.jpg" alt="三個人擠在一台筆電前，中間那位笑著" width="1200" height="800" loading="lazy">
+  </picture>
+  <h3>探索營 College Bootcamp</h3>
+  <p>每年寒暑假各一場，免費。兩天裡，你會看到學長姐當年真正送出去的申請文書，動手改一次自己的，再跟五、六位不同科系的人聊他們在國外的實際生活。我們會事先問你想讀什麼，再去找對應背景的人回來。</p>
+  <h3>導生配對計畫 Mentorship Program</h3>
+  <p>一學期配對一次。你會有一位走過同一條路的學長姐，他不會幫你寫 essay，但會陪你把卡住的地方講清楚。有些配對從申請季開始，到現在超過兩年還在聯絡。</p>
+</section>
 
-  <ul>
-    <li><strong>BT 護照</strong>（已上線）——幹部一年有 33 件事要做，散在 11 個月裡。
-    護照是一個看得到「我做了哪些、還差哪些」的地方，也是留下當時想法的地方。
-    完成一格蓋一個章。</li>
-    <li><strong>每週時間看板</strong>（開發中）——團隊散在六個時區，
-    每次開會都要重新約時間。看板讓每個人維護自己的「每週固定有空時段」，
-    要開會時直接看，不必每次重新問一輪。</li>
-  </ul>
+<section>
+  <h2>誰在做這件事</h2>
+  <picture class="photo">
+    <source srcset="./photos/sharing-mic.webp" type="image/webp">
+    <img src="./photos/sharing-mic.jpg" alt="一位拿麥克風的講者站著分享，坐在地上的聽眾在笑" width="1200" height="800" loading="lazy">
+  </picture>
+  <p>Beyond Taiwan 現在有接近三十個人，全部是學生，分散在台灣、美國、加拿大、歐洲、澳洲、日本、韓國。</p>
+  <p>我們不是老師，也不是顧問。多數人只比你早走一兩步，有些人剛申請完不久，還記得那種不知道從哪裡開始的感覺。</p>
+  <p>從 2020 年五月開始，七個人，到現在五年。</p>
+</section>
 
-  <h2>誰用得到</h2>
-
-  <p>目前只有 BT 幹部。註冊需要一組由組長發出的邀請碼——沒有邀請碼的帳號看不到任何內容。</p>
-
-  <p><strong>之後會開放給 BT 的學員（高中生）使用。</strong>現在還沒有給學員的功能，
-  但帳號與權限的結構已經先做好了，功能加進來時不需要回頭重做。</p>
-
-  <h2>資料與隱私</h2>
-
-  <p>幹部在護照裡寫的心得與上傳的照片<strong>只有本人看得到</strong>，
-  這件事由資料庫的權限規則保證，不是靠介面隱藏。BT 的成員包含未滿 18 歲者，
-  我們把這件事寫得很明確——詳見<a href="./privacy/">隱私政策</a>。</p>
-
-  <p>本網站不使用任何追蹤或廣告工具。</p>
-
-  <div class="en" lang="en">
-    <h2>About Beyond Taiwan</h2>
-
-    <p>Beyond Taiwan is a student-run non-profit organisation in Taiwan, working to help
-    students at public high schools see their options for studying abroad. The cadre team
-    is around 30 people, spread across Taiwan, the United States, Canada, Europe, Australia,
-    Japan and Korea.</p>
-
-    <p><strong>This website is an internal tool for BT cadres, not a public service.</strong>
-    It currently hosts one feature, with a second in development:</p>
-
-    <ul>
-      <li><strong>BT Passport</strong> (live) — cadres have 33 activities across 11 months
-      of the school year. The passport is where they can see what they have done and what
-      is left, and where they record what they were thinking at the time.</li>
-      <li><strong>Weekly availability board</strong> (in development) — the team spans six
-      time zones. The board lets each person maintain their recurring weekly availability,
-      so meetings can be scheduled without asking everyone each time.</li>
-    </ul>
-
-    <p>Access requires an invite code issued by a team lead. Accounts without one cannot see
-    any content. We plan to open the site to BT's high-school students later; the account and
-    permission structure is already built for that.</p>
-
-    <p>What cadres write and the photos they upload are visible <strong>only to
-    themselves</strong>, enforced by database-level access rules rather than by hiding
-    things in the interface. Some members are under 18, and we are explicit about how their
-    data is handled — see our <a href="./privacy/">privacy policy</a>.</p>
-
-    <p>This site uses no tracking or advertising tools.</p>
+<section>
+  <h2>數字</h2>
+  <div class="nums">
+    <div><b>250+ 位學員</b><p>從 2020 年到現在，超過 250 位高中生在申請路上有人可以問。</p></div>
+    <div><b>每年 50 對配對</b><p>一學期一次，配到就是一整個申請季有人陪。</p></div>
+    <div><b>100+ 位高中生</b><p>探索營舉辦兩年，收到超過 150 份申請，協助超過 100 位國內高中生。</p></div>
+    <div><b>20+ 位學長姐回來</b><p>超過 20 位 BT 校友回來當講者。他們當年也是被這樣帶過來的。</p></div>
+    <div><b>5 年，近 30 人</b><p>成立五年，幹部全部是學生，分布七個國家。</p></div>
+    <div><b>0 元</b><p>幾乎所有活動都免費。</p></div>
   </div>
+</section>
+
+<section>
+  <h2>加入我們 / 聯絡</h2>
+  <picture class="photo">
+    <source srcset="./photos/group-photo.webp" type="image/webp">
+    <img src="./photos/group-photo.jpg" alt="近三十位 BT 幹部在舞台上的大合照，每個人用手比出同一個手勢" width="1200" height="800" loading="lazy">
+  </picture>
+  <h3>如果你是高中生</h3>
+  <p>下一場探索營、下一輪導生配對，都會先在 Instagram 公布。追蹤 <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>，或直接私訊問我們，看到都會回。</p>
+  <h3>如果你想贊助或合作</h3>
+  <p>我們持續在找願意一起做這件事的個人、企業與學校。過去合作過的單位包括美國在臺協會 AIT、EducationUSA、TRÈS BON 好伴 café、臺北市立第一女子高級中學。</p>
+  <p>來信：<a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+</section>
+
+</div>
+
+<!-- ═══════════ English ═══════════ -->
+<div class="en" lang="en">
+
+<section>
+  <h1>There are other paths. No one told you about them.</h1>
+  <p class="lead">Beyond Taiwan is a group of students who came out of Taiwan's public high schools. We went looking, and we came back to tell you what we found.</p>
+  <picture class="photo">
+    <source srcset="./photos/hero-listening.webp" type="image/webp">
+    <img src="./photos/hero-listening.jpg" alt="A row of high-school students listening to a speaker; two blurred heads in the foreground" width="1200" height="800" loading="lazy">
+  </picture>
+</section>
+
+<section>
+  <h2>Why we exist</h2>
+  <picture class="photo">
+    <source srcset="./photos/talking-laptop.webp" type="image/webp">
+    <img src="./photos/talking-laptop.jpg" alt="A student with orange hair holding a laptop, mid-conversation" width="1200" height="800" loading="lazy">
+  </picture>
+  <p>In Taiwan, studying abroad is still widely treated as something only well-off families get to consider.</p>
+  <p>That impression is not baseless. Agency fees are high, and public schools rarely have the staff or resources to guide a student through an overseas application. But the harder barrier is information. If no one around you has done it, you do not even know what to ask.</p>
+  <p>So students rule the option out before they ever look into it. Not because it does not suit them, but because no one has shown them what it actually involves.</p>
+  <p>That gap is the reason Beyond Taiwan exists. Almost everything we run is free: mentorship, bootcamps, talks. We cannot make anyone's decision. We can make sure they know what they are choosing between.</p>
+</section>
+
+<section>
+  <h2>What we do</h2>
+  <picture class="photo">
+    <source srcset="./photos/three-at-laptop.webp" type="image/webp">
+    <img src="./photos/three-at-laptop.jpg" alt="Three students crowded around one laptop, the one in the middle smiling" width="1200" height="800" loading="lazy">
+  </picture>
+  <h3>College Bootcamp</h3>
+  <p>Twice a year, winter and summer, free. Over two days you read the essays alumni actually submitted, rewrite one of your own, and talk with five or six people studying very different subjects about what their lives abroad are really like. We ask what you want to study before the camp, then bring back people with that background.</p>
+  <h3>Mentorship Program</h3>
+  <p>One matching round per semester. You are paired with someone who has been down the same road. They will not write your essay. They will sit with you until you can say out loud what you are stuck on. Some pairs that started in an application season are still in touch more than two years later.</p>
+</section>
+
+<section>
+  <h2>Who runs this</h2>
+  <picture class="photo">
+    <source srcset="./photos/sharing-mic.webp" type="image/webp">
+    <img src="./photos/sharing-mic.jpg" alt="A speaker with a microphone; the audience seated on the floor, laughing" width="1200" height="800" loading="lazy">
+  </picture>
+  <p>Beyond Taiwan is close to thirty people, all of us students, spread across Taiwan, the United States, Canada, Europe, Australia, Japan and Korea.</p>
+  <p>We are not teachers and we are not consultants. Most of us are only a step or two ahead of you. Some finished their own applications recently enough to still remember not knowing where to start.</p>
+  <p>We began in May 2020 with seven people. Five years later, we are still here.</p>
+</section>
+
+<section>
+  <h2>Numbers</h2>
+  <div class="nums">
+    <div><b>250+ mentees</b><p>Since 2020, more than 250 high school students have had someone to ask.</p></div>
+    <div><b>50 pairs a year</b><p>One matching round each semester. A match means company for a whole application season.</p></div>
+    <div><b>100+ students reached</b><p>Two years of College Bootcamp, over 150 applications received, more than 100 students helped.</p></div>
+    <div><b>20+ alumni returned</b><p>More than 20 Beyond Taiwan alumni have come back as speakers. They were once on the other side of the room.</p></div>
+    <div><b>5 years, close to 30 people</b><p>Five years old. Every organizer is a student. Seven countries.</p></div>
+    <div><b>Free</b><p>Almost everything we run costs nothing.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Get involved / Contact</h2>
+  <picture class="photo">
+    <source srcset="./photos/group-photo.webp" type="image/webp">
+    <img src="./photos/group-photo.jpg" alt="About thirty Beyond Taiwan cadres on a stage, all making the same hand sign" width="1200" height="800" loading="lazy">
+  </picture>
+  <h3>If you are a high school student</h3>
+  <p>The next College Bootcamp and the next mentorship round are announced on Instagram first. Follow <a href="https://www.instagram.com/beyondtaiwan/">@beyondtaiwan</a>, or message us directly. We read everything.</p>
+  <h3>If you want to support or partner with us</h3>
+  <p>We are always looking for individuals, companies and schools willing to build this with us. Past partners include the American Institute in Taiwan, EducationUSA, TRÈS BON café, and Taipei First Girls' High School.</p>
+  <p>Write to us: <a href="mailto:beyondtaiwan2020@gmail.com">beyondtaiwan2020@gmail.com</a></p>
+</section>
+
+</div>
 </main>
 
 <footer>
