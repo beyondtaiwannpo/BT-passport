@@ -12,7 +12,9 @@ export const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + Str
 // 這個陣列就是那兩件事之間唯一的轉換點，不要在別的地方再轉一次。
 export const COL_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-export function shellHTML(tab, inner, weekLabel) {
+// msg 一定要有地方畫。2026-09-02 加「只能往前看四週」時差點漏掉這件事：
+// 設了 S.msg 卻沒有任何模板讀它，等於又做了一個「按了沒反應」的按鈕。
+export function shellHTML(tab, inner, weekLabel, msg) {
   return `<div class="bar">
     <img src="../shared/logo.png" alt="Beyond Taiwan">
     <div class="tabs">
@@ -29,6 +31,7 @@ export function shellHTML(tab, inner, weekLabel) {
     <button class="btn ghost sm" data-act="week" data-d="1">後一週 →</button>
     <button class="btn quiet sm" data-act="week" data-d="0">回本週</button>
   </div>` : ""}
+  ${msg ? `<div class="wnote" style="margin-bottom:12px">${esc(msg)}</div>` : ""}
   ${inner}`;
 }
 
@@ -115,7 +118,12 @@ export function boardHTML(S, counts, dates) {
 export function peekHTML(S, free, dayLabel, minute, localTimes) {
   const busy = S.members.filter(m => m.tz && !free.includes(m.id));
   const noTz = S.members.filter(m => !m.tz);
-  return `<div class="scrim" data-act="close-peek"><div class="modal" data-stop="1">
+  // data-stop 拿掉了：關不關由 main.js 正面表列（按鈕 或 點在遮罩本身），
+  // 不再靠「祖先有沒有 data-stop」反面排除 —— 那個條件把關閉鍵自己排除掉了。
+  // 右上角多一顆 ✕：手機上遮罩露出來的可點面積只有左右 16px 加上下一小條，
+  // 「點外面關掉」在小螢幕上不是一條可靠的路。
+  return `<div class="scrim" data-act="close-peek"><div class="modal">
+    <button class="x" data-act="close-peek" aria-label="關起來">✕</button>
     <h3>${esc(dayLabel)} ${esc(hhmm(minute))}</h3>
     <div class="sub">${free.length} 人有空</div>
     <div class="two">

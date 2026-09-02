@@ -55,7 +55,7 @@ function render() {
   }
   else if (S.tab === "mine") inner = UI.mineHTML(S);
   else inner = UI.membersHTML(S, Date.now());
-  el.innerHTML = UI.shellHTML(S.tab, inner, label);
+  el.innerHTML = UI.shellHTML(S.tab, inner, label, S.msg);
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
   // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
   // 也就是容器頂端往下 600 多 px，而容器一次只看得到二十幾列。
@@ -120,6 +120,12 @@ document.addEventListener("click", async e => {
     // 前後各 4 週（使用者 2026-09-02 裁定）。翻週唯一的作用是看 DST 切換
     // 前後的差別，一年兩次，範圍不需要更大。
     const next = d === 0 ? 0 : Math.max(-4, Math.min(4, S.weekOffset + d));
+    // 已經在邊界的話**要說話**，不能按了沒反應 —— 那正是這一頁反覆出現的症狀。
+    if (next === S.weekOffset && d !== 0) {
+      S.msg = d < 0 ? "只能往前看四週。" : "只能往後看四週。";
+      render(); return;
+    }
+    S.msg = "";
     setWeek(next); render(); return;
   }
 
@@ -141,10 +147,18 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "tz-pick") {
+    // 這一步會打網路。沒有這個 busy 的話，網路慢的時候點下去完全沒反應 ——
+    // 跟知情同意那個 bug 是同一個形狀（2026-09-02 順手補的）。
+    if (S.busy) return;
+    S.busy = true; S.msg = "存起來中…"; render();
     try {
       await DATA.saveTz(S.user.id, b.dataset.tz);
-      S.myTz = b.dataset.tz; S.needTz = false; S.msg = ""; setWeek(S.weekOffset); render();
-    } catch (err) { S.msg = DATA.authMessage(err); render(); }
+      S.myTz = b.dataset.tz; S.needTz = false; S.msg = ""; S.busy = false;
+      setWeek(S.weekOffset); render();
+    } catch (err) {
+      console.error("設定時區失敗。真正的原因：", err);
+      S.busy = false; S.msg = DATA.authMessage(err); render();
+    }
     return;
   }
   if (act === "change-tz") { S.needTz = true; S.tzQuery = ""; S.tzResults = []; render(); return; }
@@ -219,12 +233,17 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "confirm-same") {
+    // 一樣會打網路，一樣要先講話再等。
+    b.disabled = true; b.textContent = "記錄中…";
     try {
       const at = await DATA.confirmUnchanged();
       const me = S.members.find(m => m.id === S.user.id);
       if (me) me.updatedAt = at;
       S.mineMsg = "記下來了，這份時間是最新的。";
-    } catch (err) { S.mineMsg = DATA.authMessage(err); }
+    } catch (err) {
+      console.error("確認沒變失敗。真正的原因：", err);
+      S.mineMsg = DATA.authMessage(err);
+    }
     render(); return;
   }
 
@@ -234,7 +253,20 @@ document.addEventListener("click", async e => {
     S.peek = UI.peekHTML(S, free, "星期" + UI.DAY_ZH[UI.COL_ORDER[col]], min, localTimesFor(col, min));
     render(); return;
   }
-  if (act === "close-peek" && !e.target.closest("[data-stop]")) { S.peek = null; render(); return; }
+  if (act === "close-peek") {
+    // ⚠ **不要用「祖先有沒有 data-stop」來判斷。**
+    // 2026-09-02：原本寫成 `act === "close-peek" && !e.target.closest("[data-stop]")`，
+    // 而 data-stop 掛在 .modal 上、關閉鍵就住在 .modal 裡面 ——
+    // 那個條件把關閉鍵自己排除掉了，按下去事件有觸發、狀態不會變、畫面完全不動。
+    // 實測確認過：act=close-peek 進得來，但有 data-stop 祖先，所以整個分支跳過。
+    //
+    // 現在改成正面表列**哪兩種情況要關**，而不是反面排除：
+    //   按到的是一顆按鈕（關閉鍵、右上角的 ✕）
+    //   或者點在遮罩本身（不是彈窗裡面）
+    const onScrim = e.target.classList && e.target.classList.contains("scrim");
+    if (b.tagName === "BUTTON" || onScrim) { S.peek = null; render(); }
+    return;
+  }
 });
 
 document.addEventListener("input", e => {

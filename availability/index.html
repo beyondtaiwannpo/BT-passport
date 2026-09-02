@@ -113,7 +113,12 @@
     justify-content:center;padding:16px;z-index:50;overflow:auto}
   .modal{background:var(--paper);border-radius:var(--r);padding:22px;max-width:520px;width:100%;
     border:1px solid rgba(16,42,134,.3);max-height:92vh;overflow:auto}
-  .modal h3{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 2px}
+  .modal{position:relative}
+  /* ✕ 的可點區域至少 44×44 —— 手機上比視覺大小重要。 */
+  .modal .x{position:absolute;top:6px;right:6px;width:44px;height:44px;font-size:20px;
+    line-height:1;opacity:.55;border-radius:2px}
+  .modal .x:hover{opacity:1}
+  .modal h3{font-family:var(--display);font-size:26px;font-weight:700;margin:0 40px 2px 0}
   .modal .sub{font-size:13px;opacity:.6;margin-bottom:14px}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
   .two i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55}
