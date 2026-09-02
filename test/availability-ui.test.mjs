@@ -90,7 +90,14 @@ test("連不上的那一頁給得出下一步", () => {
 import { peekHTML, shellHTML } from "../availability/src/ui.js";
 
 const PS = { members: [{ id: "w", name: "王平", tz: "Asia/Taipei" }, { id: "a", name: "安", tz: null }] };
-const peek = () => peekHTML(PS, ["w"], "星期一", 1140, ["一 19:00　Asia/Taipei"]);
+// 參數包成物件（2026-09-02 加日曆連結時改的）—— 這一頁的參數已經七個，
+// 排成一列的話呼叫端漏傳或順序錯都不會報錯，只會靜靜地畫錯東西。
+const peek = (over = {}) => peekHTML(PS, Object.assign({
+  free: ["w"], dayLabel: "星期一", minute: 1140,
+  lines: ["底特律 / Detroit　9/1（一）19:00", "台北 / Taipei　9/2（二）07:00"],
+  calUrl: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=BT+%E6%9C%83%E8%AD%B0&dates=20260901T230000Z/20260902T000000Z",
+  title: "BT 會議", copyMsg: "",
+}, over));
 
 test("★ 彈窗的關閉控制項必須是 <button>（判斷式靠 tagName）", () => {
   const h = peek();
@@ -123,4 +130,40 @@ test("★ shellHTML 會把訊息畫出來", () => {
   const without = shellHTML("board", "<i>x</i>", "9/1 – 9/7", "");
   assert.ok(withMsg.includes("只能往前看四週。"), "訊息沒有被畫出來");
   assert.notEqual(withMsg, without, "有訊息跟沒訊息畫出來一樣，等於訊息沒有作用");
+});
+
+// ── 日曆連結與一鍵複製（2026-09-02 加）──────────────────────────────
+test("彈窗有各地時間、複製鍵、標題欄與日曆連結", () => {
+  const h = peek();
+  assert.ok(h.includes('id="times"'), "沒有各地時間那一段");
+  assert.ok(h.includes('data-act="copy-times"'), "沒有複製鍵");
+  assert.ok(h.includes('id="evtitle"'), "沒有標題欄");
+  assert.ok(h.includes('id="callink"'), "沒有日曆連結");
+  assert.ok(h.includes("BT 會議"), "標題沒有預設值");
+});
+
+// 用 <a> 不用 <button>：長按與中鍵開新分頁才有作用。
+test("日曆連結是 <a> 而且開新分頁", () => {
+  const h = peek();
+  assert.match(h, /<a class="btn" id="callink" href="[^"]+" target="_blank" rel="noopener">/,
+    "日曆連結不是帶 target 與 rel 的 <a>");
+});
+
+test("複製失敗要說話，不是靜靜地沒反應", () => {
+  const quiet = peek({ copyMsg: "" });
+  const loud = peek({ copyMsg: "複製不了，請自己選取上面那幾行。" });
+  assert.ok(loud.includes("複製不了"), "訊息沒有被畫出來");
+  assert.notEqual(quiet, loud, "有訊息跟沒訊息畫出來一樣，等於訊息沒有作用");
+});
+
+test("標題與各地時間都會跳脫", () => {
+  const h = peek({ title: '"><script>x</script>', lines: ['<img src=x onerror=1>'] });
+  assert.ok(!h.includes("<script>"), "標題沒有跳脫");
+  assert.ok(!h.includes("<img src=x"), "各地時間沒有跳脫");
+});
+
+test("講清楚事件建在誰的日曆、以及不會自動邀請人", () => {
+  const h = peek();
+  assert.ok(h.includes("你自己的"), "沒有講事件建在誰的日曆上");
+  assert.ok(h.includes("不會自動加任何人"), "沒有講它不會自動邀請人");
 });

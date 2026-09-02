@@ -116,20 +116,19 @@ export function boardHTML(S, counts, dates) {
       所以台北的週一早上會出現在美東的週日晚上。</div>`;
 }
 
-export function peekHTML(S, free, dayLabel, minute, localTimes) {
-  const busy = S.members.filter(m => m.tz && !free.includes(m.id));
+// ctx: { free, dayLabel, minute, lines, calUrl, title, copyMsg }
+// 參數包成一個物件而不是排成一列：這一頁的參數已經七個了，排成一列的話
+// 呼叫端漏傳或順序錯都不會報錯，只會靜靜地畫錯東西。
+export function peekHTML(S, ctx) {
+  const busy = S.members.filter(m => m.tz && !ctx.free.includes(m.id));
   const noTz = S.members.filter(m => !m.tz);
-  // data-stop 拿掉了：關不關由 main.js 正面表列（按鈕 或 點在遮罩本身），
-  // 不再靠「祖先有沒有 data-stop」反面排除 —— 那個條件把關閉鍵自己排除掉了。
-  // 右上角多一顆 ✕：手機上遮罩露出來的可點面積只有左右 16px 加上下一小條，
-  // 「點外面關掉」在小螢幕上不是一條可靠的路。
   return `<div class="scrim" data-act="close-peek"><div class="modal">
     <button class="x" data-act="close-peek" aria-label="關起來">✕</button>
-    <h3>${esc(dayLabel)} ${esc(hhmm(minute))}</h3>
-    <div class="sub">${free.length} 人有空</div>
+    <h3>${esc(ctx.dayLabel)} ${esc(hhmm(ctx.minute))}</h3>
+    <div class="sub">${ctx.free.length} 人有空</div>
     <div class="two">
-      <div><i>有空</i>${free.length
-        ? `<ul>${free.map(id => `<li>${esc(nameOf(S, id))}</li>`).join("")}</ul>`
+      <div><i>有空</i>${ctx.free.length
+        ? `<ul>${ctx.free.map(id => `<li>${esc(nameOf(S, id))}</li>`).join("")}</ul>`
         : `<div class="empty sm">沒有人</div>`}</div>
       <div><i>沒空</i>${busy.length
         ? `<ul class="dim">${busy.map(m => `<li>${esc(m.name)}</li>`).join("")}</ul>`
@@ -137,8 +136,27 @@ export function peekHTML(S, free, dayLabel, minute, localTimes) {
     </div>
     ${noTz.length ? `<div class="wnote">${noTz.length} 個人還沒設定時區，
       他們的時間畫不出來，所以不在上面：${esc(noTz.map(m => m.name).join("、"))}</div>` : ""}
-    <div class="wnote"><b>各地當地時間</b><br>${localTimes.map(t => esc(t)).join("<br>")}</div>
-    <div class="row"><button class="btn ghost" data-act="close-peek">關起來</button></div>
+
+    <div class="times">
+      <i>各地當地時間</i>
+      <pre id="times">${ctx.lines.map(t => esc(t)).join("\n")}</pre>
+      <div class="row">
+        <button class="btn ghost sm" data-act="copy-times">複製這幾行</button>
+        <span class="mini">${esc(ctx.copyMsg || "")}</span>
+      </div>
+    </div>
+
+    <label style="margin-top:16px"><i>事件標題</i>
+      <input id="evtitle" value="${esc(ctx.title)}" autocomplete="off"></label>
+    <div class="row">
+      <!-- 用 <a> 不用 <button>：長按與中鍵開新分頁才會有作用。
+           標題改的時候由 main.js 直接改這個 href。 -->
+      <a class="btn" id="callink" href="${esc(ctx.calUrl)}" target="_blank" rel="noopener">加到 Google 日曆</a>
+      <button class="btn ghost" data-act="close-peek">關起來</button>
+    </div>
+    <div class="wnote" style="margin-top:12px">事件會建在<b>你自己的</b>日曆上，
+      預設一小時，時間是這一格的絕對時刻 —— 你邀請的人會看到他們自己時區的時間。
+      要邀請誰由你決定，這個連結不會自動加任何人。</div>
   </div></div>`;
 }
 

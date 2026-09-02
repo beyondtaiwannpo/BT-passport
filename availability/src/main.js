@@ -6,7 +6,9 @@ import * as UI from "./ui.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
-import { startOfWeek, detectTz, partsIn, addDays, toInstant } from "./tz.js";
+import { cellInstant, googleCalUrl, localTimesText, DEFAULT_TITLE } from "./calendar.js";
+import { labelOf } from "./tz-alias.js";
+import { startOfWeek, detectTz, partsIn, addDays } from "./tz.js";
 
 const root = () => document.getElementById("bt-root");
 const K = DATA.key;
@@ -18,7 +20,8 @@ let S = {
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
-  peek: null, msg: "", busy: false, boardTop: null
+  peek: null, peekCell: null, peekLines: [], msg: "", busy: false, boardTop: null,
+  evTitle: "", copyMsg: ""
 };
 
 // ── 換算：把所有人的時段落到觀看者的格子上 ──────────────────────────
@@ -248,10 +251,24 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "peek") {
-    const col = +b.dataset.c, min = +b.dataset.m;
-    const free = calcCounts(S.members, S.slots, S.weekStart, S.myTz).get(col + ":" + min) || [];
-    S.peek = UI.peekHTML(S, free, "星期" + UI.DAY_ZH[UI.COL_ORDER[col]], min, localTimesFor(col, min));
-    render(); return;
+    S.peekCell = { col: +b.dataset.c, min: +b.dataset.m };
+    S.copyMsg = "";
+    S.evTitle = S.evTitle || DEFAULT_TITLE;
+    buildPeek(); render(); return;
+  }
+
+  if (act === "copy-times") {
+    const text = (S.peekLines || []).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      S.copyMsg = "複製好了。";
+    } catch (err) {
+      // 不是 https、或舊瀏覽器的話 clipboard API 不在。
+      // **不要靜靜地失敗** —— 那又是一次「按了沒反應」（README 第 13 項）。
+      console.error("複製失敗。真正的原因：", err);
+      S.copyMsg = "複製不了，請自己選取上面那幾行。";
+    }
+    buildPeek(); render(); return;
   }
   if (act === "close-peek") {
     // ⚠ **不要用「祖先有沒有 data-stop」來判斷。**
@@ -270,6 +287,17 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("input", e => {
+  // 標題改了就跟著改連結的 href。**不重畫整個彈窗** ——
+  // 重畫會讓輸入框失焦，使用者打第二個字就得再點一次。
+  if (e.target.id === "evtitle") {
+    S.evTitle = e.target.value;
+    const a = document.getElementById("callink");
+    if (a && S.peekCell) {
+      a.href = googleCalUrl(cellInstant(S.weekStart, S.peekCell.col, S.peekCell.min, S.myTz),
+                            undefined, S.evTitle);
+    }
+    return;
+  }
   if (e.target.id === "tzq") {
     S.tzQuery = e.target.value;
     S.tzResults = searchTz(S.tzQuery);
@@ -289,17 +317,25 @@ function readBatch() {
   if (c) S.copyFrom = +c.value;
 }
 
-// 這一格在每個人所在地的當地時間（規格 §4-3 A）。
-function localTimesFor(col, min) {
-  const p = partsIn(S.weekStart, S.myTz);
-  const d = addDays(p.year, p.month, p.day, col);
-  const target = toInstant(d.year, d.month, d.day, Math.floor(min / 60), min % 60, S.myTz);
-  const zones = [...new Set(S.members.filter(m => m.tz).map(m => m.tz))];
-  if (!target) return ["（這一格算不出來）"];
-  return zones.map(tz => {
-    const q = partsIn(target, tz);
-    return `${UI.DAY_ZH[new Date(Date.UTC(q.year, q.month - 1, q.day)).getUTCDay()]} ` +
-           `${String(q.hour).padStart(2, "0")}:${String(q.minute).padStart(2, "0")}　${tz}`;
+// 組出詳情彈窗要的一切。
+//
+// **時間一律從 S.weekStart 算**（見 calendar.js 的 cellInstant）——
+// 使用者可能是在翻週的時候點的，用「本週」算的話事件會差一整週，
+// 而那個事件看起來完全正常，只是日期錯了。
+function buildPeek() {
+  const { col, min } = S.peekCell;
+  const counts = calcCounts(S.members, S.slots, S.weekStart, S.myTz);
+  const free = counts.get(col + ":" + min) || [];
+  const inst = cellInstant(S.weekStart, col, min, S.myTz);
+  const zones = [...new Set(S.members.filter(m => m.tz).map(m => m.tz))].sort();
+  S.peekLines = localTimesText(inst, zones, labelOf);
+  S.peek = UI.peekHTML(S, {
+    free, minute: min,
+    dayLabel: "星期" + UI.DAY_ZH[UI.COL_ORDER[col]],
+    lines: S.peekLines,
+    calUrl: googleCalUrl(inst, undefined, S.evTitle),
+    title: S.evTitle,
+    copyMsg: S.copyMsg,
   });
 }
 
