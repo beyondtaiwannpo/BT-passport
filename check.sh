@@ -461,6 +461,13 @@ fi
 # **不是所有 upsert 都有問題**：護照對 stamps / entries / visas 用 upsert 是對的，
 # 那幾張表有表層級的 update 授權。有問題的只有「欄位層級授權」的表。
 # 所以這條守門先從 migration 讀出哪些表是欄位層級授權的，再去前端找那些表的 upsert。
+ICON_OUT=$(node scripts/check-icons.mjs 2>&1)
+case "$ICON_OUT" in
+  "OK "*)  ok "圖示與 manifest：${ICON_OUT#OK } 都指向 shared/，start_url 是 /app/" ;;
+  "BAD "*) bad "圖示或 manifest 有問題：${ICON_OUT#BAD }" ;;
+  *)       bad "圖示守門自己壞了（這不是發現違規）：$ICON_OUT" ;;
+esac
+
 UPSERT_OUT=$(node scripts/check-upsert.mjs 2>&1)
 case "$UPSERT_OUT" in
   "OK "*)  ok "欄位層級授權的表沒有被 .upsert()（守著：${UPSERT_OUT#OK }）" ;;

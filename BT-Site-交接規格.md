@@ -69,12 +69,18 @@ beyondtaiwannpo.com/
 │   ├── supabase.js         連線設定與 client（整站只有這一個）
 │   ├── auth.js             登入、目前使用者、角色判斷
 │   ├── brand.css           色票、字體
-│   └── logo.png            旁邊放著，因為 CSS 檔載不了 PNG
+│   ├── logo.png            旁邊放著，因為 CSS 檔載不了 PNG
+│   ├── favicon-32/48.png、apple-touch-icon.png、icon-192/512.png
+│   └── site.webmanifest    start_url 指 /app/（2026-09-02 從 passport/ 搬來）
 ├── vendor/                 supabase-js，第三方相依，平台層級
 ├── app/                    登入頁 + 登入後依角色顯示的功能選單
 ├── passport/               現有的 BT Passport 搬進來
 └── availability/           新的每週時間看板
 ```
+
+**（2026-09-02 更新：`shared/` 現在是四個模組加六個圖示檔。**
+圖示與 manifest 從 `passport/` 搬過來了，理由見 §2-1 底下那一段。
+下面這段講的是 2026-08-31 當時的狀態，判準沒有變 —— 變的是「什麼算共用」。）
 
 **`shared/` 是三個檔案加一張圖（2026-08-31，階段 2）。** 規格原本寫「只有三個檔案」，
 `logo.png` 是第四個 —— 但它不是第四個「模組」，是 `brand.css` 那一行「色票、字體、logo」
@@ -94,6 +100,22 @@ beyondtaiwannpo.com/
 **為什麼是路徑不是子網域：** 瀏覽器的登入狀態綁定「來源」。`passport.beyondtaiwannpo.com` 和 `availability.beyondtaiwannpo.com` 在瀏覽器眼中是兩個不同的地方，localStorage 不共用，會被要求登入兩次。要跨子網域共用得改寫 Supabase 的憑證儲存方式、切成多個 cookie 再組回來，那段程式碼平常沒事、某天會突然壞掉，對每年換屆的學生團隊是負擔。
 
 **同一個來源底下用資料夾，登入狀態自動共用，不需要寫任何額外程式。**
+
+### 圖示與 manifest 放 `shared/`，`start_url` 指 `/app/`（2026-09-02）
+
+原本六個圖示檔加 `site.webmanifest` 住在 `passport/` 底下，
+而 `/app/` 與 `/availability/` 根本沒有圖示，`/privacy/` 與 `/reset/` 是指過去借的。
+**那種借法沒有壞掉，所以不會有人發現它該修** —— 直到有人問「幹部會把哪一頁
+釘到主畫面」。
+
+使用者的裁定：**入口是 `/app/`，所以圖示搬到 `shared/`，`start_url` 指 `/app/`。**
+理由是幹部釘到主畫面的會是「登入後看得到全部功能的那一頁」，不是護照 ——
+護照現在只是選單裡的一個入口，時間看板也在那個選單裡。
+
+`scope` 是 `"/"`，四個資料夾都在範圍內；manifest 裡的圖示用絕對路徑
+（`/shared/icon-192.png`），因為同一份 manifest 會被六個不同深度的頁面引用。
+六個頁面全部都要引用圖示與 manifest，`scripts/check-icons.mjs` 守著這件事，
+包含「路徑指到的檔案真的存在嗎」。
 
 ### 2-2. `/app/` 依角色顯示不同內容
 

@@ -7,11 +7,27 @@
 <!-- 2026-09-02（階段 7 前置）：這一頁是登入後的入口（規格 §2-1）。
      `/` 是對外簡介，`/app/` 是登入與登入後的選單，`/passport/` 只剩護照本身。
 
-     圖示（favicon / apple-touch-icon / manifest）目前只有 /passport/ 有，
-     這一頁沒有。**這是知道而暫時沒做的，不是漏掉的**：那幾個檔案現在住在
-     passport/ 底下，從這裡引用會變成一個階段 7 還要拆掉的依賴。
-     真正的問題是「幹部現在會把哪一頁釘到主畫面」——那個答案在階段 7
-     重做視覺與導覽的時候才會定，圖示跟著那個決定一起搬。 -->
+     ── 圖示與 manifest（2026-09-02 從 passport/ 搬到 shared/）──
+     **manifest 的 start_url 指這一頁。** 幹部釘到主畫面的是「登入後看得到
+     全部功能的那一頁」，不是護照 —— 護照現在只是選單裡的一個入口，
+     時間看板也在那個選單裡。scope 是 "/"，所以四個資料夾都在範圍內。
+
+     背景色用 #EDE5D8 不是隨便挑的 —— logo 本來就是坐在卡片的那個紙色上設計的
+     （它同時有深色與淺色筆畫，換成別的底色其中一半會消失）。
+     圖示四周留了 14% 的邊：iOS 會把主畫面圖示切圓角，貼邊的話 logo 會被切掉。
+     apple-touch-icon 是 iOS 用的，manifest 裡的 192/512 是 Android 用的，兩邊都要。
+     **所有尺寸都只用左邊的台灣圖形，不含 Beyond Taiwan 字樣。**
+     兩個理由：整組橫式 logo 縮到 32px 會糊成一團認不出來；而主畫面圖示實際顯示
+     大約 60pt，那個大小下「Beyond Taiwan」那行字也已經看不清了。
+     圖形與文字的切點（原圖 x=160）是量出來的，不是目測：逐欄統計不透明像素，
+     那裡有一段 35px 全透明的空白。
+     一開始大尺寸留了整組 logo、小尺寸用圖形，後來統一成圖形 ——
+     同一個 app 在不同位置長得不一樣，比哪一種好看更糟。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="../shared/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../shared/favicon-48.png">
+<link rel="apple-touch-icon" href="../shared/apple-touch-icon.png">
+<link rel="manifest" href="../shared/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Beyond Taiwan">
 <meta name="theme-color" content="#102A86">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
