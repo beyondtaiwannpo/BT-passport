@@ -10,18 +10,26 @@ import fs from "node:fs";
 export const DIR = "photos";
 export const MAX_WEBP = 80 * 1024;     // 單張
 export const MAX_JPG  = 120 * 1024;    // 單張（退路，本來就比較大）
-export const MAX_TOTAL = 600 * 1024;   // 整頁的圖片合計
+// ⚠ **合計要分格式算，不能把 webp 與 jpg 加在一起。**
+// 沒有任何瀏覽器會兩種都下載 —— <picture> 只挑一個。
+// 加起來算的話那個數字不對應到任何人的實際載入量，
+// 而且會逼人為了一個假的上限去壓縮真正在用的那一份。
+// 2026-09-02 第一版就是加起來算的，照片一放進去就超標，
+// 但真正下載的 webp 那份離上限還很遠。
+export const MAX_WEBP_TOTAL = 400 * 1024;   // 幾乎所有人走這條
+export const MAX_JPG_TOTAL  = 700 * 1024;   // 舊 iOS 的退路，人少但也要有上限
 
 export function scanFiles(dir = DIR) {
   if (!fs.existsSync(dir)) return { files: [], bad: [] };
   const files = fs.readdirSync(dir).filter(f => /\.(webp|jpg|jpeg|png)$/i.test(f));
   const bad = [];
-  let total = 0;
+  const byExt = { webp: 0, jpg: 0 };
   const stems = new Map();
   for (const f of files) {
     const size = fs.statSync(dir + "/" + f).size;
-    total += size;
     const ext = f.slice(f.lastIndexOf(".") + 1).toLowerCase();
+    if (ext === "webp") byExt.webp += size;
+    if (ext === "jpg" || ext === "jpeg") byExt.jpg += size;
     const stem = f.slice(0, f.lastIndexOf("."));
     if (!stems.has(stem)) stems.set(stem, new Set());
     stems.get(stem).add(ext === "jpeg" ? "jpg" : ext);
@@ -34,8 +42,11 @@ export function scanFiles(dir = DIR) {
     if (!exts.has("webp")) bad.push(`${stem} 少了 .webp`);
     if (!exts.has("jpg"))  bad.push(`${stem} 少了 .jpg（舊 iOS 會看不到圖，而且不會報錯）`);
   }
-  if (total > MAX_TOTAL) bad.push(`合計 ${Math.round(total / 1024)}KB 超過 ${Math.round(MAX_TOTAL / 1024)}KB`);
-  return { files, total, bad };
+  if (byExt.webp > MAX_WEBP_TOTAL)
+    bad.push(`webp 合計 ${Math.round(byExt.webp / 1024)}KB 超過 ${Math.round(MAX_WEBP_TOTAL / 1024)}KB`);
+  if (byExt.jpg > MAX_JPG_TOTAL)
+    bad.push(`jpg 合計 ${Math.round(byExt.jpg / 1024)}KB 超過 ${Math.round(MAX_JPG_TOTAL / 1024)}KB`);
+  return { files, byExt, bad };
 }
 
 export function scanImgTags(html) {
@@ -69,6 +80,8 @@ if (import.meta.url === "file://" + process.argv[1]) {
   if (bad.length) { console.log("BAD " + bad.join(" / ")); process.exit(0); }
   // 數字寫進通過訊息裡：0 張照片的時候這一行會說 0，
   // 才不會有人以為它守著什麼而其實沒有東西可守。
-  console.log(`OK ${f.files.length} 個檔案 ${Math.round((f.total || 0) / 1024)}KB，`
+  const b = f.byExt || { webp: 0, jpg: 0 };
+  console.log(`OK ${f.files.length} 個檔案（webp ${Math.round(b.webp / 1024)}KB / `
+            + `jpg ${Math.round(b.jpg / 1024)}KB，實際只會下載其中一份），`
             + `index.html 有 ${t.count} 個 <img>（照片 ${t.photos} 張）`);
 }
