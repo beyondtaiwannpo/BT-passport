@@ -412,6 +412,44 @@ else
   bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
 fi
 
+# ── 建表就必須在同一份檔案裡 revoke（2026-09-02 加）──
+#
+# Supabase 在 public schema 設了 default privileges：**每一張新建的表都自動
+# grant 全部權限給 anon 與 authenticated。** 所以 migration 裡只寫 grant 是裝飾品，
+# 它不會讓任何權限消失。先 revoke 再 grant，順序不能反。
+#
+# **這條守門存在的理由是：這件事已經被寫進註解一次了，而註解沒有擋住第二次。**
+# schema.sql 第 226 行寫過、2026-08-31-profiles-and-role.sql 第 136 行寫過，
+# 2026-09-02 建看板那兩張表的時候還是漏了 —— 因為寫在檔案裡的教訓，
+# 只有讀到那一份的人會看到，而寫新 migration 的人不會回頭讀舊的。
+#
+# 註解也要先剝掉再找，不然像 milestones 那份在說明文字裡提到 "create table"
+# 的檔案會被誤判（那正是這條守門第一版踩到的）。
+MIG_BAD=$(node -e '
+const fs = require("fs");
+const files = ["supabase/schema.sql"].concat(
+  fs.readdirSync("supabase/migrations").filter(f => f.endsWith(".sql"))
+    .map(f => "supabase/migrations/" + f));
+const bad = [];
+for (const f of files) {
+  const src = fs.readFileSync(f, "utf8").replace(/--[^\n]*/g, "");   // 先剝註解
+  const made = [...src.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?([a-z_][a-z0-9_]*)/gi)]
+                 .map(m => m[1].toLowerCase());
+  if (!made.length) continue;
+  const revoked = new Set();
+  for (const m of src.matchAll(/revoke\s+[\s\S]*?\son\s+([\s\S]*?)\sfrom\s/gi))
+    for (const t of m[1].split(","))
+      revoked.add(t.trim().replace(/^table\s+/i, "").replace(/^public\./i, "").toLowerCase());
+  for (const t of new Set(made)) if (!revoked.has(t)) bad.push(f.split("/").pop() + ":" + t);
+}
+process.stdout.write(bad.join(" "));
+' 2>&1)
+if [ -z "$MIG_BAD" ]; then
+  ok "每一份建表的 SQL 都在同一份檔案裡 revoke 過那張表"
+else
+  bad "有表建了卻沒在同一份檔案裡 revoke（default privileges 已經把它全開了）：$MIG_BAD"
+fi
+
 # ── 階段 7 前置：/app/ 與 /passport/ 的分工（2026-09-02）──
 #
 # 登入、註冊、忘記密碼、角色升級全部只在 /app/。護照那邊如果又長出一份登入表單，

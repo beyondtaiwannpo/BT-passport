@@ -107,6 +107,13 @@ create policy meta_update on public.availability_meta
 -- importPassport 三條寫入路徑全部靜靜地失敗，而 RLS 政策是對的、兩層驗收也都
 -- 誠實地通過了 —— 因為它們驗的是政策，不是授權。Postgres 要求 SET 清單上的
 -- **每一個欄位**都有權限，少一個就整句失敗。
+-- 2026-09-02 補上的兩句 revoke。原本這裡只有下面那幾句 grant，而那是不夠的
+-- （見上面那段警告）。放在 grant 前面，順序不能反。
+-- 修補檔 2026-09-02-availability-revoke.sql 留著不刪：它是實際對正式資料庫
+-- 跑過的那一份，而這兩句是為了讓「在乾淨的資料庫上只跑這一份」也是對的。
+revoke all on public.availability      from anon, authenticated;
+revoke all on public.availability_meta from anon, authenticated;
+
 grant select, insert, delete   on public.availability      to authenticated;
 grant select, insert           on public.availability_meta to authenticated;
 -- 只給 notice_seen_at。updated_at 不在裡面是刻意的（見上面那條欄位註解）。
