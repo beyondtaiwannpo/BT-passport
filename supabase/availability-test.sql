@@ -29,6 +29,7 @@ reset role;
 select set_config('request.jwt.claims', '', false);
 
 drop table if exists pg_temp.av_result;
+drop table if exists pg_temp.av_tmp;
 
 -- ---------- 0. 先清乾淨 ----------
 -- 只認下面三個固定的測試 UUID，碰不到任何真實資料。
@@ -44,7 +45,15 @@ create temp table av_result (
   actual   text,
   pass     boolean
 );
+-- **anon 也要給。** 第 4 節會用未登入身分寫一列結果進來，
+-- 少了這一句整份會在那裡中斷（2026-09-02 實際發生過）——
+-- 而中斷的後果是 217 之後全部沒跑到，包括 999 那條「跑了幾條」的斷言本身。
 grant all on av_result to authenticated;
+grant all on av_result to anon;
+
+-- 跨交易傳一個值用的。為什麼需要它見下面 212。
+create temp table av_tmp (k text primary key, v timestamptz);
+grant all on av_tmp to authenticated;
 
 -- ---------- 1. 三個測試帳號 ----------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
@@ -169,15 +178,33 @@ begin
      and notice_seen_at = '2001-01-01';
   insert into av_result values (209, '乙改不動甲的 meta', '0 列', n || ' 列', n = 0);
 
-  -- ===== 確認按鈕（Q1）=====
-  select updated_at into t from availability_meta
+  -- ===== 確認按鈕（Q1）的基準線 =====
+  -- 只記下現在的值，比較留到下一個交易做。理由見下面那一段。
+  insert into av_tmp (k, v)
+  select 'before', updated_at from availability_meta
    where user_id = 'b0000000-0000-0000-0000-0000000000b2';
-  perform pg_sleep(0.01);
+end $$;
+
+-- ⚠ 212 要**單獨一個交易**，這不是排版。
+--
+-- Postgres 的 now() 回的是**交易開始時間**，不是當下時間。整個 do 區塊是一句
+-- SQL、也就是一個交易，所以 trigger 寫進去的 now() 跟 confirm_availability_unchanged()
+-- 寫進去的 now() 會是同一個值 —— 在同一個區塊裡比「有沒有變新」永遠不會變新。
+-- pg_sleep 也救不了，它不會讓 now() 前進。
+--
+-- 這一條 2026-09-02 第一次跑是**通過**的，而它通過的理由是錯的：
+-- 當時 207 那個 bug 還在（authenticated 改得動 updated_at），測試前一步剛把它
+-- 設成 400 天前，所以「變新」自然成立。**把那個 bug 修掉之後，這條才變紅。**
+-- 一條測試靠另一個 bug 才會過，它測的就不是它名字上寫的那件事。
+do $$
+declare t timestamptz; t2 timestamptz;
+begin
+  select v into t from av_tmp where k = 'before';
   perform public.confirm_availability_unchanged();
   select updated_at into t2 from availability_meta
    where user_id = 'b0000000-0000-0000-0000-0000000000b2';
   insert into av_result values (212, '幹部按「確認沒變」會把 updated_at 往前推', '變新',
-    case when t2 > t then '變新' else '沒有變' end, t2 > t);
+    case when t2 > t then '變新（' || t || ' → ' || t2 || '）' else '沒有變' end, t2 > t);
 end $$;
 
 -- ============================================================================
@@ -229,13 +256,19 @@ select set_config('request.jwt.claims', '', false);
 do $$
 declare n int; blocked boolean;
 begin
-  blocked := false;
+  -- ⚠ 這一條 2026-09-02 改寫過，因為**舊版在說謊**。
+  -- 舊版的例外分支寫死「連授權都沒有」，但當時 anon 其實有 select 授權，
+  -- 真正擋下它的是 permission denied for function is_cadre（早先的 migration
+  -- 把那支函式從 anon 收回了）。也就是說：測試通過了，而它給的理由是錯的，
+  -- 未登入的人是被一個意外擋住的，不是被設計擋住的。
+  -- 現在這一版**不宣稱原因**，把實際的錯誤訊息填進 actual 欄；
+  -- 「anon 到底有沒有權限」交給下面 225／226 直接查目錄。
   begin
     select count(*) into n from availability;
-    insert into av_result values (216, '未登入讀不到任何格子', '0 列', n || ' 列', n = 0);
+    insert into av_result values (216, '未登入讀不到任何格子', '0 列或被擋下', n || ' 列', n = 0);
   exception when insufficient_privilege then
-    -- anon 連 select 的授權都沒有，被授權擋下也算過 —— 那比政策更早一層。
-    insert into av_result values (216, '未登入讀不到任何格子', '0 列', '連授權都沒有', true);
+    insert into av_result values (216, '未登入讀不到任何格子', '0 列或被擋下',
+      '被擋下：' || sqlerrm, true);
   end;
 end $$;
 
@@ -284,6 +317,22 @@ begin
     has_column_privilege('authenticated','public.availability_meta','notice_seen_at','update')::text,
     has_column_privilege('authenticated','public.availability_meta','notice_seen_at','update'));
 
+  -- anon 對這兩張表不准有任何權限。
+  -- **這兩條是這次真正該有而沒有的。** Supabase 在 public schema 設了
+  -- default privileges，每一張新表自動 grant 全部權限給 anon 與 authenticated，
+  -- 所以「我沒有 grant 給 anon」不等於「anon 沒有權限」——要先 revoke。
+  -- 只驗政策的話這件事永遠不會被看見：政策確實會擋，但那是第二層，
+  -- 而第一層破了的時候沒有任何東西會講。
+  select count(*) into n from (
+    select unnest(array['select','insert','update','delete']) as p) x
+   where has_table_privilege('anon','public.availability', x.p);
+  insert into av_result values (225, 'anon 對 availability 沒有任何權限', '0 種', n || ' 種', n = 0);
+
+  select count(*) into n from (
+    select unnest(array['select','insert','update','delete']) as p) x
+   where has_table_privilege('anon','public.availability_meta', x.p);
+  insert into av_result values (226, 'anon 對 availability_meta 沒有任何權限', '0 種', n || ' 種', n = 0);
+
   -- 兩支函式都要 security definer 且鎖住 search_path。
   -- 少了 search_path，同名的表可以被塞進 search_path 前面把函式騙走。
   select count(*) into n from pg_proc
@@ -303,7 +352,7 @@ delete from auth.users        where id      in ('a0000000-0000-0000-0000-0000000
 -- 中途硬錯誤會讓某個 do 區塊整段沒跑完，而少掉的那幾條在結果表裡是「不見」，
 -- 不是「紅」—— 沒有這一條的話，一份少了一半的報告看起來仍然全綠。
 insert into av_result
-select 999, '實際執行的測試數', '25 條', count(*) || ' 條', count(*) = 25 from av_result;
+select 999, '實際執行的測試數', '27 條', count(*) || ' 條', count(*) = 27 from av_result;
 
 select * from (
   select 0 as sort, -1 as n,

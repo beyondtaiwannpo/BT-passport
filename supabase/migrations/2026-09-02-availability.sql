@@ -95,6 +95,13 @@ create policy meta_update on public.availability_meta
 -- ─────────────────────────────────────────────────────────────────────
 -- 4. 授權
 -- ─────────────────────────────────────────────────────────────────────
+-- ⚠⚠ **這一段不完整，2026-09-02 當天就補了一份修補檔。**
+-- 光 grant 是不夠的：Supabase 在 public schema 設了 default privileges，
+-- 每一張新表自動 grant 全部權限給 anon 與 authenticated，所以下面這幾句
+-- **沒有讓任何權限消失**。要先 revoke。
+-- 見 supabase/migrations/2026-09-02-availability-revoke.sql。
+-- 在乾淨的資料庫上重放這個資料夾時，那一份必須跟著跑，否則兩張表是全開的。
+--
 -- ⚠ **授權跟政策是兩件事，兩件都要做。**
 -- 2026-09-01：profiles 的 grant update 少列了一個欄位，saveProfile / clearAll /
 -- importPassport 三條寫入路徑全部靜靜地失敗，而 RLS 政策是對的、兩層驗收也都
