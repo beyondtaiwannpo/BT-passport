@@ -5,10 +5,23 @@
 // 02:00–02:59 會自動收合。**不要自己重寫，也不要引進 moment 或 dayjs。**
 // 需要新功能就在下面加，不要動這三支。
 
+// 格式器快取。**這不是過早最佳化**：三十個人各填四十格 = 1200 個時段，
+// 每個時段的換算會呼叫 partsIn 三到四次，等於幾千次 Intl.DateTimeFormat 建構，
+// 而那個建構在手機上是實測得出來的慢。快取的鍵只有時區字串，不會過期。
+const FMT = new Map();
+function fmtFor(tz) {
+  let f = FMT.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US",{timeZone:tz,hour12:false,
+      year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    FMT.set(tz, f);
+  }
+  return f;
+}
+
 export function partsIn(date, tz){
-  const f = new Intl.DateTimeFormat("en-US",{timeZone:tz,hour12:false,
-    year:"numeric",month:"2-digit",day:"2-digit",
-    hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const f = fmtFor(tz);
   const p = {};
   for (const x of f.formatToParts(date)) if (x.type!=="literal") p[x.type]=+x.value;
   if (p.hour === 24) p.hour = 0;

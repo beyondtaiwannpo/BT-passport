@@ -158,6 +158,10 @@ export function menuHTML(who) {
         <b>幹部護照</b>
         <span>這一年的活動、章、心得與照片</span>
       </a>
+      <a class="mitem" href="../availability/">
+        <b>每週時間看板</b>
+        <span>填自己每週固定有空的時段，約會議時直接挑</span>
+      </a>
     </div>
     <div class="row" style="margin-top:22px">
       <button class="btn ghost sm" data-act="signout">登出</button>
