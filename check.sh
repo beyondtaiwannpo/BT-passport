@@ -408,6 +408,29 @@ else
   bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
 fi
 
+# 信件範本。三份都要有**剛好一個** Supabase 的連結變數、不准寫死網址、不准有註解。
+#
+# 寫死網址的後果特別安靜：那個變數展開出來帶著一次性 token，寫死的話信裡的連結
+# 會指向一個沒有 token 的頁面，使用者只會看到「連結無效或過期了」——
+# 而信本身、後台的預覽、寄送紀錄全部看起來完全正常。
+# 「剛好一次」而不是「至少一次」：出現兩次代表 token 在信裡被印了兩遍。
+#
+# 不准有註解，是因為貼進後台的就是整份檔案，HTML 註解在信件原始碼裡看得到。
+# 2026-09-01 對外簡介頁才發生過內部註解漏到公開頁面上。維護者的話寫在
+# supabase/email-templates/README.md，那份不會跟著信寄出去。
+TPL_BAD=""
+for t in supabase/email-templates/*.html; do
+  n_url=$(grep -o '{{ \.ConfirmationURL }}' "$t" | wc -l | tr -d ' ')
+  [ "$n_url" = "1" ] || TPL_BAD="$TPL_BAD $(basename "$t")(連結變數 $n_url 次)"
+  grep -q 'href="http' "$t" && TPL_BAD="$TPL_BAD $(basename "$t")(寫死網址)"
+  grep -q '<!--' "$t" && TPL_BAD="$TPL_BAD $(basename "$t")(有註解)"
+done
+if [ -z "$TPL_BAD" ] && [ "$(ls supabase/email-templates/*.html 2>/dev/null | wc -l | tr -d ' ')" = "3" ]; then
+  ok "三份信件範本都只用 {{ .ConfirmationURL }}，沒有寫死網址、沒有註解"
+else
+  bad "信件範本有問題：${TPL_BAD:-找不到三份範本}"
+fi
+
 # ui.js 裡不准有重複的 id。
 # 2026-09-01：忘記密碼那格本來也叫 id="fe"，跟設定頁的「英文名」撞名。
 # 那兩頁互斥、永遠不會同時出現在 DOM 裡，所以**當下沒有壞** ——
