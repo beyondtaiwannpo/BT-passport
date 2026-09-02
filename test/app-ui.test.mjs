@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { authHTML, notCadreHTML, menuHTML, downHTML } from "../app/src/ui.js";
-import { resolveNext, NEXT } from "../app/src/nav.js";
+import { resolveNext, stashNext, takeNext, NEXT } from "../app/src/nav.js";
 
 test("notCadreHTML 有邀請碼輸入框與升級按鈕，而且走得掉", () => {
   const h = notCadreHTML("");
@@ -176,4 +176,100 @@ test("連不上的那一頁不說「你的資料都還在」", () => {
   const h = downHTML();
   assert.ok(h.includes("beyondtaiwan2020@gmail.com"), "沒有給求助的出口");
   assert.ok(!h.includes("你的資料都還在"), "這一頁的人還沒登入，那句話對他沒有意義");
+});
+
+// ── 兩條登入路徑必須一致（2026-09-02 回報的 bug）─────────────────────
+//
+// 回報：從 /passport/ 被導到 /app/?next=passport 之後，用 email 登入會回到護照，
+// 用 Google 登入停在選單。
+//
+// email 那條路 boot() 在同一頁跑，網址從頭到尾沒變；Google 那條路瀏覽器離開又
+// 回來，next 要活過我們的頁面 → supabase-js → GoTrue → Google → callback → 回來。
+// 下面這幾條釘住的是**不管網址上還有沒有 next，兩條路的結果都一樣**。
+
+// 最小的假 storage。node 沒有 sessionStorage。
+const fakeStore = () => {
+  const m = new Map();
+  return { getItem: k => (m.has(k) ? m.get(k) : null),
+           setItem: (k, v) => m.set(k, String(v)),
+           removeItem: k => m.delete(k),
+           _size: () => m.size };
+};
+// Safari 無痕 / 封鎖網站資料時 sessionStorage 會直接 throw。
+const angryStore = () => ({
+  getItem() { throw new Error("SecurityError"); },
+  setItem() { throw new Error("SecurityError"); },
+  removeItem() { throw new Error("SecurityError"); }
+});
+
+test("★ 兩條登入路徑送到同一個地方", () => {
+  // email：原地登入，網址還帶著 next，沒有存過東西
+  const emailPath = takeNext("?next=passport", fakeStore());
+
+  // Google：離開前存起來，回來時**網址上的 next 已經不見了**
+  const st = fakeStore();
+  stashNext("?next=passport", st);
+  const googlePath = takeNext("", st);
+
+  assert.equal(emailPath, "../passport/", "email 那條路沒有回到護照");
+  assert.equal(googlePath, "../passport/", "Google 那條路沒有回到護照");
+  assert.equal(emailPath, googlePath, "兩條路的結果不一樣 —— 這正是 2026-09-02 回報的 bug");
+});
+
+test("Google 那條路：網址上的 next 還在的話也一樣（兩層都有的情況）", () => {
+  const st = fakeStore();
+  stashNext("?next=passport", st);
+  assert.equal(takeNext("?next=passport", st), "../passport/");
+});
+
+// 拿完就丟。不丟的話，他之後自己打 /app/ 會被莫名其妙送去護照。
+test("takeNext 會把存起來的鑰匙用掉，只送一次", () => {
+  const st = fakeStore();
+  stashNext("?next=passport", st);
+  assert.equal(takeNext("", st), "../passport/", "第一次應該送過去");
+  assert.equal(takeNext("", st), null, "第二次還在送 —— 鑰匙沒有被用掉");
+  assert.equal(st._size(), 0, "storage 裡還留著東西");
+});
+
+test("白名單以外的值不會被存起來", () => {
+  for (const bad of ["//evil.com", "https://evil.com", "__proto__", "constructor", ""]) {
+    const st = fakeStore();
+    stashNext("?next=" + encodeURIComponent(bad), st);
+    assert.equal(st._size(), 0, `next=${bad} 被存起來了`);
+    assert.equal(takeNext("", st), null, `next=${bad} 變成了一個目的地`);
+  }
+});
+
+// 存的是鑰匙不是網址：storage 是使用者能改的地方。
+test("被竄改的 storage 內容不會變成網址", () => {
+  const st = fakeStore();
+  st.setItem("bt-next", "https://evil.com");
+  assert.equal(takeNext("", st), null, "storage 裡的字串被直接當成網址用了");
+  const st2 = fakeStore();
+  st2.setItem("bt-next", "passport");
+  assert.equal(takeNext("", st2), "../passport/", "存鑰匙的正常情況壞掉了");
+});
+
+// **登不進去比記不住去哪裡嚴重得多。**
+test("storage 會 throw 的瀏覽器不准讓登入壞掉", () => {
+  assert.doesNotThrow(() => stashNext("?next=passport", angryStore()));
+  assert.doesNotThrow(() => takeNext("?next=passport", angryStore()));
+  assert.equal(takeNext("?next=passport", angryStore()), "../passport/",
+    "storage 壞掉時，網址上的 next 這條退路也要能用");
+  assert.doesNotThrow(() => stashNext("?next=passport", null));
+  assert.equal(takeNext("", null), null);
+});
+
+// 註冊不需要邀請碼（5-7 起）。這一句寫錯的方向是最糟的那一種：
+// 它讓還沒拿到碼的人以為自己不能註冊，而他不會來問，他會關掉頁面。
+// 看的是**那顆按鈕上的字**，不是整份 HTML 有沒有出現某個字串 ——
+// 第一版寫成後者，結果被我自己解釋這件事的那段 HTML 註解絆倒（註解會送到瀏覽器）。
+// 「這份文件裡沒有這個字」跟「這顆按鈕沒有這樣說」不是同一件事。
+test("註冊那顆按鈕不准把邀請碼講成註冊的前提", () => {
+  const h = authHTML("in", "");
+  const m = h.match(/data-act="switch-auth" data-m="up">([^<]*)</);
+  assert.ok(m, "找不到切換到註冊的那顆按鈕");
+  const label = m[1];
+  assert.ok(!label.includes("邀請碼"), `註冊鍵上寫著「${label}」——註冊不需要邀請碼`);
+  assert.ok(label.includes("註冊"), `註冊鍵上寫著「${label}」，看不出來是去註冊的`);
 });

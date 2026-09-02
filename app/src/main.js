@@ -12,10 +12,10 @@ import * as UI from "./ui.js";
 
 let S = { user: null, role: null, name: "", authMode: "in", authMsg: "", authEmail: "", down: false };
 
-// 登入之後送他回原本要去的地方。白名單與理由都在 nav.js，
-// 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
-import { resolveNext } from "./nav.js";
-const nextURL = () => resolveNext(location.search);
+// 登入之後送他回原本要去的地方。白名單、為什麼要存起來、為什麼包 try/catch，
+// 全部在 nav.js —— 抽出去是為了測得到（main.js 一 import 就會跑 boot()）。
+import { stashNext, takeNext } from "./nav.js";
+const store = () => { try { return window.sessionStorage; } catch (e) { return null; } };
 
 const root = () => document.getElementById("bt-root");
 
@@ -48,7 +48,10 @@ async function boot() {
     S.name = data ? (data.name_zh || data.name_en || "") : "";
 
     // 是幹部而且他本來就是要去某個地方 → 直接送過去，不要讓他多按一次。
-    const n = S.role === "cadre" && nextURL();
+    // takeNext 會同時看網址與存起來的鑰匙，而且拿完就丟掉。
+    // 兩條路（原地登入 / 繞完 Google 回來）走的是同一行，所以行為一致是構造上的，
+    // 不是碰巧的。
+    const n = S.role === "cadre" && takeNext(location.search, store());
     if (n) {
       root().innerHTML = `<div class="empty">帶你過去…</div>`;
       // replace 不留下歷史紀錄。用 href 的話，他從護照按上一頁會回到這裡，
@@ -88,9 +91,10 @@ document.addEventListener("click", async e => {
 
   if (act === "do-google") {
     S.authMsg = "";
-    // 帶著 location.search 回來，不然 ?next=passport 會在 Google 那一趟來回中掉掉，
-    // 從護照被導過來的人繞完 Google 之後會停在選單，還要自己再按一次。
-    // next 的值永遠只當白名單的鑰匙用，所以它可以被任何人塞任何字進去，不影響安全。
+    // 離開之前先把鑰匙收起來。**這一行才是真正讓 Google 那條路回得到護照的東西**
+    // —— 下面 redirectTo 帶著 location.search 是第二層保險，不是主要機制
+    //（實測過我們確實有送出去，但那一串要活過 GoTrue 的 callback，而那一步驗不到）。
+    stashNext(location.search, store());
     try { await AUTH.signInWithGoogle(location.origin + location.pathname + location.search); }
     catch (err) { S.authMsg = err.message; render(); }
     // 成功的話瀏覽器已經在往 Google 跳，這裡不要 render()，那會在跳轉前閃一下。

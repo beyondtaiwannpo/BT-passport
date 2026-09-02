@@ -432,6 +432,19 @@ else
   bad "登入的東西又出現在護照裡（或 app 反向依賴護照）：$SPLIT_BAD"
 fi
 
+# Google 那條路離開之前必須先把 next 收起來。
+#
+# 2026-09-02 咬過：從 /passport/ 被導來的人，用 email 登入回得到護照，
+# 用 Google 登入停在選單。next 要活過瀏覽器離開再回來那一整趟，而中間有一段
+# （GoTrue 的 OAuth callback）不在我們手上、也驗不到。
+# 這一行讓那一段不重要 —— 少了它，兩條路就會又開始不一樣，
+# **而且是那種只有一半的人遇得到、所以幾乎沒有人回報的不一樣**。
+if grep -q 'stashNext(location.search, store());' app/src/main.js; then
+  ok "Google 登入之前會先把 next 收起來（兩條路才會一致）"
+else
+  bad "app/src/main.js 沒有在跳去 Google 之前 stashNext —— Google 那條路會回不到護照"
+fi
+
 # 沒登入的人直接打 /passport/ 要被導去 /app/，不能是空白或壞掉。
 # 這一條守的是「導向真的存在」，不是導向長什麼樣。
 if grep -q 'if (!S.user) { toApp(); return; }' passport/src/main.js \

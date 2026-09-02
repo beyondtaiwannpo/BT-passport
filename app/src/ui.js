@@ -83,9 +83,16 @@ export function authHTML(mode, msg, email) {
          在那個時間點講這段話是錯的時機，而且會讓人以為註冊就等於加入 BT。
          真正該講的時刻是**升級成幹部的那一下**，那才是資料開始被別人看得到的時刻。
          規格 §4-5 的原則：要在第一次進入之前明講。 -->
+    <!-- 2026-09-02：註冊那顆按鈕的字改過。舊的那句以邀請碼當作註冊的前提，
+         **而那個前提 5-7 之後就沒有了** —— 註冊不需要邀請碼，任何人都開得了帳號，
+         邀請碼是登入之後升級成幹部才用的。
+         錯的方向剛好是最糟的那一種：它讓一個還沒拿到碼的人以為自己不能註冊，
+         而他不會來問，他會關掉頁面。
+         （這段刻意不引用舊的那句字面 —— HTML 註解是會送到瀏覽器的，
+           引用它等於把那句話留在頁面裡，守門也會抓到。） -->
     <div class="row">
       <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
-      <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "我有邀請碼，要註冊"}</button>
+      <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "還沒有帳號，要註冊"}</button>
     </div>
     <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
          有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
