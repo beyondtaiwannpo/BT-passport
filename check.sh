@@ -24,7 +24,7 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 守門會照樣全綠，因為它掃的是一個已經沒有色票的檔案（README 第 10 項）。
 # 2026-09-01 再加 privacy/。那一頁會被家長與學校讀，**反而是最不該破版的一頁** ——
 # 它同時是 Google OAuth 同意畫面指過去的網址。
-FILES="index.html privacy shared passport/index.html passport/src passport/activities.json"
+FILES="index.html privacy reset shared passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -38,6 +38,24 @@ if grep -rIEq --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' . ; then
   grep -rInE --exclude-dir=.git 'sb_secret_[A-Za-z0-9]{8,}' .
 else
   ok "§11-6 沒有 sb_secret_ 金鑰"
+fi
+
+# Resend 的 API key 絕不可入庫
+#
+# 2026-09-01 新增，跟下面那條連線字串同一個家族。這一輪開發期間用的那把 key
+# 只走環境變數、沒有落地，但「這次沒有寫進檔案」跟「以後不會有人寫進檔案」是兩件事。
+#
+# 那把 key 能用 beyondtaiwannpo.com 這個網域寄信 —— 外洩的後果是有人可以冒用
+# 組織的名義寄信給幹部與家長，而且 SPF/DKIM 全部會通過，收件人完全看不出來。
+# 它比連線字串「安靜」：資料庫被亂動遲早會被發現，冒名寄信可能永遠不會。
+#
+# pattern 要求 re_ 後面接一段夠長的英數（真的 key 是 30 幾碼），
+# 所以文件裡寫 re_ 這兩個字、或程式碼裡有 re_something 的變數名都不會被誤抓。
+if grep -rIEq --exclude-dir=.git 're_[A-Za-z0-9]{8,}_[A-Za-z0-9]{20,}' . ; then
+  bad "repo 裡出現 Resend 的 API key"
+  grep -rInE --exclude-dir=.git 're_[A-Za-z0-9]{8,}_[A-Za-z0-9]{20,}' . | sed 's/:.*/: （內容不印出來）/'
+else
+  ok "repo 裡沒有 Resend 的 API key"
 fi
 
 # 資料庫連線字串絕不可入庫
@@ -71,7 +89,7 @@ fi
 # 這件事把 grep 的錯誤結束碼跟「沒掃到東西」混在一起，害這支檢查誤判成通過）。
 # 不掃 docs/、.superpowers/、vendor/（vendor 之後會放 supabase-js，原始碼裡
 # service_role 是 API 的一部分）。
-service_scope="index.html privacy shared passport/index.html passport/src passport/activities.json"
+service_scope="index.html privacy reset shared passport/index.html passport/src passport/activities.json"
 [ -d .github ] && service_scope="$service_scope .github"
 if grep -rIq service_role $service_scope 2>/dev/null; then
   bad "§11-6 repo 裡出現 service_role"
@@ -88,7 +106,7 @@ fi
 # 其餘檔案（src、passport/activities.json）不受影響、照舊整份掃。
 strayA=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html \
          | grep -ohI '#[0-9A-Fa-f]\{3,8\}\b')
-strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html privacy shared passport/src passport/activities.json 2>/dev/null)
+strayB=$(grep -rhIo '#[0-9A-Fa-f]\{3,8\}\b' index.html privacy reset shared passport/src passport/activities.json 2>/dev/null)
 stray=$(printf '%s\n%s\n' "$strayA" "$strayB" \
         | tr 'a-f' 'A-F' | sort -u | grep -v '^$' \
         | grep -v '^#FFC46C$' | grep -v '^#EDE5D8$' | grep -v '^#102A86$')
@@ -130,7 +148,7 @@ fi
 
 # 方向二：這些色碼**不准出現在區塊外面**。季節色是入境章專用的，
 # 不是「解禁了十色可以到處用」。
-outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html privacy/index.html shared/* passport/src/*.js passport/activities.json 2>/dev/null)
+outside=$(sed '/ESTAMP-PALETTE-BEGIN/,/ESTAMP-PALETTE-END/d' passport/index.html; cat index.html privacy/index.html reset/index.html reset/reset.js shared/* passport/src/*.js passport/activities.json 2>/dev/null)
 outsidebad=0
 for c in $ESTAMP_PALETTE; do
   if printf '%s' "$outside" | grep -qiF "$c"; then
@@ -574,6 +592,13 @@ leakOut=$(node -e '
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
       mustHide: ["因為手機上會有人真的從頭讀到尾"]
+    },
+    // reset/ 的「可見文字」是 JavaScript 沒跑起來時的那一份 —— 這條守門不執行 JS，
+    // 看到的就是靜態 HTML。那份 fallback 本來就該存在（見該檔的註解），
+    // 所以拿它當錨點是對的：它不見了本身就是問題。
+    "reset/index.html": {
+      mustShow: ["重設密碼", "這一頁需要 JavaScript 才能運作", "回 BT 護照"],
+      mustHide: ["而那正是這個 repo 反覆踩到的病根"]
     }
   };
 
@@ -625,7 +650,7 @@ leakOut=$(node -e '
         bad.push("  " + f + " 剝掉註解之後找不到 " + tag + "（有註解忘了關，把它吞掉了？）");
   }
   if (bad.length) { console.log(bad.join("\n")); process.exit(1); }
-' index.html privacy/index.html 2>&1)
+' index.html privacy/index.html reset/index.html 2>&1)
 leakCode=$?
 if [ $leakCode -eq 2 ] || [ $leakCode -gt 2 ]; then
   bad "檢查不出來：抽取頁面可見文字時失敗（不是外洩，是這條守門自己壞了）"
@@ -657,7 +682,7 @@ fi
 #
 # ⚠ 這是「必須不存在」型的守門，所以**上面這段說明裡不能寫出那個標記本身**，
 #   不然它會抓到自己而變成常紅（同一個坑在連線字串那條守門上踩過一次）。
-placeholder_scope="index.html privacy passport/index.html passport/src passport/activities.json"
+placeholder_scope="index.html privacy reset passport/index.html passport/src passport/activities.json"
 if grep -rIq '【待補文案】' ${placeholder_scope} 2>/dev/null; then
   bad "部署範圍裡還有佔位文案，會直接顯示給使用者（2026-08-22 出過事）"
   grep -rIn '【待補文案】' ${placeholder_scope}

@@ -276,6 +276,36 @@ export async function signInWithGoogle(redirectTo) {
   if (error) throw new Error(authMessage(error));
 }
 
+// 寄出重設密碼信（規格 §3-6）。
+//
+// **只有 email + 密碼那條路需要這個。** Google 進來的人沒有密碼可以重設 ——
+// 他們忘記的是 Google 帳號的密碼，那不歸我們管，畫面上也不該叫他們來這裡。
+//
+// redirectTo 是使用者點信裡的連結之後會被送到的位址，**必須在 Supabase 後台的
+// Redirect URLs 允許清單裡**（我們設的是 https://beyondtaiwannpo.com/**，涵蓋 /reset/）。
+//
+// 這個函式**不會**告訴呼叫端「這個 email 存不存在」，Supabase 對存在與不存在的
+// 信箱回一樣的成功。那是刻意的：不然任何人都能拿它當帳號列舉的工具，
+// 一次一個 email 問「這個人是不是 BT 幹部」。呼叫端的文案要跟著這個事實寫 ——
+// 講「如果這個信箱有帳號，我們寄了一封信」，不要講「已寄出」。
+export async function sendPasswordReset(email, redirectTo) {
+  if (!supabase) throw new Error(MSG.offline);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw new Error(authMessage(error));
+}
+
+// 設定新密碼。呼叫這個之前必須已經有 session ——
+// 使用者點了信裡的連結、supabase-js 從網址把 recovery token 換成 session 之後才行。
+//
+// 這個 client 是 implicit flow（實測 flowType === "implicit"），所以 token 走網址的
+// hash，detectSessionInUrl 會自己接住並觸發 PASSWORD_RECOVERY 事件。
+// **不要在這裡自己解析網址** —— 那是 supabase-js 的工作，自己解會有兩份邏輯。
+export async function updatePassword(newPassword) {
+  if (!supabase) throw new Error(MSG.offline);
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(authMessage(error));
+}
+
 // 角色升級（規格 §3-5）。**前端唯一能改動角色的路徑就是這一個函式**，
 // 而它只是呼叫資料庫那支 security definer 的 RPC —— 驗碼、扣碼、升級、
 // 建 passports 那一列，全部在資料庫裡一次做完。

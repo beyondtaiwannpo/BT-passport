@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>重設密碼 — Beyond Taiwan</title>
+
+<!-- 重設密碼頁（規格 §3-6 第 4 點）。
+     ⚠ 這一頁的文案是可運作的最小版本，使用者會重寫。改文案時只改 <main> 裡的字，
+        狀態機與錯誤處理在 reset.js，不要把文案搬進那裡。
+
+     ── 為什麼放在 /reset/ 而不是護照裡 ──
+     使用者點開重設連結的時候是**進不去護照的**（他就是因為進不去才要重設）。
+     把它藏在護照的登入流程裡，等於要求一個進不去的人先進去。
+     而且它跟角色、跟功能選單都無關，階段 7 做 /app/ 的時候可以原地不動。
+
+     ── 這一頁需要 JavaScript，跟 / 與 /privacy/ 不同 ──
+     那兩頁是給不認識 BT 的人讀的文件，不該執行任何程式。
+     這一頁是一個功能：它必須讓 supabase-js 從網址接住 recovery token。
+     所以它載入 shared/supabase.js，而那兩頁不載入。這個差別是刻意的。
+
+     ── 為什麼不自己解析網址 ──
+     這個 client 是 implicit flow（實測 flowType === "implicit"），
+     token 走網址的 hash，detectSessionInUrl 會自己接住並觸發 PASSWORD_RECOVERY。
+     自己再解一次會有兩份邏輯，而那正是這個 repo 反覆踩到的病根。 -->
+
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#102A86">
+<link rel="icon" type="image/png" sizes="32x32" href="../passport/favicon-32.png">
+<link rel="apple-touch-icon" href="../passport/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/brand.css">
+
+<style>
+/* 色票與字體全部來自 ../shared/brand.css，這裡沒有寫死的色碼
+   （唯一例外是 head 的 theme-color，meta 吃不了 var）。 */
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:400 17px/1.7 var(--body);-webkit-font-smoothing:antialiased;
+  display:flex;align-items:flex-start;justify-content:center;min-height:100vh}
+.card{width:100%;max-width:26em;margin:0 auto;padding:40px 22px 64px}
+img.logo{height:30px;display:block;margin:0 0 22px}
+h1{font-family:var(--display);font-size:32px;line-height:1.15;margin:0 0 10px}
+.sub{margin:0 0 22px;opacity:.85}
+p{margin:0 0 16px}
+label{display:block;margin:0 0 18px}
+label i{display:block;font-style:normal;font-size:14px;font-weight:600;margin:0 0 6px}
+input{width:100%;font:inherit;font-size:17px;padding:11px 13px;border:1px solid var(--bt-navy);
+  border-radius:var(--r);background:var(--paper);color:var(--ink)}
+input:focus-visible{outline:2px solid var(--bt-orange);outline-offset:1px}
+.btn{font:inherit;font-weight:600;font-size:16px;cursor:pointer;border:none;border-radius:999px;
+  padding:11px 22px;background:var(--bt-orange);color:var(--bt-navy)}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+.note{border:1px solid var(--bt-orange);border-radius:var(--r);padding:12px 14px;margin:0 0 18px;font-size:15px}
+.foot{margin-top:32px;padding-top:18px;border-top:1px solid var(--bt-orange);font-size:15px}
+a{color:var(--ink);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<main class="card" id="root">
+  <!-- reset.js 會把這裡整段換掉。這份是「JavaScript 沒跑起來」時看到的東西 ——
+       **不要拿掉**：沒有它，關掉 JS 或載入失敗的人看到的是一片空白，
+       而空白會被當成網站壞了。 -->
+  <img class="logo" src="../shared/logo.png" alt="Beyond Taiwan">
+  <h1>重設密碼</h1>
+  <p class="sub">這一頁需要 JavaScript 才能運作。</p>
+  <div class="note">如果你看到這句話沒有變成密碼輸入框，請換一個瀏覽器再試一次，
+  或寄信到 beyondtaiwan2020@gmail.com，我們幫你處理。</div>
+  <p class="foot"><a href="../passport/">← 回 BT 護照</a></p>
+</main>
+
+<script type="module" src="./reset.js"></script>
+</body>
+</html>
