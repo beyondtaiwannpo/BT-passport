@@ -424,9 +424,15 @@ for t in supabase/email-templates/*.html; do
   [ "$n_url" = "1" ] || TPL_BAD="$TPL_BAD $(basename "$t")(連結變數 $n_url 次)"
   grep -q 'href="http' "$t" && TPL_BAD="$TPL_BAD $(basename "$t")(寫死網址)"
   grep -q '<!--' "$t" && TPL_BAD="$TPL_BAD $(basename "$t")(有註解)"
+  # 「不要回覆這封信」那一句是必要的，不是禮貌用語：
+  # noreply@beyondtaiwannpo.com 沒有 MX 紀錄，按回覆會被退回，
+  # 而那個人只會覺得沒有人理他 —— 他不會再想別的辦法聯絡我們。
+  # 2026-09-02 那一句在實際收到的信裡沒有出現過一次，所以它需要守門。
+  grep -q '請不要直接回覆這封信' "$t" || TPL_BAD="$TPL_BAD $(basename "$t")(少了不要回覆那句)"
+  grep -q 'beyondtaiwan2020@gmail.com' "$t" || TPL_BAD="$TPL_BAD $(basename "$t")(少了組織信箱)"
 done
 if [ -z "$TPL_BAD" ] && [ "$(ls supabase/email-templates/*.html 2>/dev/null | wc -l | tr -d ' ')" = "3" ]; then
-  ok "三份信件範本都只用 {{ .ConfirmationURL }}，沒有寫死網址、沒有註解"
+  ok "三份信件範本：連結變數各一次、沒有寫死網址、沒有註解、都有不要回覆與組織信箱"
 else
   bad "信件範本有問題：${TPL_BAD:-找不到三份範本}"
 fi
