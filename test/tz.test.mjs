@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { partsIn, toInstant, weekdayOf, addDays, startOfWeek,
+import { partsIn, offsetOf, toInstant, weekdayOf, addDays, startOfWeek,
          slotInstants, cellOf, offsetLabel, detectTz } from "../availability/src/tz.js";
 
 const TPE = "Asia/Taipei", DET = "America/Detroit";
@@ -118,4 +118,25 @@ test("detectTz 猜不到就回 null，不編一個出來", () => {
   } finally { Intl.DateTimeFormat = real; }
   assert.ok(typeof detectTz() === "string" && detectTz().includes("/"),
     "正常環境下應該猜得到一個 IANA 名稱");
+});
+
+// offsetOf 是 §5-3 那三支之一，被 toInstant 用著。這一條測的是它真的會
+// 隨著 DST 改變 —— 那正是規格說「不要存 UTC 偏移量」的理由：
+// 同一個時區在一年之中的偏移不是固定的，存死了就會錯。
+test("offsetOf 會隨夏令時間改變（所以偏移量不能存死）", () => {
+  const winter = offsetOf(new Date("2026-01-15T12:00:00Z"), DET) / 3600000;
+  const summer = offsetOf(new Date("2026-07-15T12:00:00Z"), DET) / 3600000;
+  assert.equal(winter, -5, "美東冬令是 UTC-5");
+  assert.equal(summer, -4, "美東夏令是 UTC-4");
+  assert.notEqual(winter, summer, "偏移量在一年之中變了 —— 這就是不能存死的原因");
+
+  // 台北不換日光節約，一年到頭都是 +8。有這一條才看得出上面那個差別
+  // 是 DST 造成的，不是這個函式本身不穩定。
+  assert.equal(offsetOf(new Date("2026-01-15T12:00:00Z"), TPE) / 3600000, 8);
+  assert.equal(offsetOf(new Date("2026-07-15T12:00:00Z"), TPE) / 3600000, 8);
+});
+
+test("offsetLabel 跟著 offsetOf 一起變", () => {
+  assert.equal(offsetLabel(new Date("2026-01-15T12:00:00Z"), DET), "UTC-5");
+  assert.equal(offsetLabel(new Date("2026-07-15T12:00:00Z"), DET), "UTC-4");
 });

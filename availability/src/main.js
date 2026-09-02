@@ -6,7 +6,7 @@ import * as UI from "./ui.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
-import { startOfWeek, slotInstants, cellOf, detectTz, partsIn, addDays, toInstant } from "./tz.js";
+import { startOfWeek, detectTz, partsIn, addDays, toInstant } from "./tz.js";
 
 const root = () => document.getElementById("bt-root");
 const K = DATA.key;

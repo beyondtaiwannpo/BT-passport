@@ -55,6 +55,19 @@ export function quickDays(q) {
   return [];
 }
 
+// 把要刪的格子照星期分組。PostgREST 的 or 語法在幾十個條件時會很長，
+// 分組之後最多七個請求，而實際上通常只有一兩個。
+// 抽出來是為了測得到 —— 它埋在 saveMine 裡的時候要 mock 整個 supabase client 才測得動。
+export function groupByWeekday(keys) {
+  const byDay = new Map();
+  for (const k of keys) {
+    const [wd, min] = k.split(":").map(Number);
+    if (!byDay.has(wd)) byDay.set(wd, []);
+    byDay.get(wd).push(min);
+  }
+  return byDay;
+}
+
 // 要寫進資料庫的差集。**不是先刪光再全部寫回**（理由見 data.js 的 saveMine）。
 export function diff(wanted, current) {
   return {

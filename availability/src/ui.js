@@ -1,6 +1,7 @@
 // 看板的畫面。**esc 是自己的一份**，不從 passport/ 或 app/ import
 //（跟 app/ 同一條規矩：資料夾之間不互相依賴）。
 import { labelOf } from "./tz-alias.js";
+import { offsetLabel } from "./tz.js";
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -234,7 +235,9 @@ export function membersHTML(S, now) {
       const filled = (S.slots.get(m.id) || new Set()).size;
       return `<tr class="${stale ? "stale" : ""}">
         <td>${esc(m.name)}${m.team ? `<span class="team">${esc(m.team)}</span>` : ""}</td>
-        <td>${m.tz ? esc(labelOf(m.tz)) : `<span class="warn">還沒設定時區</span>`}</td>
+        <td>${m.tz
+              ? `${esc(labelOf(m.tz))}<span class="team">${esc(offsetLabel(new Date(now), m.tz))}</span>`
+              : `<span class="warn">還沒設定時區</span>`}</td>
         <td>${d == null ? `<span class="warn">還沒填過</span>`
               : `${d} 天前${d > 30 ? `<span class="warn">　該更新了</span>` : ""}${filled ? "" : `<span class="warn">（目前 0 格）</span>`}`}</td>
       </tr>`;

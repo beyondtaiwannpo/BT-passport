@@ -2,6 +2,7 @@
 //（跟 app/ 同一條規矩：護照壞掉不該讓別的功能一起打不開）。
 import { supabase } from "../../shared/supabase.js";
 import { authMessage, isOfflineError } from "../../shared/auth.js";
+import { groupByWeekday } from "./edit.js";
 
 const SLOT = 30;                      // 半小時一格
 export const key = (wd, min) => wd + ":" + min;
@@ -49,15 +50,8 @@ export async function saveMine(userId, wanted, current) {
   if (!add.length && !del.length) return { add: 0, del: 0 };
 
   if (del.length) {
-    // 一次刪一批。PostgREST 的 or 語法在幾十個條件時會很長，
-    // 所以照星期分組刪——最多七個請求，而實際上通常只有一兩個。
-    const byDay = new Map();
-    for (const k of del) {
-      const [wd, min] = k.split(":").map(Number);
-      if (!byDay.has(wd)) byDay.set(wd, []);
-      byDay.get(wd).push(min);
-    }
-    for (const [wd, mins] of byDay) {
+    // 照星期分組刪（分組的理由與測試見 edit.js 的 groupByWeekday）。
+    for (const [wd, mins] of groupByWeekday(del)) {
       const { error } = await supabase.from("availability")
         .delete().eq("user_id", userId).eq("weekday", wd).in("minute", mins);
       if (error) throw error;

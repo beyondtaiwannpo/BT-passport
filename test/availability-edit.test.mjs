@@ -3,7 +3,7 @@
 // 而主要的填法要有測試。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyRange, copyDay, quickDays, diff, key } from "../availability/src/edit.js";
+import { applyRange, copyDay, quickDays, diff, key, groupByWeekday } from "../availability/src/edit.js";
 
 const S = (...ks) => new Set(ks);
 const sorted = s => [...s].sort();
@@ -112,4 +112,27 @@ test("weekdays 是 null 時安靜地什麼都不做，不丟例外", () => {
     assert.equal(r.changed, 0);
     assert.deepEqual(sorted(r.set), sorted(base));
   }
+});
+
+// 刪除照星期分組：PostgREST 的 or 語法在幾十個條件時會很長。
+// 這一段本來埋在 data.js 的 saveMine 裡，要 mock 整個 supabase client 才測得動。
+test("刪除照星期分組，一天一批", () => {
+  const g = groupByWeekday(["1:600", "1:630", "3:1200", "0:0"]);
+  assert.equal(g.size, 3, "三個不同的星期就是三批");
+  assert.deepEqual(g.get(1), [600, 630]);
+  assert.deepEqual(g.get(3), [1200]);
+  assert.deepEqual(g.get(0), [0], "星期日是 0，不能被當成假值漏掉");
+});
+
+test("沒有東西要刪的時候是空的，不會送出任何一批", () => {
+  assert.equal(groupByWeekday([]).size, 0);
+});
+
+// 整週都要刪的話是七批，不是一個超長的請求。
+test("整週都刪也只有七批", () => {
+  const all = [];
+  for (let d = 0; d < 7; d++) for (let m = 0; m < 1440; m += 30) all.push(d + ":" + m);
+  const g = groupByWeekday(all);
+  assert.equal(g.size, 7);
+  assert.equal(g.get(0).length, 48);
 });
