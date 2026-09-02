@@ -450,6 +450,24 @@ else
   bad "有表建了卻沒在同一份檔案裡 revoke（default privileges 已經把它全開了）：$MIG_BAD"
 fi
 
+# ── 欄位層級授權的表不准用 .upsert()（2026-09-02 加）──
+#
+# 2026-09-02 咬過，而且咬的是**所有人第一次進看板都會撞到的那一道門**：
+# 知情同意按下去完全沒反應。根因是 markNoticeSeen 用了 .upsert()。
+# PostgREST 的 upsert 會把 payload 裡的每一欄都放進 ON CONFLICT DO UPDATE 的
+# SET 清單，包含主鍵；而 availability_meta 只發了 grant update (notice_seen_at)。
+# Postgres 要求 SET 清單上每一欄都有權限，於是整句被拒。
+#
+# **不是所有 upsert 都有問題**：護照對 stamps / entries / visas 用 upsert 是對的，
+# 那幾張表有表層級的 update 授權。有問題的只有「欄位層級授權」的表。
+# 所以這條守門先從 migration 讀出哪些表是欄位層級授權的，再去前端找那些表的 upsert。
+UPSERT_OUT=$(node scripts/check-upsert.mjs 2>&1)
+case "$UPSERT_OUT" in
+  "OK "*)  ok "欄位層級授權的表沒有被 .upsert()（守著：${UPSERT_OUT#OK }）" ;;
+  "BAD "*) bad "這些地方對欄位層級授權的表用了 .upsert()，會整句被拒：${UPSERT_OUT#BAD }" ;;
+  *)       bad "upsert 守門自己壞了（這不是發現違規）：$UPSERT_OUT" ;;
+esac
+
 # ── 階段 7 前置：/app/ 與 /passport/ 的分工（2026-09-02）──
 #
 # 登入、註冊、忘記密碼、角色升級全部只在 /app/。護照那邊如果又長出一份登入表單，

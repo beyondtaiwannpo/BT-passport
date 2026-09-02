@@ -17,7 +17,7 @@ let S = {
   weekStart: null, weekOffset: 0,
   chips: new Set(), bfrom: 19 * 60, bto: 22 * 60, copyFrom: 1,
   needNotice: false, needTz: false, tzQuery: "", tzResults: [], tzGuess: null,
-  peek: null, msg: ""
+  peek: null, msg: "", busy: false
 };
 
 // ── 換算：把所有人的時段落到觀看者的格子上 ──────────────────────────
@@ -63,7 +63,7 @@ function render() {
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.ready) { el.innerHTML = `<div class="empty">載入中…</div>`; return; }
   if (S.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
-  if (S.needNotice) { el.innerHTML = UI.noticeHTML(); return; }
+  if (S.needNotice) { el.innerHTML = UI.noticeHTML(S.msg, S.busy); return; }
   if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
 
   let inner, label = null;
@@ -131,8 +131,19 @@ document.addEventListener("click", async e => {
   }
 
   if (act === "notice-ok") {
-    try { await DATA.markNoticeSeen(S.user.id); S.needNotice = false; render(); }
-    catch (err) { S.msg = DATA.authMessage(err); render(); }
+    // 連點會送出兩次請求。第二次撞主鍵之後現在雖然不會報錯，
+    // 但畫面在那兩秒裡完全沒有反應，而「沒有反應」正是這個 bug 的形狀。
+    if (S.busy) return;
+    S.busy = true; S.msg = ""; render();
+    try {
+      await DATA.markNoticeSeen(S.user.id);
+      S.needNotice = false; S.busy = false; render();
+    } catch (err) {
+      console.error("記錄告知失敗。真正的原因：", err);
+      S.busy = false;
+      S.msg = DATA.authMessage(err);
+      render();
+    }
     return;
   }
 

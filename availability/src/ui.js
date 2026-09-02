@@ -36,17 +36,22 @@ export function shellHTML(tab, inner, weekLabel) {
 // **這一頁擋在編輯器前面，按了確認才寫 notice_seen_at。**
 // 打開頁面就記的話，「他看過了」這件事會變成假的 —— 而這是這個功能
 // 唯一的知情同意：看板會把三十個人的完整作息表送進每一個幹部的瀏覽器。
-export function noticeHTML() {
+//
+// ⚠ **msg 一定要畫出來。** 2026-09-02 的第一版沒有這個參數，於是存檔失敗時
+// render() 畫出一模一樣的畫面 —— 使用者按了沒反應，只會再按一次、按五次、
+// 然後關掉。這跟邀請碼那一輪學到的是同一件事：**失敗一定要說話。**
+export function noticeHTML(msg, busy) {
   return `<div class="card">
     <h2>填之前先知道一件事</h2>
     <div class="sub">這一頁只出現一次。</div>
+    ${msg ? `<div class="wnote big">${esc(msg)}</div>` : ""}
     <div class="wnote big">你填的每週時間，<b>其他 BT 幹部看得到</b>。<br>
       他們看得到你哪一天固定有空、哪一天固定不在。</div>
     <p>看板要回答的就是「這個時段有誰有空」，所以每個幹部都會看到全部人的時間，
       不是只看到人數。這是這個功能的形狀，沒有辦法只給你看得到的部分。</p>
     <p>你的護照心得與活動照片<b>不在這裡面</b>，那些仍然只有你自己看得到。</p>
     <div class="row">
-      <button class="btn" data-act="notice-ok">我知道了，開始填</button>
+      <button class="btn" data-act="notice-ok" ${busy ? "disabled" : ""}>${busy ? "處理中…" : "我知道了，開始填"}</button>
       <a class="btn ghost" href="../app/">先不要</a>
     </div>
   </div>`;

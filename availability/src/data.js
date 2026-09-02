@@ -76,11 +76,30 @@ export async function saveMine(userId, wanted, current) {
 
 // 看過告知。規格 §4-5 第 3 點 —— 這是這個功能唯一的知情同意，
 // 所以是「按了確認才記」，不是「打開頁面就記」。
+// ⚠ **不要用 .upsert()。** 2026-09-02 就是這樣壞掉的，而且是所有人第一次
+// 進看板都會撞到的那一道門。
+//
+// PostgREST 的 upsert 會把 payload 裡的**每一欄**都放進 ON CONFLICT DO UPDATE
+// 的 SET 清單，包含 user_id。而 availability_meta 只發了
+// `grant update (notice_seen_at)` —— 沒有 user_id。Postgres 要求 SET 清單上
+// 每一欄都有權限，所以整句被拒：
+//   ERROR: permission denied for table availability_meta
+// **欄位授權是對的**（主鍵本來就不該讓前端改），錯的是這裡用錯動詞。
+//
+// 改成先 update、沒有那一列再 insert。兩句都落在已發的權限裡。
+// update 帶 .select() 是為了知道有沒有改到列 —— 沒有它就分不出
+// 「改好了」跟「那一列還不存在」。
 export async function markNoticeSeen(userId) {
-  const { error } = await supabase.from("availability_meta")
-    .upsert({ user_id: userId, notice_seen_at: new Date().toISOString() },
-            { onConflict: "user_id" });
-  if (error) throw error;
+  const at = new Date().toISOString();
+  const up = await supabase.from("availability_meta")
+    .update({ notice_seen_at: at }).eq("user_id", userId).select("user_id");
+  if (up.error) throw up.error;
+  if (up.data && up.data.length) return;
+  const ins = await supabase.from("availability_meta")
+    .insert({ user_id: userId, notice_seen_at: at });
+  // 兩個人同時第一次進來的話，第二句可能撞主鍵（23505）。
+  // 那代表「已經有那一列了」，跟成功是同一個結果，不該報錯給使用者。
+  if (ins.error && ins.error.code !== "23505") throw ins.error;
 }
 
 // 「我確認過了，沒有變」。updated_at 前端寫不動，只能走這支 RPC。
