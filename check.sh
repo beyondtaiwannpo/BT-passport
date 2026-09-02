@@ -24,7 +24,11 @@ ok()  { printf 'ok    %s\n' "$1"; }
 # 守門會照樣全綠，因為它掃的是一個已經沒有色票的檔案（README 第 10 項）。
 # 2026-09-01 再加 privacy/。那一頁會被家長與學校讀，**反而是最不該破版的一頁** ——
 # 它同時是 Google OAuth 同意畫面指過去的網址。
-FILES="index.html privacy reset shared passport/index.html passport/src passport/activities.json"
+# 2026-09-02（階段 7 前置）再加 app/。登入頁與升級頁從 passport/ 搬過去之後，
+# 範圍不跟著搬的話，「三色兩字體」「佔位文案」這幾條就對**全站唯一一個
+# 沒登入的人也看得到的動態頁面**完全不設防 —— 而它掃的 passport/ 裡
+# 那些規則要守的東西已經不在那裡了。這是第 10 項那個形狀的第三次。
+FILES="index.html privacy reset shared app/index.html app/src passport/index.html passport/src passport/activities.json"
 
 # §11-6 secret key 絕不可入庫。兩支各自獨立回報（不是 elif）——
 # 一支沒抓到，不能蓋掉另一支抓到的事。
@@ -408,6 +412,42 @@ else
   bad ".estamp 少了 pointer-events:none，蓋滿的月份會有格子點不開"
 fi
 
+# ── 階段 7 前置：/app/ 與 /passport/ 的分工（2026-09-02）──
+#
+# 登入、註冊、忘記密碼、角色升級全部只在 /app/。護照那邊如果又長出一份登入表單，
+# Supabase 的 redirect URL、錯誤訊息、忘記密碼的入口就會有兩份，
+# 而它們一定會慢慢不一樣 —— 那種不一樣不會壞掉，只會讓其中一條路悄悄變舊。
+SPLIT_BAD=""
+for pat in 'authHTML' 'notCadreHTML' 'do-signin' 'do-signup' 'do-google' 'do-forgot' 'do-claim' 'id="ae"' 'id="ap"'; do
+  grep -rq -- "$pat" passport/src passport/index.html && SPLIT_BAD="$SPLIT_BAD $pat"
+done
+# /app/ 不准 import passport/ 的任何東西。護照壞掉不該讓人連登入頁都打不開。
+# **只看 import，不看字串。** 第一版寫成 grep 'passport/'，結果把 nav.js 裡
+# 那個 "../passport/" 連結目的地也算成依賴 —— 那是連結不是 import，
+# /app/ 本來就該連得到護照。守門要守的是「執行時載入護照的程式碼」。
+grep -rqE "^\\s*import .*passport/" app/src/*.js && SPLIT_BAD="$SPLIT_BAD app→passport-import"
+if [ -z "$SPLIT_BAD" ]; then
+  ok "登入的東西只在 /app/，護照那邊沒有殘留，也沒有互相 import"
+else
+  bad "登入的東西又出現在護照裡（或 app 反向依賴護照）：$SPLIT_BAD"
+fi
+
+# 沒登入的人直接打 /passport/ 要被導去 /app/，不能是空白或壞掉。
+# 這一條守的是「導向真的存在」，不是導向長什麼樣。
+if grep -q 'if (!S.user) { toApp(); return; }' passport/src/main.js \
+   && grep -q 'location.replace("../app/?next=passport")' passport/src/main.js; then
+  ok "沒登入直接打 /passport/ 會被導去 /app/（帶 next）"
+else
+  bad "passport/src/main.js 沒有把未登入的人導去 /app/ —— 那一頁現在沒有登入表單可以退回去"
+fi
+
+# 對外首頁右上角的登入連結要指向 /app/，不是直接指進護照。
+if grep -q '<a class="login" href="./app/">' index.html; then
+  ok "首頁的登入連結指向 /app/"
+else
+  bad "首頁的登入連結不是 ./app/ —— 學員點進護照只會被彈回來"
+fi
+
 # 信件範本。三份都要有**剛好一個** Supabase 的連結變數、不准寫死網址、不准有註解。
 #
 # 寫死網址的後果特別安靜：那個變數展開出來帶著一次性 token，寫死的話信裡的連結
@@ -444,11 +484,15 @@ fi
 # 或有人讓兩頁同時出現，就會安靜地讀到另一格的值。
 # 真的咬到人的是反向驗證：破壞 id="fe" 的時候，改動落在兩處，
 # 於是「哪一條測試該變紅」變得說不清楚。重複的 id 會讓驗證本身失去解析度。
-DUP_IDS=$(grep -o 'id="[a-zA-Z0-9_-]*"' passport/src/ui.js | sort | uniq -d)
+DUP_IDS=""
+for f in passport/src/ui.js app/src/ui.js; do
+  d=$(grep -o 'id="[a-zA-Z0-9_-]*"' "$f" | sort | uniq -d)
+  [ -n "$d" ] && DUP_IDS="$DUP_IDS $(basename "$(dirname "$(dirname "$f")")")/$(echo "$d" | tr '\n' ' ')"
+done
 if [ -z "$DUP_IDS" ]; then
-  ok "ui.js 裡沒有重複的 id"
+  ok "passport 與 app 的 ui.js 裡都沒有重複的 id"
 else
-  bad "ui.js 有重複的 id：$(echo "$DUP_IDS" | tr '\n' ' ')"
+  bad "ui.js 有重複的 id：$DUP_IDS"
 fi
 
 # 單元測試。node 不在的話**算失敗不算通過** —— 「沒跑到」跟「跑過而且過了」
@@ -640,7 +684,7 @@ leakOut=$(node -e '
     // 看到的就是靜態 HTML。那份 fallback 本來就該存在（見該檔的註解），
     // 所以拿它當錨點是對的：它不見了本身就是問題。
     "reset/index.html": {
-      mustShow: ["重設密碼", "這一頁需要 JavaScript 才能運作", "回 BT 護照"],
+      mustShow: ["重設密碼", "這一頁需要 JavaScript 才能運作", "回 Beyond Taiwan"],
       mustHide: ["而那正是這個 repo 反覆踩到的病根"]
     }
   };

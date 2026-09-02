@@ -9,7 +9,7 @@ import * as DATA from "./data.js";
 import * as UI from "./ui.js";
 
 let S = {
-  user: null, authMode: "in", authMsg: "", authEmail: "",
+  user: null,
   profile: null, stamps: {}, entries: {},
   activities: [], months: [], destinations: [], visas: {},
   page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
@@ -51,22 +51,36 @@ function toast(msg) {
 /* ---------- render ---------- */
 const root = () => document.getElementById("bt-root");
 
+// 把人送去 /app/。用 replace 不用 href：href 會留下一筆歷史紀錄，
+// 於是他從 /app/ 按上一頁會回到這裡，而這裡又立刻把他送回去 —— 上一頁變成按不動的。
+//
+// 帶著 ?next=passport：他本來就是要來看護照的，登入完應該直接回來，
+// 而不是停在選單再自己找一次。那個值在 /app/ 只當白名單的鑰匙用（見 app/src/main.js）。
+//
+// 先寫一句話再跳：boot() 是非同步的，跳轉前那一瞬間畫面上如果是空的，
+// 慢一點的網路會看到一片白。
+function toApp() {
+  const el = root();
+  if (el) el.innerHTML = `<div class="empty">帶你去登入頁…</div>`;
+  location.replace("../app/?next=passport");
+}
+
 function render() {
   const el = root();
   // 這一條要排在所有其他分支前面：連不上資料庫的時候，S.user / S.profile 全是空的，
   // 少了它畫面會掉回登入頁，等於對一個明明登入著的人說「請登入」（spec §8.1）。
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
-  if (!S.user) { el.innerHTML = UI.authHTML(S.authMode || "in", S.authMsg, S.authEmail); return; }
-  // 登入了但還不是幹部（階段 5，規格 §3-5）。**這一條必須排在申請護照那一條前面。**
-  // 學員沒有 passports 那一列，所以 S.profile 是 null —— 少了這一條，他會被丟到
-  // 「填護照資料」頁，然後存不進去（passports 沒有 insert policy），
-  // 而且畫面上一個活動格子都沒有（RLS 擋掉 months/activities）。那看起來像壞掉。
+  // 沒登入不會走到這裡（boot() 已經導去 /app/）。真的走到了就是 boot 的判斷漏了，
+  // 那時候顯示一句話比顯示空白好 —— 這一頁不再有登入表單可以退回去。
+  if (!S.user) { el.innerHTML = `<div class="empty">請先登入。<a href="../app/">去登入頁</a></div>`; return; }
+  // 不是幹部的人也不會走到這裡（boot() 導去 /app/，升級表單在那邊）。
+  // 同樣的道理：走到了就講一句話，不要空白。
   //
-  // 用 `S.role && S.role !== "cadre"` 而不是 `S.role !== "cadre"`：
+  // 條件維持 `S.role && S.role !== "cadre"` 而不是 `S.role !== "cadre"`：
   // S.role 是 null 的時候（profiles 那一列查不到、或資料庫還沒遷移）不要接住，
-  // 讓它掉到下面既有的分支去 —— 那些情況跟「是學員」不是同一件事，
-  // 顯示「你還不是幹部」會把一個資料壞掉的幹部誤導成他自己沒升級。
-  if (S.role && S.role !== "cadre") { el.innerHTML = UI.notCadreHTML(S.authMsg); return; }
+  // 讓它掉到下面既有的分支去 —— 那跟「是學員」不是同一件事，
+  // 把它說成「你還不是幹部」會讓一個資料壞掉的幹部以為問題出在自己沒升級。
+  if (S.role && S.role !== "cadre") { el.innerHTML = `<div class="empty">這裡只開放給 BT 幹部。<a href="../app/">回到入口</a></div>`; return; }
   // Task 6 之後 trigger 會先建一列空的 passport，所以「有 profile 但兩個名字都空」
   // 也要當成還沒申請過，繼續停在申請畫面（brief Step 6）。
   if (!S.profile || !S.profile.name_zh && !S.profile.name_en) { el.innerHTML = UI.setupHTML(S.profile, S.user); return; }
@@ -234,115 +248,13 @@ document.addEventListener("click", async e => {
   // 那一段會在這裡就跑完，接下來要處理的這個新動作看到的已經是刪完的狀態。
   if (S.tearing) doUnstamp(S.tearing);
 
-  if (act === "switch-auth") { S.authMode = b.dataset.m; S.authMsg = ""; render(); return; }
-
-  if (act === "do-signin" || act === "do-signup") {
-    const email = document.getElementById("ae").value.trim();
-    const pw = document.getElementById("ap").value;
-    // 邀請碼的正規化**整套都在資料庫做**，前端不負責。註冊 trigger 的比對是
-    //   where upper(btrim(code)) = upper(btrim(v_code))
-    // 兩邊都先去掉前後空白、再轉成大寫才比，所以學生打大寫、打小寫、前後多了空白，
-    // 都對得到管理員存的那一組；管理員存的是小寫還是前後帶空白，也一樣對得到。
-    //
-    // 這裡留著的 .trim() 只是順手（送出去的值乾淨一點、console 看起來清楚），
-    // **正確性不靠它** —— 就算它哪天被拿掉，資料庫那邊照樣會對到。
-    //
-    // 為什麼要講到這個地步：2026-08-17 在正式站台上咬到人。當時這一行是 .trim()
-    // 加 .toUpperCase()，管理員建了一組小寫的 bt2026test（uses_left = 5，SQL 裡查得到），
-    // 學生怎麼打都被告知「這個邀請碼不對，或是已經被用完了」。攔下來的封包是
-    //   輸入 "bt2026test" → 送出 "BT2026TEST"
-    // 而 trigger 當時是 `where code = v_code`，嚴格相同、分大小寫，對不到 → raise → 500。
-    // 前端轉大寫加上資料庫嚴格比對，等於**偷偷規定「所有邀請碼都必須用大寫存」**，
-    // 而這條規定沒有寫進 spec、沒有寫進 README、也沒有人告訴過管理員。
-    // 真正的病根是「正規化被拆在前端和資料庫兩層、各做一半」，所以修法是把它整個
-    // 搬到資料庫（見 supabase/migrations/2026-08-17-invite-code-case-insensitive.sql）。
-    // **不要把 .toUpperCase()、也不要把任何其他大小寫轉換加回這一行。**
-    // 前端一旦又開始改使用者打進來的值，同一個坑就會以另一個形狀回來。
-    const inv = document.getElementById("ai") ? document.getElementById("ai").value.trim() : "";
-    // 欄位空的時候不要打網路。實測過（2026-08-17，probe 情境 3 的意外）：email 空著送
-    // 出去，GoTrue 回的是 AuthApiError / 400 / validation_failed
-    //「Unable to validate email address: invalid format」—— 一趟往返，只為了知道
-    // 這一格是空的，而空不空前端自己看得到。擋在這裡就不必白跑。
-    // 畫面上顯示的是既有文案（authMessage(null) 取得，文案的真相來源仍然只有
-    // data.js 的 MSG 一處）。
-    //
-    // 「有填但格式不對」（例如 wang@gmail 漏了 .com）刻意**不**擋在這裡：那種要走到
-    // 伺服器才知道對不對，而且 spec §6.1 已經有專屬的一句（badEmail），由 data.js 的
-    // RULES 認 validation_failed 之後翻出來。不要在這裡自己寫 email 格式的正規表示式 ——
-    // 那會變成第二套判斷標準，而且一定跟 GoTrue 的不一樣。
-    if (!email || !pw) {
-      S.authMsg = DATA.authMessage(null);
-      render();
-      return;
-    }
-    try {
-      if (act === "do-signup") await DATA.signUp(email, pw, inv);
-      else await DATA.signIn(email, pw);
-      await boot();
-    } catch (e) {
-      S.authMsg = e.message;
-      render();
-    }
-    return;
-  }
-
-  // 忘記密碼：要一封重設連結。
-  if (act === "do-forgot") {
-    const email = document.getElementById("fpe").value.trim();
-    if (!email) { S.authMsg = DATA.authMessage(null); render(); return; }
-    // 重設頁的網址用相對路徑算出來，不要寫死 https://beyondtaiwannpo.com/reset/ ——
-    // 寫死的話本機就測不了（本機按下去會收到一封叫你去線上那一頁的信，
-    // 而本機發出的 recovery token 在那邊沒有用）。從 /passport/ 往上一層就是 /reset/。
-    const redirectTo = new URL("../reset/", location.href).href;
-    try {
-      await DATA.sendPasswordReset(email, redirectTo);
-    } catch (e) {
-      // 真的連不上（斷網、設定沒填）才報錯 —— 那種時候說「信寄出去了」是騙人的。
-      S.authMsg = e.message; render(); return;
-    }
-    // ⚠ 這裡**不分辨**「這個 email 有沒有帳號」，因為分辨不了、也不該分辨：
-    // Supabase 對兩種情況都回成功。理由寫在 ui.js 的 sent 那一段。
-    S.authEmail = email;
-    S.authMsg = "";
-    S.authMode = "sent";
-    render();
-    return;
-  }
-
-  if (act === "do-google") {
-    S.authMsg = "";
-    try { await DATA.signInWithGoogle(); }
-    catch (e) { S.authMsg = e.message; render(); }
-    // 成功的話瀏覽器已經在往 Google 跳轉，這裡不需要做任何事 ——
-    // 也**不要**在這裡 render()，那會在跳轉前閃一下畫面。
-    return;
-  }
-
-  // 角色升級。**前端唯一碰得到角色的地方就是這裡，而它只是呼叫那支 RPC。**
-  // 規格 §3-5 第 4 點：前端不准有任何「設定角色」的路徑。
-  if (act === "do-claim") {
-    const el = document.getElementById("ci");
-    // .trim() 只是順手。大小寫與前後空白的正規化整套在資料庫做
-    // （claim_invite 兩邊都套 upper(btrim(...))）——**不要在這裡加任何大小寫轉換**，
-    // 理由跟上面 do-signup 那段一模一樣，2026-08-17 已經咬過一次。
-    const code = el ? el.value.trim() : "";
-    if (!code) { S.authMsg = DATA.authMessage(null); render(); return; }
-    b.disabled = true;
-    try {
-      await DATA.claimInvite(code);
-      // 不管回的是 upgraded 還是 already_cadre 都重新 boot：
-      // 角色變了之後 RLS 看得到的東西整組不一樣，只改前端狀態是不夠的。
-      S.authMsg = "";
-      await boot();
-    } catch (e) {
-      S.authMsg = e.message;
-      b.disabled = false;
-      render();
-    }
-    return;
-  }
-
-  if (act === "signout") { await DATA.signOut(); location.reload(); return; }
+// 登入、註冊、忘記密碼、角色升級的處理器全部搬到 app/src/main.js（2026-09-02）。
+  // 這一頁只服務「已經登入而且是幹部」的人，其他情況在 boot() 就導去 /app/ 了。
+  // **不要把登入表單加回來。** 兩個地方都能登入的話，Supabase 的 redirect URL、
+  // 錯誤訊息、忘記密碼的入口就會有兩份，而它們一定會慢慢不一樣。
+  // 登出之後回 /app/，不要 reload。reload 會停在這一頁，然後 boot() 再把他導去
+  // /app/ —— 同樣的終點，但中間多閃一次「載入護照中…」。
+  if (act === "signout") { await DATA.signOut(); location.replace("../app/"); return; }
 
   if (act === "intro-done") {
     // 樂觀更新：先讓畫面走，再背景寫資料庫。
@@ -555,7 +467,6 @@ document.addEventListener("click", async e => {
     // 參考資料不列、護照內容才列——對 destinations、visas 依然成立，
     // 不因為某張參考資料表沒被讀就不用守。
     Object.assign(S, {
-      authMode: "in", authMsg: "", authEmail: "",
       profile: null, stamps: {}, entries: {}, visas: {},
       page: 0, view: "passport", wall: null, wallLoading: false, wallError: false,
       down: false, justStamped: null, flipped: {}, justFlipped: null, tearing: null
@@ -593,18 +504,23 @@ document.addEventListener("animationend", e => {
 /* ---------- boot ---------- */
 export async function boot() {
   try {
-    // 先問「現在是誰」。沒有人登入就到此為止：render() 會停在登入頁，
-    // 不去讀護照內容（讀了也只會被 RLS 擋掉）。登入成功後 main.js 會再呼叫一次
-    // boot()，那時候 S.user 有值，才會往下走。
-    // config.js 填錯時 client 建不出來，這裡拿到空字串以外的東西，
-    // 登入頁就會帶著「現在連不上資料庫」那句出現，而不是一片空白（spec §8.1）。
-    S.authMsg = DATA.configMessage();
-    // 不能只看「查不查得到人」：連不上的時候也查不到，而那時候顯示登入頁
-    // 等於告訴一個登入中的人「你被登出了」。兩者要分開處理（見 data.js 的 currentUserDetailed）。
+    // 先問「現在是誰」。沒有人登入就導去 /app/，不去讀護照內容
+    //（讀了也只會被 RLS 擋掉）。
+    //
+    // supabase client 建不出來（金鑰填錯）時 currentUserDetailed 會回 offline，
+    // 於是走到下面那條 down 分支顯示「資料庫休眠中」。2026-09-02 之前這裡還會
+    // 先呼叫 configMessage() 把那句話放進登入頁，登入頁搬走之後那一行沒有人讀了。
+    //
+    // 不能只看「查不查得到人」：連不上的時候也查不到，而那時候把人導去登入頁
+    // 等於告訴一個登入中的人「你被登出了」，而他還登入不了，因為資料庫是壞的。
+    // 兩者要分開處理（見 data.js 的 currentUserDetailed）。
     const who = await DATA.currentUserDetailed();
     if (who.offline) { S.down = true; render(); return; }
     S.user = who.user;
-    if (!S.user) { S.down = false; render(); return; }
+    // 沒登入 → 導去 /app/。**這一條必須排在上面那個 who.offline 後面**：
+    // 連不上的時候也查不到人，那時候把人導走等於在資料庫出事的時候
+    // 對一個登入中的幹部說「請重新登入」，而他登入不了，因為資料庫是壞的。
+    if (!S.user) { toApp(); return; }
 
     // 連不上資料庫時 loadAll 要 **7 秒** 才會失敗（2026-08-17 實測：postgrest-js 對網路
     // 失敗有內建重試與退避，五個查詢各重試四次，總共 20 次 fetch）。那 7 秒裡畫面上
@@ -632,6 +548,9 @@ export async function boot() {
     // active === false 的活動要濾掉。這一行留在這裡而不是搬進 data.js：
     // data.js 的職責是「把資料庫裡的東西拿回來」，要不要顯示是畫面的事。
     S.activities = all.activities.filter(a => a.active !== false);
+    // 學員 → 導去 /app/ 輸入邀請碼。這一條要放在 loadAll 之後，因為 role 是
+    // loadAll 帶回來的；學員的查詢不會報錯，只會回空的（RLS 擋的是列不是請求）。
+    if (S.role && S.role !== "cadre") { toApp(); return; }
     S.down = false;
     // 補發入境章（spec §9.9）：syncVisas 的樂觀更新是同步的，所以 render() 之前
     // 呼叫就能讓這一次畫面立刻反映修復後的 S.visas；實際寫入資料庫的網路請求

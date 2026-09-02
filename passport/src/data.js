@@ -18,8 +18,11 @@ import { supabase } from "../../shared/supabase.js";
 import { currentUser } from "../../shared/auth.js";
 
 export { supabase };
-export { authMessage, configMessage, signUp, signIn, signOut, signInWithGoogle,
-         claimInvite, sendPasswordReset, isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
+// 2026-09-02：登入相關的轉出砍到只剩護照真的會用到的三支。
+// signUp / signIn / signInWithGoogle / claimInvite / sendPasswordReset / authMessage /
+// configMessage 全部搬去 app/src/main.js，那邊直接 import shared/auth.js。
+// **留著沒有人用的轉出，等於在護照裡留一組現成的零件邀請下一個人在這裡再蓋一次登入頁。**
+export { signOut, isOfflineError, currentUserDetailed, currentUser } from "../../shared/auth.js";
 
 /* ---------- 護照內容 ---------- */
 

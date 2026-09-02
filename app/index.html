@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond Taiwan</title>
+<!-- 2026-09-02（階段 7 前置）：這一頁是登入後的入口（規格 §2-1）。
+     `/` 是對外簡介，`/app/` 是登入與登入後的選單，`/passport/` 只剩護照本身。
+
+     圖示（favicon / apple-touch-icon / manifest）目前只有 /passport/ 有，
+     這一頁沒有。**這是知道而暫時沒做的，不是漏掉的**：那幾個檔案現在住在
+     passport/ 底下，從這裡引用會變成一個階段 7 還要拆掉的依賴。
+     真正的問題是「幹部現在會把哪一頁釘到主畫面」——那個答案在階段 7
+     重做視覺與導覽的時候才會定，圖示跟著那個決定一起搬。 -->
+<meta name="theme-color" content="#102A86">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/brand.css">
+
+<style>
+  /* 色票、字體家族、圓角全部來自 ../shared/brand.css，這裡一個都不重新宣告。
+
+     下面這些卡片與按鈕的樣式跟 passport/index.html 裡的長得很像，
+     **是各寫一份，不是共用的**——brand.css 的檔頭明文寫著不要把按鈕、卡片、
+     格線搬進去，理由是那會變成一個沒有人敢動的全站樣式表。
+     這兩個資料夾在階段 7 都要重做視覺，那時候才會知道有沒有真正共用的元件。 */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  #bt-root{
+    font-family:var(--body);color:var(--ink);line-height:1.55;
+    max-width:620px;margin:0 auto;padding:44px 16px 40px;
+  }
+  /* :where() 是必要的，不是風格。裸寫 #bt-root button 的特異性會蓋掉所有
+     用 class 描述外觀的規則，.btn 的深藍底、.btn.ghost 的外框全部會失效。
+     護照那邊因為這件事，畫面上所有按鈕的外觀死了一個多月都沒有人發現。
+     **不要把 :where() 拿掉**（見 passport/index.html 同一條的註解）。 */
+  :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
+
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:30px 28px}
+  .card h2{font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1}
+  .card .sub{font-size:13px;opacity:.6;margin-bottom:24px}
+  label{display:block;margin-bottom:15px}
+  label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
+  input{
+    width:100%;font-family:var(--body);font-size:15px;color:var(--ink);
+    padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
+    background:rgba(255,255,255,.55);
+  }
+  .btn{
+    font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    padding:11px 22px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:opacity .15s;
+  }
+  .btn:hover{opacity:.86}
+  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
+  .btn.sm{font-size:15px;padding:7px 14px}
+  /* 護照那邊的 .btn.quiet 是給「清除這本護照」用的，它的降級是安全設計
+     （找得到但不會手滑按到），check.sh 有兩條在守。
+     這裡的 .quiet 只是「這顆不是主要動作」，**不要**把兩者當成同一件事，
+     也不要因為這裡改了就去動護照那一顆。 */
+  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.55);text-transform:none;letter-spacing:0;font-family:var(--body);font-size:14px;font-weight:600;padding:0;text-decoration:underline}
+  .btn.quiet:hover{color:var(--ink)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .wnote{font-size:12px;opacity:.6;margin-bottom:20px;padding:9px 12px;background:rgba(255,196,108,.25);border-radius:2px}
+  .empty{text-align:center;padding:48px 0;opacity:.55;font-size:14px}
+
+  /* 登入後的選單 */
+  .menu{display:grid;gap:10px}
+  .mitem{
+    display:block;padding:16px 18px;border:1px solid rgba(16,42,134,.22);border-radius:2px;
+    background:rgba(255,255,255,.4);color:var(--ink);text-decoration:none;transition:background .15s;
+  }
+  .mitem:hover{background:rgba(255,255,255,.75)}
+  .mitem b{font-family:var(--display);font-size:23px;font-weight:600;display:block;line-height:1.15}
+  .mitem span{font-size:13px;opacity:.6}
+</style>
+</head>
+<body>
+<div id="bt-root"><div class="empty">載入中…</div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

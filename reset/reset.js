@@ -21,7 +21,7 @@ const esc = s => String(s == null ? "" : s)
 const shell = inner => `
   <img class="logo" src="../shared/logo.png" alt="Beyond Taiwan">
   ${inner}
-  <p class="foot"><a href="../passport/">← 回 BT 護照</a></p>`;
+  <p class="foot"><a href="../app/">← 回 Beyond Taiwan</a></p>`;
 
 const VIEW = {
   checking: () => shell(`
@@ -41,14 +41,16 @@ const VIEW = {
   invalid: msg => shell(`
     <h1>這個連結不能用了</h1>
     <p class="sub">${esc(msg || "重設密碼的連結有時效，通常一小時後就會過期。")}</p>
-    <div class="note">重新要一封就好：回到護照的登入頁，用「忘記密碼」再寄一次。
+    <div class="note">重新要一封就好：回到登入頁，用「忘記密碼」再寄一次。
     如果還是不行，寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
-    <p><a href="../passport/">回護照登入頁</a></p>`),
+    <p><a href="../app/">回登入頁</a></p>`),
 
+  // 送去 /app/ 而不是直接進護照：他已經登入了，但不一定是幹部。
+  // 直接送進 /passport/ 的話，學員會先看到護照的載入畫面再被彈回來。
   done: () => shell(`
     <h1>改好了</h1>
     <p class="sub">新密碼已經生效，而且你現在已經登入了。</p>
-    <p><a href="../passport/">進入 BT 護照 →</a></p>`)
+    <p><a href="../app/">繼續 →</a></p>`)
 };
 
 let state = "checking";
