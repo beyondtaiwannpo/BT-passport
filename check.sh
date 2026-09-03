@@ -760,8 +760,9 @@ leakOut=$(node -e '
       mustShow: ["登入 / Sign in", "還有別條路，只是沒有人跟你說過。",
                  "There are other paths. No one told you about them.",
                  "收到超過 150 份申請，協助超過 100 位國內高中生",
-                 "隱私政策 / Privacy Policy"],
-      mustHide: ["之後要改文案", "scripts/check-photos.mjs"]
+                 "隱私政策 / Privacy Policy",
+                 "本網站不使用任何追蹤或廣告工具。", "This site uses no tracking or advertising tools."],
+      mustHide: ["之後要改文案", "scripts/check-photos.mjs", "三種人"]
     },
     "privacy/index.html": {
       mustShow: ["最後更新 / Last updated", "僅限本人", "回 Beyond Taiwan 首頁"],
