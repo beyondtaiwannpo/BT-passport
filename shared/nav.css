@@ -1,32 +1,36 @@
 /* 站台頂欄。跟 shared/nav.js 成對，每個登入後的頁面都載這一份。
-   rgba 只用守門允許的三個底（深藍、橘、白）；登出鈕的框線用半透明白，
-   在深藍底上看起來跟紙色一樣，但不必新增第四個色碼。
-   色票與字體來自 brand.css，這裡不重新宣告任何色碼。
+   色票與字體來自 brand.css，這裡不重新宣告任何色碼；rgba 只用守門允許的三個底。
 
-   頂欄用**深藍實心底、淺色字**；各頁自己的子欄（護照的「我的護照／進度牆」、
-   看板的「團隊看板／我的時間／成員」）維持紙色底。兩層都是紙色的話，
-   不管字型怎麼調，看起來還是同一種東西 —— 顏色反轉是最不會被誤讀的分層。 */
-.btnav{display:flex;align-items:center;gap:14px;padding:0 14px;height:52px;
-  background:var(--bt-navy);color:var(--bt-cream);font-family:var(--body)}
-.btnav-logo{display:flex;align-items:center;height:36px;padding:0 8px;background:var(--paper);border-radius:2px;flex:none}
-.btnav-logo img{height:22px;width:auto;display:block}
-.btnav-items{display:flex;gap:4px;min-width:0}
+   ── 為什麼是米白底，不是深藍（2026-09-04 使用者裁定）──
+   第一版整條鋪深藍。問題不是顏色是**面積**：深藍在 Brand Book 裡是點綴色
+   （標題、線條、印章框），整條橫幅鋪滿等於把它當主色用；而整站其他頁面都是
+   米白加細線，那條深藍看起來像貼上去的東西。
+   所以：米白底、深藍只用在文字、底下一條細線、當前項橘色底線。
+   兩層（頂欄 vs 各頁的子欄）靠三件事分：底線、當前項的橘色標記、留白 ——
+   跟隱私政策和首頁同一套做法，不靠色塊。 */
+.btnav{display:flex;align-items:center;gap:12px;padding:0 12px;height:48px;margin-bottom:14px;
+  background:var(--paper);color:var(--ink);font-family:var(--body);
+  border-bottom:1px solid rgba(16,42,134,.22)}
+.btnav-logo{display:flex;align-items:center;flex:none}
+.btnav-logo img{height:24px;width:auto;display:block}
+.btnav-items{display:flex;gap:2px;min-width:0}
 .btnav-items a{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;
-  color:var(--bt-cream);text-decoration:none;padding:6px 8px;border-bottom:3px solid transparent;
-  opacity:.78;white-space:nowrap}
+  color:var(--ink);text-decoration:none;padding:6px 7px;border-bottom:3px solid transparent;
+  opacity:.6;white-space:nowrap}
 .btnav-items a:hover{opacity:1}
-/* 當前所在：橘色底線、全亮。 */
+/* 當前所在：橘色底線、全深。 */
 .btnav-items a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
 .btnav-sp{flex:1}
-.btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.9}
+.btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.75}
 .btnav-who .short{display:none}
-.btnav-out{font-family:var(--body);font-size:14px;font-weight:600;color:var(--bt-cream);
-  background:none;border:1px solid rgba(255,255,255,.4);border-radius:2px;padding:5px 10px;min-height:40px;cursor:pointer;flex:none}
-.btnav-out:hover{border-color:var(--bt-cream)}
-.btnav :focus-visible{outline:2px solid var(--bt-orange);outline-offset:2px}
+/* 登出：深藍的低透明度框線。米白底上半透明白會消失，而深藍是允許的 rgba 底之一。 */
+.btnav-out{font-family:var(--body);font-size:14px;font-weight:600;color:var(--ink);
+  background:none;border:1px solid rgba(16,42,134,.3);border-radius:2px;padding:5px 10px;min-height:38px;cursor:pointer;flex:none}
+.btnav-out:hover{border-color:var(--ink)}
+.btnav :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 /* 窄螢幕：名字只留第一個字，項目字級縮一點。量過 390／360／320（見 ledger）。 */
 @media (max-width:360px){
-  .btnav{gap:10px;padding:0 10px}
+  .btnav{gap:8px;padding:0 10px}
   .btnav-who .full{display:none}.btnav-who .short{display:inline}
-  .btnav-items a{font-size:16px;padding:6px 6px}
+  .btnav-items a{font-size:16px;padding:6px 5px}
 }

@@ -30,8 +30,8 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 // current：現在在哪一個功能（FEATURES 的 key），會被標成當前。
 // role：看的人的角色。name：顯示在右邊的名字。
 //
-// logo 坐在一小塊紙色上：logo 的深灰筆畫是為紙色底設計的（shared/brand.css 的規矩：
-// 不可改色），直接放在深藍底上那一半筆畫會不見。紙色那一塊就是它的底，不是裝飾。
+// 頂欄是米白底（見 nav.css 檔頭：深藍是點綴色，整條鋪滿等於把它當主色用），
+// 所以 logo 直接坐在上面，不需要另外墊一塊——它本來就是為這個紙色設計的。
 export function navHTML({ current, role, name }) {
   const items = featuresFor(role).map(f =>
     `<a href="${f.href}"${f.key === current ? ' aria-current="page"' : ""}>${esc(f.label)}</a>`).join("");
