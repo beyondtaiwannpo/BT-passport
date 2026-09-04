@@ -54,11 +54,16 @@ label i{display:block;font-style:normal;font-size:14px;font-weight:600;margin:0 
 input{width:100%;font:inherit;font-size:17px;padding:11px 13px;border:1px solid var(--bt-navy);
   border-radius:var(--r);background:var(--paper);color:var(--ink)}
 input:focus-visible{outline:2px solid var(--bt-orange);outline-offset:1px}
-.btn{font:inherit;font-weight:600;font-size:16px;cursor:pointer;border:none;border-radius:999px;
-  padding:11px 22px;background:var(--bt-orange);color:var(--bt-navy)}
+/* 2026-09-03（7-4）：跟 /app/ 同一套按鈕規則——實心深藍、display 字體、滿版、方角。
+   之前這裡是圓角膠囊、內文字體，跟登入頁長得不一樣；使用者從登入頁點過來會以為到了別的站。 */
+.btn{display:block;width:100%;font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;cursor:pointer;border:none;border-radius:2px;padding:13px 20px;
+  background:var(--bt-navy);color:var(--bt-cream);transition:opacity .15s;text-align:center}
+.btn:hover{opacity:.86}
 .btn[disabled]{opacity:.55;cursor:default}
 .btn:focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
-.note{border:1px solid var(--bt-orange);border-radius:var(--r);padding:12px 14px;margin:0 0 18px;font-size:15px}
+/* 訊息框跟 /app/ 的 .wnote 同一個樣子：橘底加左邊一條橘線。這一頁的 .note 本來就只給狀態訊息用。 */
+.note{background:rgba(255,196,108,.3);border-left:3px solid var(--bt-orange);border-radius:2px;padding:11px 14px;margin:0 0 18px;font-size:15px;line-height:1.55}
 .foot{margin-top:32px;padding-top:18px;border-top:1px solid var(--bt-orange);font-size:15px}
 a{color:var(--ink);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

@@ -44,7 +44,7 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   #bt-root{
     font-family:var(--body);color:var(--ink);line-height:1.55;
-    max-width:620px;margin:0 auto;padding:44px 16px 40px;
+    max-width:520px;margin:0 auto;padding:clamp(20px,6vw,44px) 14px 40px;
   }
   /* :where() 是必要的，不是風格。裸寫 #bt-root button 的特異性會蓋掉所有
      用 class 描述外觀的規則，.btn 的深藍底、.btn.ghost 的外框全部會失效。
@@ -53,9 +53,11 @@
   :where(#bt-root button){font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   #bt-root :focus-visible{outline:2px solid var(--bt-navy);outline-offset:2px}
 
-  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:30px 28px}
-  .card h2{font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:.03em;margin:0 0 4px;line-height:1}
-  .card .sub{font-size:13px;opacity:.6;margin-bottom:24px}
+  /* 2026-09-03（7-4）：內距與標題在手機上縮小。之前 30/28 + 36px 的 h2 在 390px
+     的螢幕上，卡片有三分之一是留白與標題，表單本身被擠到第二屏。 */
+  .card{background:var(--paper);border:1px solid rgba(16,42,134,.18);border-radius:var(--r);padding:clamp(22px,5vw,30px) clamp(18px,5vw,28px)}
+  .card h2{font-family:var(--display);font-size:clamp(28px,7vw,34px);font-weight:700;letter-spacing:.02em;margin:0 0 4px;line-height:1.05}
+  .card .sub{font-size:14px;opacity:.65;margin-bottom:20px}
   label{display:block;margin-bottom:15px}
   label i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.55;display:block;margin-bottom:5px}
   input{
@@ -63,22 +65,39 @@
     padding:9px 11px;border:1px solid rgba(16,42,134,.28);border-radius:2px;
     background:rgba(255,255,255,.55);
   }
+  /* ── 按鈕的輕重（2026-09-03，7-4）──
+     一頁只有**一顆**實心深藍鈕，就是主要動作，滿版。
+     第二選擇（Google）是滿版的框線鈕，用內文字體、不大寫、一行 ——
+     之前它用 display 字體大寫加雙語標籤，折成兩行、成了整頁最大的元素，
+     比主要動作還搶眼（使用者 2026-09-01 的回報；量到是 284×71 對 84×47）。
+     導覽（切換登入／註冊、回登入、登出）不是按鈕，是文字連結：見 .link。
+     這裡不再有 .quiet：護照那邊的 .btn.quiet 是給「清除這本護照」的安全降級，
+     跟「這顆不是主要動作」不是同一件事，同名只會讓人把兩者混在一起。 */
   .btn{
-    font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-    padding:11px 22px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
-    transition:opacity .15s;
+    display:block;width:100%;
+    font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    padding:13px 20px;border-radius:2px;background:var(--bt-navy);color:var(--bt-cream);
+    transition:opacity .15s;text-align:center;
   }
   .btn:hover{opacity:.86}
-  .btn.ghost{background:none;color:var(--ink);border:1px solid rgba(16,42,134,.3)}
-  .btn.sm{font-size:15px;padding:7px 14px}
-  /* 護照那邊的 .btn.quiet 是給「清除這本護照」用的，它的降級是安全設計
-     （找得到但不會手滑按到），check.sh 有兩條在守。
-     這裡的 .quiet 只是「這顆不是主要動作」，**不要**把兩者當成同一件事，
-     也不要因為這裡改了就去動護照那一顆。 */
-  .btn.quiet{background:none;border:none;color:rgba(16,42,134,.55);text-transform:none;letter-spacing:0;font-family:var(--body);font-size:14px;font-weight:600;padding:0;text-decoration:underline}
-  .btn.quiet:hover{color:var(--ink)}
+  .btn[disabled]{opacity:.4;cursor:default}
+  .btn.ghost{
+    background:none;color:var(--ink);border:1px solid rgba(16,42,134,.35);
+    font-family:var(--body);font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;
+    padding:12px 16px;
+  }
+  .btn.sm{display:inline-block;width:auto;font-size:14px;padding:7px 14px}
+  .link{background:none;border:none;padding:0;font-family:var(--body);font-size:15px;font-weight:600;
+    color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+  .link:hover{opacity:.75}
+  .stack{display:grid;gap:10px;margin-top:18px}
+  .nav{margin-top:16px;font-size:15px}
+  /* 說明文字：小字、無底色。**橘色框只留給錯誤與狀態訊息**（.wnote）——
+     說明跟錯誤共用一種框的時候，有事的那塊框跳不出來，這一頁就沒有輕重。 */
+  .note{font-size:13px;line-height:1.6;opacity:.7;margin-top:14px}
+  .note b{opacity:1}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
-  .wnote{font-size:12px;opacity:.6;margin-bottom:20px;padding:9px 12px;background:rgba(255,196,108,.25);border-radius:2px}
+  .wnote{font-size:14px;line-height:1.55;margin-bottom:18px;padding:11px 14px;background:rgba(255,196,108,.3);border-left:3px solid var(--bt-orange);border-radius:2px}
   .empty{text-align:center;padding:48px 0;opacity:.55;font-size:14px}
 
   /* 登入後的選單 */

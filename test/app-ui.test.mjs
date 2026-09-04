@@ -273,3 +273,52 @@ test("註冊那顆按鈕不准把邀請碼講成註冊的前提", () => {
   assert.ok(!label.includes("邀請碼"), `註冊鍵上寫著「${label}」——註冊不需要邀請碼`);
   assert.ok(label.includes("註冊"), `註冊鍵上寫著「${label}」，看不出來是去註冊的`);
 });
+
+// ── 7-4 的按鈕輕重（2026-09-03）────────────────────────────────────
+// 使用者 2026-09-01 的回報：三顆按鈕大小不一、Google 比主要動作搶眼、兩塊說明擠在一起。
+// 量到的數字：登入 84×47、Google 284×71 折成兩行。下面幾條釘的是修完之後的結構——
+// 一頁只有一顆實心鈕、Google 是一行的框線鈕、導覽是連結、說明不用橘色框。
+const solid = h => [...h.matchAll(/<button class="btn"[^>]*>/g)].length;
+const ghost = h => [...h.matchAll(/<button class="btn ghost"[^>]*>/g)].length;
+
+test("★ 每一種登入狀態都只有一顆實心的主要動作", () => {
+  for (const [name, h] of [["登入", authHTML("in", "")], ["註冊", authHTML("up", "")],
+                           ["忘記密碼", authHTML("forgot", "")], ["未升級", notCadreHTML("")]])
+    assert.equal(solid(h), 1, `${name}頁有 ${solid(h)} 顆實心鈕，應該剛好一顆——不然這一頁沒有輕重`);
+  assert.equal(solid(authHTML("sent", "", "a@b.co")), 0, "寄出頁沒有動作可做，不該有實心鈕");
+});
+
+test("Google 是框線鈕，而且標籤只有中文一行", () => {
+  for (const m of ["in", "up"]) {
+    const h = authHTML(m, "");
+    const g = h.match(/<button class="btn ghost" data-act="do-google">([^<]*)</);
+    assert.ok(g, `${m} 模式的 Google 鈕不是框線鈕`);
+    assert.equal(g[1].trim(), "用 Google 登入", "雙語標籤正是它折成兩行的原因，Google 這個字不需要翻譯");
+    assert.equal(ghost(h), 1, "框線鈕只該有 Google 那一顆");
+  }
+});
+
+test("導覽（切換登入／註冊、回登入、登出）是文字連結，不是按鈕", () => {
+  const h = authHTML("in", "");
+  assert.match(h, /<button class="link" data-act="switch-auth" data-m="up">/, "「還沒有帳號」應該是連結");
+  assert.match(authHTML("forgot", ""), /<button class="link" data-act="switch-auth" data-m="in">回登入/, "「回登入」應該是連結");
+  assert.match(notCadreHTML(""), /<button class="link" data-act="signout">/, "「登出」應該是連結");
+  assert.ok(!/class="btn[^"]*" data-act="switch-auth"/.test(h), "切換模式的東西又變成按鈕了");
+});
+
+// 橘色框只留給錯誤與狀態訊息。說明跟錯誤共用一種框的時候，有事的那塊框跳不出來。
+test("★ 沒有訊息時，登入頁不出現任何橘色框；有訊息時剛好一個", () => {
+  for (const m of ["in", "up", "forgot"]) {
+    assert.equal((authHTML(m, "").match(/class="wnote"/g) || []).length, 0,
+      `${m} 模式在沒有訊息時出現了橘色框——說明文字該用 .note`);
+    assert.equal((authHTML(m, "出了點狀況。").match(/class="wnote"/g) || []).length, 1,
+      `${m} 模式有訊息時橘色框應該剛好一個`);
+  }
+  assert.equal((notCadreHTML("").match(/class="wnote"/g) || []).length, 0);
+});
+
+test("註冊頁的標題是「註冊」，不是 5-7 之前的「註冊 BT 護照」", () => {
+  const h = authHTML("up", "");
+  assert.match(h, /<h2>註冊<\/h2>/);
+  assert.ok(!h.includes("註冊 BT 護照"), "現在註冊的是帳號，不是護照");
+});

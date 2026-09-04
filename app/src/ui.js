@@ -28,12 +28,12 @@ export function authHTML(mode, msg, email) {
     <div class="sub">輸入你註冊時用的 email，我們寄一封重設連結給你。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <label><i>Email</i><input id="fpe" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="you@example.com"></label>
-    <div class="row">
+    <div class="stack">
       <button class="btn" data-act="do-forgot">寄出重設連結</button>
-      <button class="btn ghost" data-act="switch-auth" data-m="in">回登入</button>
     </div>
-    <div class="wnote" style="margin:16px 0 0"><b>用 Google 登入的話不需要密碼</b>，回登入頁直接按那顆 Google 按鈕就好。這一頁只對「用 email + 密碼註冊」的人有用。</div>
-    <div class="wnote" style="margin:12px 0 0">連 email 也想不起來？寄信到 beyondtaiwan2020@gmail.com，我們幫你找。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
+    <div class="note"><b>用 Google 登入的話不需要密碼</b>，回登入頁直接按那顆 Google 按鈕就好。這一頁只對「用 email + 密碼註冊」的人有用。</div>
+    <div class="note">連 email 也想不起來？寄信到 beyondtaiwan2020@gmail.com，我們幫你找。</div>
   </div>`;
 
   // ── 寄出之後 ──
@@ -47,16 +47,14 @@ export function authHTML(mode, msg, email) {
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>信寄出去了</h2>
     <div class="sub">如果 <b>${esc(email || "那個信箱")}</b> 有帳號，我們寄了一封重設連結給它。</div>
-    <div class="wnote" style="margin:0 0 16px">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
-    <div class="row">
-      <button class="btn ghost" data-act="switch-auth" data-m="in">回登入</button>
-    </div>
-    <div class="wnote" style="margin:16px 0 0">試了幾次都收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
+    <div class="note" style="margin-top:0">沒收到的話，先看一下垃圾郵件匣。連結大約一小時內有效，過期了再回來要一次就好。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="in">回登入</button></div>
+    <div class="note">試了幾次都收不到？寄信到 beyondtaiwan2020@gmail.com，我們直接幫你處理。</div>
   </div>`;
 
   return `<div class="card">
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
-    <h2>${up ? "註冊 BT 護照" : "登入"}</h2>
+    <h2>${up ? "註冊" : "登入"}</h2>
     <!-- 註冊不再需要邀請碼（2026-09-01，階段 5-7 把門搬到角色升級）。
          **那格輸入已經移除，不是留著不讀。** 留著的話它是一句謊：使用者會以為
          自己填的東西有作用，打錯了還會以為是自己的問題，而實際上不管填什麼都會
@@ -90,10 +88,8 @@ export function authHTML(mode, msg, email) {
          而他不會來問，他會關掉頁面。
          （這段刻意不引用舊的那句字面 —— HTML 註解是會送到瀏覽器的，
            引用它等於把那句話留在頁面裡，守門也會抓到。） -->
-    <div class="row">
+    <div class="stack">
       <button class="btn" data-act="${up ? "do-signup" : "do-signin"}">${up ? "註冊" : "登入"}</button>
-      <button class="btn ghost" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "還沒有帳號，要註冊"}</button>
-    </div>
     <!-- Google 登入（規格 §3-4）。**email + 密碼那條路不要拿掉**：
          有人沒有 Google 帳號、有人在中國、有人的 Google 就是登不進去。
          兩條路並存是規格明寫的決定，不是過渡狀態。
@@ -104,15 +100,17 @@ export function authHTML(mode, msg, email) {
 
          登入與註冊兩種模式都放，因為 Google 那條路沒有「註冊」與「登入」之分：
          第一次點就是註冊，第二次點就是登入，使用者不需要先決定自己是哪一種。 -->
-    <div class="row" style="margin-top:6px">
-      <button class="btn ghost" data-act="do-google">用 Google 登入 / Continue with Google</button>
+      <!-- 標籤只有中文：雙語標籤正是它折成兩行的原因，而「Google」這個字不需要翻譯
+           （使用者 2026-09-03 裁定）。 -->
+      <button class="btn ghost" data-act="do-google">用 Google 登入</button>
     </div>
-    <div class="wnote" style="margin:12px 0 0">用 Google 進來的話不需要密碼。<b>還是需要邀請碼</b>——登入之後再輸入。</div>
+    <div class="nav"><button class="link" data-act="switch-auth" data-m="${up ? "in" : "up"}">${up ? "我已經有帳號了" : "還沒有帳號，要註冊"}</button></div>
+    <div class="note">用 Google 進來的話不需要密碼。<b>還是需要邀請碼</b>——登入之後再輸入。</div>
     <!-- 2026-09-01：寄信接好之後，忘記密碼改成自助為主、組織信箱為輔。
          **組織信箱那條不要刪** —— 自助那條路需要「還記得自己用哪個 email」，
          而連 email 都想不起來的人（換過信箱、當初用學校信箱註冊）沒有別的出口。
          一條自助路徑蓋不住所有情況，留著人工那條的成本只是一行字。 -->
-    ${up ? "" : `<div class="wnote" style="margin:16px 0 0">忘記密碼？<button class="btn sm quiet" data-act="switch-auth" data-m="forgot">寄一封重設連結給我</button><br>連 email 也想不起來的話，寄信到 beyondtaiwan2020@gmail.com。</div>`}
+    ${up ? "" : `<div class="note">忘記密碼？<button class="link" data-act="switch-auth" data-m="forgot">寄一封重設連結給我</button><br>連 email 也想不起來的話，寄信到 beyondtaiwan2020@gmail.com。</div>`}
   </div>`;
 }
 
@@ -137,12 +135,12 @@ export function notCadreHTML(msg) {
     <div class="sub">護照目前只開放給幹部。你已經登入了，但還沒有升級。</div>
     ${msg ? `<div class="wnote" style="margin:0 0 16px">${esc(msg)}</div>` : ""}
     <label><i>邀請碼 / Invite code</i><input id="ci" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="跟組長拿"></label>
-    <div class="wnote" style="margin:0 0 16px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
-    <div class="row">
+    <div class="note" style="margin:0 0 14px">升級之後，你的姓名、團隊、大頭照與蓋章紀錄會出現在全體進度牆上，<b>其他 BT 幹部看得到，包含你的大頭照</b>。你寫的心得和上傳的活動照片只留在你自己的護照裡，<b>其他幹部看不到</b>。</div>
+    <div class="stack">
       <button class="btn" data-act="do-claim">我是幹部，我有邀請碼</button>
-      <button class="btn sm quiet" data-act="signout">登出</button>
     </div>
-    <div class="wnote" style="margin:16px 0 0">還不是幹部也沒關係，這個帳號留著。之後開放給學員的功能會用同一個帳號登入。</div>
+    <div class="nav"><button class="link" data-act="signout">登出</button></div>
+    <div class="note">還不是幹部也沒關係，這個帳號留著。之後開放給學員的功能會用同一個帳號登入。</div>
   </div>`;
 }
 // 登入之後的選單。**這一頁不放還不存在的東西。**
