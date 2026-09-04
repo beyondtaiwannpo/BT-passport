@@ -237,13 +237,14 @@ export function mrz(p) {
 
 export function barHTML(S) {
   const done = stampCount(S);
+  // 2026-09-04：logo 與登出搬到 shared 的頂欄（navHTML），這裡只剩護照內部的分頁
+  // 與蓋章進度。這一條是子欄，不是站台導覽 —— 之前它長得像導覽，使用者會以為
+  // 「我的護照／進度牆」就是整個站的全部。
   return `<div class="bar">
-    <img src="../shared/logo.png" alt="Beyond Taiwan">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="${S.view === "passport"}" data-act="tab" data-v="passport">我的護照</button>
       <button role="tab" aria-selected="${S.view === "wall"}" data-act="tab" data-v="wall">進度牆</button>
     </div>
-    <button class="btn ghost sm" data-act="signout">登出</button>
     <div class="sp"></div>
     <div class="prog"><small>Stamps collected</small>${done} <span style="opacity:.4">/ ${S.activities.length}</span></div>
   </div>`;

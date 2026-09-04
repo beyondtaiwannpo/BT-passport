@@ -7,6 +7,7 @@
 // 所以整個拿掉：idPageHTML 讀 S.profile.avatar，slotHTML 讀 S.entries[id]。
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
+import { navHTML } from "../../shared/nav.js";
 
 let S = {
   user: null,
@@ -96,7 +97,11 @@ function render() {
   // 嚴格比較讓這個功能自己等資料庫準備好：欄位不存在時 undefined !== false，
   // 引導頁不出現；遷移跑完之後 default false 才開始生效。
   if (S.profile.intro_seen === false) { el.innerHTML = UI.introHTML(); return; }
-  el.innerHTML = UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
+  // 頂欄是 shared 的（站台導覽），barHTML 是護照自己的子欄（內部分頁與蓋章進度）。
+  // 兩層用顏色反轉分開：頂欄深藍底、子欄紙色底。
+  el.innerHTML = navHTML({ current: "passport", role: S.role,
+                           name: S.profile && (S.profile.name_zh || S.profile.name_en) })
+               + UI.barHTML(S) + (S.view === "wall" ? UI.wallHTML(S) : UI.bookHTML(S));
 }
 
 async function loadWall() {

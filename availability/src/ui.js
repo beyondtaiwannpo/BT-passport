@@ -16,15 +16,13 @@ export const COL_ORDER = [1, 2, 3, 4, 5, 6, 0];
 // msg 一定要有地方畫。2026-09-02 加「只能往前看四週」時差點漏掉這件事：
 // 設了 S.msg 卻沒有任何模板讀它，等於又做了一個「按了沒反應」的按鈕。
 export function shellHTML(tab, inner, weekLabel, msg) {
+  // 2026-09-04：logo 與「回入口」搬到 shared 的頂欄，這裡只剩看板內部的分頁與翻週。
   return `<div class="bar">
-    <img src="../shared/logo.png" alt="Beyond Taiwan">
     <div class="tabs">
       <button data-act="tab" data-t="board" ${tab === "board" ? 'aria-current="true"' : ""}>團隊看板</button>
       <button data-act="tab" data-t="mine"  ${tab === "mine"  ? 'aria-current="true"' : ""}>我的時間</button>
       <button data-act="tab" data-t="who"   ${tab === "who"   ? 'aria-current="true"' : ""}>成員</button>
     </div>
-    <span class="sp"></span>
-    <a class="btn ghost sm" href="../app/">回入口</a>
   </div>
   ${weekLabel ? `<div class="weeknav">
     <button class="btn ghost sm" data-act="week" data-d="-1">← 前一週</button>

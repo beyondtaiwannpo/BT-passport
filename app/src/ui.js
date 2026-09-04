@@ -9,6 +9,10 @@
 // 為了它讓 /app/ 去依賴 /passport/ 的模組，等於把「護照壞掉」變成
 // 「連登入頁都打不開」。這兩個資料夾之間**不要有任何 import**。
 
+// 選單卡片從 shared/nav.js 的 FEATURES 產生，跟頂欄同一份清單 —— 兩份清單的話
+// 漏加的那一頁不會壞、只會少一個入口，而那種缺陷沒有人會回報。
+import { featuresFor } from "../../shared/nav.js";
+
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // ⚠ 這裡原本有一段註解寫著「不做自助重設、不做重設畫面、不呼叫
@@ -151,15 +155,11 @@ export function menuHTML(who) {
     <img src="../shared/logo.png" alt="Beyond Taiwan" style="height:30px;display:block;margin-bottom:18px">
     <h2>Beyond Taiwan</h2>
     <div class="sub">${who ? esc(who) : ""}</div>
-    <div class="menu">
-      <a class="mitem" href="../passport/">
-        <b>幹部護照</b>
-        <span>這一年的活動、章、心得與照片</span>
-      </a>
-      <a class="mitem" href="../availability/">
-        <b>每週時間看板</b>
-        <span>填自己每週固定有空的時段，約會議時直接挑</span>
-      </a>
+    <div class="menu">${featuresFor("cadre").map(f => `
+      <a class="mitem" href="${f.href}">
+        <b>${esc(f.title)}</b>
+        <span>${esc(f.desc)}</span>
+      </a>`).join("")}
     </div>
     <div class="row" style="margin-top:22px">
       <button class="btn ghost sm" data-act="signout">登出</button>

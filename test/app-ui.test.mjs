@@ -151,7 +151,9 @@ test("白名單裡的每個目的地都是站內的相對路徑", () => {
 // ── 登入後的選單 ────────────────────────────────────────────────────
 test("選單有護照的入口，也走得掉", () => {
   const h = menuHTML("王平");
-  assert.ok(h.includes('href="../passport/"'), "選單裡沒有護照的入口");
+  // 2026-09-04：選單卡片從 shared/nav.js 的 FEATURES 產生，href 是根目錄相對路徑。
+  assert.ok(h.includes('href="/passport/"'), "選單裡沒有護照的入口");
+  assert.ok(h.includes('href="/availability/"'), "選單裡沒有看板的入口");
   assert.ok(h.includes('data-act="signout"'), "選單裡沒有登出");
   assert.ok(h.includes("王平"), "沒有顯示現在登入的是誰");
 });

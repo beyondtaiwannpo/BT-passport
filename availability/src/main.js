@@ -3,6 +3,7 @@ import * as AUTH from "../../shared/auth.js";
 import { supabase } from "../../shared/supabase.js";
 import * as DATA from "./data.js";
 import * as UI from "./ui.js";
+import { navHTML } from "../../shared/nav.js";
 import { searchTz } from "./tz-alias.js";
 import { applyRange, copyDay, quickDays } from "./edit.js";
 import { boardCounts as calcCounts, firstBusyMinute } from "./board.js";
@@ -14,7 +15,7 @@ const root = () => document.getElementById("bt-root");
 const K = DATA.key;
 
 let S = {
-  user: null, role: null, myTz: null, down: false, ready: false,
+  user: null, role: null, myTz: null, myName: "", down: false, ready: false,
   tab: "board", members: [], slots: new Map(),
   mine: new Set(), saved: new Set(), dirty: false, mineMsg: "",
   weekStart: null, weekOffset: 0,
@@ -45,7 +46,8 @@ function render() {
   if (!el) return;
   if (S.down) { el.innerHTML = UI.downHTML(); return; }
   if (!S.ready) { el.innerHTML = `<div class="empty">載入中…</div>`; return; }
-  if (S.role !== "cadre") { el.innerHTML = UI.notCadreHTML(); return; }
+  // 未升級的人也有頂欄：對他來說功能項是空的，但 logo、名字、登出都在。
+  if (S.role !== "cadre") { el.innerHTML = navHTML({ current: null, role: S.role, name: S.myName }) + UI.notCadreHTML(); return; }
   if (S.needNotice) { el.innerHTML = UI.noticeHTML(S.msg, S.busy); return; }
   if (S.needTz) { el.innerHTML = UI.tzSetupHTML(S.tzGuess, S.tzQuery, S.tzResults, S.msg); return; }
 
@@ -58,7 +60,8 @@ function render() {
   }
   else if (S.tab === "mine") inner = UI.mineHTML(S);
   else inner = UI.membersHTML(S, Date.now());
-  el.innerHTML = UI.shellHTML(S.tab, inner, label, S.msg);
+  el.innerHTML = navHTML({ current: "availability", role: S.role, name: S.myName })
+               + UI.shellHTML(S.tab, inner, label, S.msg);
   if (S.peek) el.insertAdjacentHTML("beforeend", S.peek);
   // 看板一打開停在 00:00，而大家有空的時間多半在傍晚 —— 第一格常常在第 38 列，
   // 也就是容器頂端往下 600 多 px，而容器一次只看得到二十幾列。
@@ -79,10 +82,11 @@ async function boot() {
     if (!S.user) { location.replace("../app/?next=availability"); return; }
 
     const { data, error } = await supabase
-      .from("profiles").select("role, tz").eq("id", S.user.id).maybeSingle();
+      .from("profiles").select("role, tz, name_zh, name_en").eq("id", S.user.id).maybeSingle();
     if (error) throw error;
     S.role = data ? data.role : null;
     S.myTz = data ? data.tz : null;
+    S.myName = data ? (data.name_zh || data.name_en || "") : "";
     if (S.role !== "cadre") { S.ready = true; render(); return; }
 
     const all = await DATA.loadAll();
@@ -116,6 +120,8 @@ document.addEventListener("click", async e => {
   const act = b.dataset.act;
 
   if (act === "retry") { location.reload(); return; }
+  // 頂欄的登出。這一頁之前沒有登出（只有「回入口」），現在頂欄有了就要接。
+  if (act === "signout") { await AUTH.signOut(); location.replace("../app/"); return; }
   if (act === "tab") { S.tab = b.dataset.t; S.peek = null; render(); return; }
 
   if (act === "week") {

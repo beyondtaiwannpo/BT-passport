@@ -515,6 +515,17 @@ else
   bad "app/src/main.js 沒有在跳去 Google 之前 stashNext —— Google 那條路會回不到護照"
 fi
 
+# shared/ 的依賴方向只能往下（2026-09-04，頂欄搬進 shared/ 時加）。
+# shared/nav.js 是每一個登入後的頁面都載的東西；它 import 護照的話，
+# 護照壞掉會讓每一頁的頂欄一起壞。掃整個 shared/，不是固定清單——
+# 之後多一個共用模組也自動在範圍內。
+SHARED_UP=$(grep -lE '^\s*import .*/(passport|availability|app)/' shared/*.js 2>/dev/null | tr '\n' ' ')
+if [ -z "$SHARED_UP" ]; then
+  ok "shared/ 沒有 import 任何功能資料夾（依賴方向只往下）"
+else
+  bad "shared/ 反向 import 了功能資料夾：$SHARED_UP"
+fi
+
 # 沒登入的人直接打 /passport/ 要被導去 /app/，不能是空白或壞掉。
 # 這一條守的是「導向真的存在」，不是導向長什麼樣。
 if grep -q 'if (!S.user) { toApp(); return; }' passport/src/main.js \

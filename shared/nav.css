@@ -1,0 +1,32 @@
+/* 站台頂欄。跟 shared/nav.js 成對，每個登入後的頁面都載這一份。
+   rgba 只用守門允許的三個底（深藍、橘、白）；登出鈕的框線用半透明白，
+   在深藍底上看起來跟紙色一樣，但不必新增第四個色碼。
+   色票與字體來自 brand.css，這裡不重新宣告任何色碼。
+
+   頂欄用**深藍實心底、淺色字**；各頁自己的子欄（護照的「我的護照／進度牆」、
+   看板的「團隊看板／我的時間／成員」）維持紙色底。兩層都是紙色的話，
+   不管字型怎麼調，看起來還是同一種東西 —— 顏色反轉是最不會被誤讀的分層。 */
+.btnav{display:flex;align-items:center;gap:14px;padding:0 14px;height:52px;
+  background:var(--bt-navy);color:var(--bt-cream);font-family:var(--body)}
+.btnav-logo{display:flex;align-items:center;height:36px;padding:0 8px;background:var(--paper);border-radius:2px;flex:none}
+.btnav-logo img{height:22px;width:auto;display:block}
+.btnav-items{display:flex;gap:4px;min-width:0}
+.btnav-items a{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;
+  color:var(--bt-cream);text-decoration:none;padding:6px 8px;border-bottom:3px solid transparent;
+  opacity:.78;white-space:nowrap}
+.btnav-items a:hover{opacity:1}
+/* 當前所在：橘色底線、全亮。 */
+.btnav-items a[aria-current]{opacity:1;border-bottom-color:var(--bt-orange)}
+.btnav-sp{flex:1}
+.btnav-who{font-size:14px;font-weight:600;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.9}
+.btnav-who .short{display:none}
+.btnav-out{font-family:var(--body);font-size:14px;font-weight:600;color:var(--bt-cream);
+  background:none;border:1px solid rgba(255,255,255,.4);border-radius:2px;padding:5px 10px;min-height:40px;cursor:pointer;flex:none}
+.btnav-out:hover{border-color:var(--bt-cream)}
+.btnav :focus-visible{outline:2px solid var(--bt-orange);outline-offset:2px}
+/* 窄螢幕：名字只留第一個字，項目字級縮一點。量過 390／360／320（見 ledger）。 */
+@media (max-width:360px){
+  .btnav{gap:10px;padding:0 10px}
+  .btnav-who .full{display:none}.btnav-who .short{display:inline}
+  .btnav-items a{font-size:16px;padding:6px 6px}
+}
